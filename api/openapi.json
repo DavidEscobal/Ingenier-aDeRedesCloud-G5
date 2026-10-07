@@ -1,0 +1,1408 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Driver Linux Grupo 5 — implementación R2",
+    "version": "2.0.0",
+    "description": "Driver Linux EX1: seis VMs Ubuntu/CirrOS, tres workers, QinQ, overlays QCOW2, inicialización de invitados y consola con token. La demo y las plantillas resueltas consumen esta API."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8085"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Disponibilidad del proceso API",
+        "operationId": "get_healthz",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "Este contrato OpenAPI",
+        "operationId": "get_openapi.json",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/capabilities": {
+      "get": {
+        "summary": "Capacidades y señalización de simulación",
+        "operationId": "get_v1_capabilities",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/nodes": {
+      "get": {
+        "summary": "Salud, recursos reales y reservas; admin/service",
+        "operationId": "get_v1_nodes",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Generic"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/nodes/{node}": {
+      "patch": {
+        "summary": "Mantenimiento del worker: enabled=false impide nuevas reservas",
+        "operationId": "patch_v1_nodes_node",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "enabled"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/nodes/{node}/cache/gc": {
+      "post": {
+        "summary": "LRU o borrado de todas las bases no usadas; admin/service",
+        "operationId": "post_v1_nodes_node_cache_gc",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "all_unused": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images": {
+      "get": {
+        "summary": "Catálogo de imágenes base",
+        "operationId": "get_v1_images",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Image"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/{sha256}": {
+      "put": {
+        "summary": "Importar QCOW2 autónomo verificado por SHA256; admin/service",
+        "operationId": "put_v1_images_sha256",
+        "responses": {
+          "201": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Image"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Image-Name",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "Content-Length",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Eliminar catálogo y base del head si no está referenciada; cache remoto por GC",
+        "operationId": "delete_v1_images_sha256",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/slices": {
+      "get": {
+        "summary": "Listar slices autorizados",
+        "operationId": "get_v1_slices",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Slice"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Reservar y desplegar en los workers seleccionados",
+        "operationId": "post_v1_slices",
+        "responses": {
+          "202": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Repetir la misma clave y cuerpo tras timeout. Otra petición con la clave devuelve 409."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SliceRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}": {
+      "get": {
+        "summary": "Consultar estado y plan persistentes",
+        "operationId": "get_v1_slices_slice_id",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Slice"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Eliminar únicamente recursos propios y liberar tras confirmación",
+        "operationId": "delete_v1_slices_slice_id",
+        "responses": {
+          "202": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Repetir la misma clave y cuerpo tras timeout. Otra petición con la clave devuelve 409."
+          }
+        ]
+      }
+    },
+    "/v1/slices/{slice_id}/reconcile": {
+      "post": {
+        "summary": "Reaplicar el plan después de un fallo; conservar discos",
+        "operationId": "post_v1_slices_slice_id_reconcile",
+        "responses": {
+          "202": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Repetir la misma clave y cuerpo tras timeout. Otra petición con la clave devuelve 409."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}/stop": {
+      "post": {
+        "summary": "Detener VMs conservando discos, red y reservas",
+        "operationId": "post_v1_slices_slice_id_stop",
+        "responses": {
+          "202": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Repetir la misma clave y cuerpo tras timeout. Otra petición con la clave devuelve 409."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}/start": {
+      "post": {
+        "summary": "Arrancar un slice detenido conservando sus discos",
+        "operationId": "post_v1_slices_slice_id_start",
+        "responses": {
+          "202": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Repetir la misma clave y cuerpo tras timeout. Otra petición con la clave devuelve 409."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}/events": {
+      "get": {
+        "summary": "Últimos 1000 eventos del slice; orden descendente",
+        "operationId": "get_v1_slices_slice_id_events",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Generic"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/slices/{slice_id}/diagnostics": {
+      "get": {
+        "summary": "Estado real por nodo, QMP, discos, recursos y DHCP",
+        "operationId": "get_v1_slices_slice_id_diagnostics",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/slices/{slice_id}/vms/{vm_name}/console": {
+      "post": {
+        "summary": "Emitir token breve de noVNC para VM autorizada",
+        "operationId": "post_v1_slices_slice_id_vms_vm_name_console",
+        "responses": {
+          "201": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Console"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vm_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ttl": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 600,
+                    "default": 120
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}/vms/{vm_name}/probe": {
+      "post": {
+        "summary": "Diagnóstico cerrado por consola serie; opcional para CirrOS",
+        "operationId": "post_v1_slices_slice_id_vms_vm_name_probe",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vm_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Probe"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/{operation_id}": {
+      "get": {
+        "summary": "Consultar operación asíncrona",
+        "operationId": "get_v1_operations_operation_id",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "Network": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "cidr": {
+            "type": "string",
+            "example": "192.168.50.0/24"
+          },
+          "cvid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4094
+          },
+          "dhcp": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "name",
+          "cidr",
+          "cvid"
+        ],
+        "additionalProperties": false
+      },
+      "NIC": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "ip": {
+            "type": "string",
+            "format": "ipv4"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,14}$",
+            "description": "Nombre estable dentro del invitado; cloud-init Ubuntu o configuración serie CirrOS."
+          }
+        },
+        "required": [
+          "network",
+          "ip"
+        ],
+        "additionalProperties": false
+      },
+      "VM": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "worker": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "image": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "vcpus": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "memory_mb": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 524288
+          },
+          "disk_gb": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 2048,
+            "description": "Admite 2.2. Unidad seleccionada por disk_unit en cluster.json (GiB por defecto; GB decimal disponible). Plan convierte a bytes y alinea a 512 bytes sin reducir la imagen base."
+          },
+          "nics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NIC"
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "internet": {
+            "type": "boolean",
+            "default": false
+          },
+          "guest": {
+            "$ref": "#/components/schemas/Guest"
+          }
+        },
+        "required": [
+          "name",
+          "worker",
+          "image",
+          "vcpus",
+          "memory_mb",
+          "disk_gb",
+          "nics"
+        ],
+        "additionalProperties": false
+      },
+      "Publication": {
+        "type": "object",
+        "properties": {
+          "vm": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "network": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "tcp",
+              "udp"
+            ]
+          },
+          "external_port": {
+            "type": "integer",
+            "minimum": 20000,
+            "maximum": 29999
+          },
+          "guest_port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "allowed_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 16
+          }
+        },
+        "required": [
+          "vm",
+          "network",
+          "protocol",
+          "external_port",
+          "guest_port",
+          "allowed_sources"
+        ],
+        "additionalProperties": false
+      },
+      "SliceRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "networks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Network"
+            },
+            "minItems": 1,
+            "maxItems": 64
+          },
+          "vms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VM"
+            },
+            "minItems": 1,
+            "maxItems": 64
+          },
+          "publications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Publication"
+            },
+            "minItems": 0,
+            "maxItems": 128
+          }
+        },
+        "required": [
+          "name",
+          "networks",
+          "vms"
+        ],
+        "additionalProperties": false
+      },
+      "Operation": {
+        "type": "object",
+        "required": [
+          "id",
+          "slice_id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slice_id": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "delete",
+              "reconcile",
+              "start",
+              "stop"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED"
+            ]
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "created": {
+            "type": "number"
+          },
+          "updated": {
+            "type": "number"
+          }
+        }
+      },
+      "Console": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "token",
+          "expires_at",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "Probe": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "addresses",
+              "ping",
+              "neighbors"
+            ],
+            "default": "addresses"
+          },
+          "target": {
+            "type": "string",
+            "format": "ipv4"
+          },
+          "packet_bytes": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 1400
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "ProbeResult": {
+        "type": "object",
+        "properties": {
+          "returncode": {
+            "type": "integer"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "returncode",
+          "stdout"
+        ],
+        "additionalProperties": false
+      },
+      "Slice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/SliceRequest"
+          },
+          "plan": {
+            "type": "object",
+            "description": "Plan inmutable con id,svid,transit,MAC,VNC,gateway,disk_bytes,guest y nombres de NIC. Diagnostics proporciona PID, worker, qemu_name y disk_path reales."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "DEPLOYING",
+              "READY",
+              "STOPPING",
+              "STOPPED",
+              "STARTING",
+              "RECONCILING",
+              "DELETING",
+              "DELETED",
+              "ERROR",
+              "ERROR_CLEANUP",
+              "FAILED_CLEANED"
+            ]
+          },
+          "reserved": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "virtual_size": {
+            "type": "integer"
+          },
+          "created": {
+            "type": "number"
+          }
+        }
+      },
+      "Generic": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "Guest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "os"
+        ],
+        "properties": {
+          "os": {
+            "type": "string",
+            "enum": [
+              "ubuntu",
+              "cirros"
+            ]
+          },
+          "username": {
+            "type": "string"
+          },
+          "password_hash": {
+            "type": "string",
+            "description": "SHA512 crypt para login VNC; requerido en Ubuntu."
+          },
+          "ssh_authorized_keys": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Ubuntu requiere username,password_hash,ssh_authorized_keys; CirrOS usa las credenciales configuradas en el agente."
+      }
+    }
+  }
+}

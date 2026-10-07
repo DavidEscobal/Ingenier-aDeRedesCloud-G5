@@ -1,0 +1,105 @@
+{
+  "ssh_key": "~/.ssh/id_ed25519_ex1",
+  "state_dir": "state",
+  "svid_range": [
+    1000,
+    3999
+  ],
+  "transit_pool": "172.30.0.0/16",
+  "management_networks": [
+    "10.0.10.0/24"
+  ],
+  "public_port_range": [
+    20000,
+    29999
+  ],
+  "max_image_gb": 4,
+  "parallel_jobs": 4,
+  "parallel_nodes": 3,
+  "remote_retries": 3,
+  "console_url": "http://127.0.0.1:6080",
+  "common": {
+    "state_dir": "/var/lib/g5-cluster",
+    "data_ports": [
+      "ens4"
+    ],
+    "management_interface": "ens3",
+    "bridge": "br-int",
+    "underlay_mtu": 1500,
+    "guest_mtu": 1450,
+    "qemu_user": "g5qemu",
+    "cache_max_gb": 8,
+    "max_image_gb": 4,
+    "disk_margin_gb": 2,
+    "memory_margin_mb": 256,
+    "guest_probes": true,
+    "probe_user": "cirros",
+    "probe_password": "gocubsgo",
+    "gc_on_delete": true
+  },
+  "workers": {
+    "server1": {
+      "name": "server1",
+      "host": "10.0.10.1",
+      "role": "worker",
+      "capacity": {
+        "vcpus": 2,
+        "memory_mb": 2048,
+        "disk_gb": 12
+      }
+    },
+    "server2": {
+      "name": "server2",
+      "host": "10.0.10.2",
+      "role": "worker",
+      "capacity": {
+        "vcpus": 2,
+        "memory_mb": 2048,
+        "disk_gb": 12
+      }
+    },
+    "server3": {
+      "name": "server3",
+      "host": "10.0.10.3",
+      "role": "worker",
+      "capacity": {
+        "vcpus": 2,
+        "memory_mb": 2048,
+        "disk_gb": 12
+      }
+    }
+  },
+  "gateway": {
+    "name": "server4",
+    "host": "10.0.10.4",
+    "role": "gateway",
+    "external_interface": "ens3",
+    "external_ip": "10.0.10.4",
+    "dns_server": "8.8.8.8",
+    "blocked_egress": [
+      "0.0.0.0/8",
+      "10.0.0.0/8",
+      "100.64.0.0/10",
+      "127.0.0.0/8",
+      "169.254.0.0/16",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+      "224.0.0.0/4",
+      "240.0.0.0/4"
+    ]
+  },
+  "switch": {
+    "name": "ofs",
+    "host": "10.0.10.5",
+    "role": "switch",
+    "bridge": "OFS",
+    "data_ports": [
+      "ens4",
+      "ens5",
+      "ens6",
+      "ens7",
+      "ens8"
+    ]
+  },
+  "disk_unit": "GiB"
+}

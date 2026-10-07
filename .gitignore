@@ -1,0 +1,13 @@
+state/
+demo-state/
+config/cluster.json
+config/keys.json
+config/*.token
+generated/
+__pycache__/
+*.pyc
+*.part
+*.qcow2
+*.img
+*.iso
+evidencias/

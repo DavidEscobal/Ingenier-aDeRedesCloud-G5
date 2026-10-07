@@ -1,0 +1,55 @@
+{
+  "name": "laboratorio-qinq",
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "192.168.50.0/24",
+      "cvid": 100,
+      "dhcp": true
+    }
+  ],
+  "vms": [
+    {
+      "name": "vm1",
+      "worker": "server1",
+      "image": "REEMPLAZAR_SHA256",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 1,
+      "nics": [
+        {
+          "network": "lan",
+          "ip": "192.168.50.11"
+        }
+      ],
+      "internet": true
+    },
+    {
+      "name": "vm2",
+      "worker": "server2",
+      "image": "REEMPLAZAR_SHA256",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 1,
+      "nics": [
+        {
+          "network": "lan",
+          "ip": "192.168.50.12"
+        }
+      ],
+      "internet": false
+    }
+  ],
+  "publications": [
+    {
+      "vm": "vm1",
+      "network": "lan",
+      "protocol": "tcp",
+      "external_port": 22022,
+      "guest_port": 22,
+      "allowed_sources": [
+        "10.0.10.4/32"
+      ]
+    }
+  ]
+}

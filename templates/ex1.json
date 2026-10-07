@@ -1,0 +1,227 @@
+{
+  "name": "ex1",
+  "networks": [
+    {
+      "name": "link12",
+      "cidr": "192.168.12.0/27",
+      "cvid": 112,
+      "dhcp": false
+    },
+    {
+      "name": "link23",
+      "cidr": "192.168.23.0/27",
+      "cvid": 123,
+      "dhcp": false
+    },
+    {
+      "name": "link14",
+      "cidr": "192.168.14.0/27",
+      "cvid": 114,
+      "dhcp": false
+    },
+    {
+      "name": "link34",
+      "cidr": "192.168.34.0/27",
+      "cvid": 134,
+      "dhcp": false
+    },
+    {
+      "name": "link45",
+      "cidr": "192.168.45.0/27",
+      "cvid": 145,
+      "dhcp": false
+    },
+    {
+      "name": "link56",
+      "cidr": "192.168.56.0/27",
+      "cvid": 156,
+      "dhcp": false
+    },
+    {
+      "name": "access1",
+      "cidr": "192.168.101.0/27",
+      "cvid": 301,
+      "dhcp": false
+    },
+    {
+      "name": "access3",
+      "cidr": "192.168.103.0/27",
+      "cvid": 303,
+      "dhcp": false
+    }
+  ],
+  "vms": [
+    {
+      "name": "vm1",
+      "worker": "server1",
+      "image": "ubuntu",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 2.2,
+      "guest": {
+        "os": "ubuntu"
+      },
+      "nics": [
+        {
+          "name": "access0",
+          "network": "access1",
+          "ip": "192.168.101.10"
+        },
+        {
+          "name": "to-vm2",
+          "network": "link12",
+          "ip": "192.168.12.10"
+        },
+        {
+          "name": "to-vm4",
+          "network": "link14",
+          "ip": "192.168.14.10"
+        }
+      ],
+      "internet": true
+    },
+    {
+      "name": "vm2",
+      "worker": "server2",
+      "image": "cirros",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 1,
+      "guest": {
+        "os": "cirros"
+      },
+      "nics": [
+        {
+          "name": "to-vm1",
+          "network": "link12",
+          "ip": "192.168.12.11"
+        },
+        {
+          "name": "to-vm3",
+          "network": "link23",
+          "ip": "192.168.23.10"
+        }
+      ],
+      "internet": false
+    },
+    {
+      "name": "vm3",
+      "worker": "server3",
+      "image": "ubuntu",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 2.2,
+      "guest": {
+        "os": "ubuntu"
+      },
+      "nics": [
+        {
+          "name": "access0",
+          "network": "access3",
+          "ip": "192.168.103.10"
+        },
+        {
+          "name": "to-vm2",
+          "network": "link23",
+          "ip": "192.168.23.11"
+        },
+        {
+          "name": "to-vm4",
+          "network": "link34",
+          "ip": "192.168.34.10"
+        }
+      ],
+      "internet": true
+    },
+    {
+      "name": "vm4",
+      "worker": "server1",
+      "image": "ubuntu",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 2.2,
+      "guest": {
+        "os": "ubuntu"
+      },
+      "nics": [
+        {
+          "name": "to-vm1",
+          "network": "link14",
+          "ip": "192.168.14.11"
+        },
+        {
+          "name": "to-vm3",
+          "network": "link34",
+          "ip": "192.168.34.11"
+        },
+        {
+          "name": "to-vm5",
+          "network": "link45",
+          "ip": "192.168.45.10"
+        }
+      ],
+      "internet": false
+    },
+    {
+      "name": "vm5",
+      "worker": "server2",
+      "image": "ubuntu",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 2.2,
+      "guest": {
+        "os": "ubuntu"
+      },
+      "nics": [
+        {
+          "name": "to-vm4",
+          "network": "link45",
+          "ip": "192.168.45.11"
+        },
+        {
+          "name": "to-vm6",
+          "network": "link56",
+          "ip": "192.168.56.10"
+        }
+      ],
+      "internet": false
+    },
+    {
+      "name": "vm6",
+      "worker": "server3",
+      "image": "cirros",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 1,
+      "guest": {
+        "os": "cirros"
+      },
+      "nics": [
+        {
+          "name": "to-vm5",
+          "network": "link56",
+          "ip": "192.168.56.11"
+        }
+      ],
+      "internet": false
+    }
+  ],
+  "publications": [
+    {
+      "vm": "vm1",
+      "network": "access1",
+      "protocol": "tcp",
+      "external_port": 22001,
+      "guest_port": 22,
+      "allowed_sources": []
+    },
+    {
+      "vm": "vm3",
+      "network": "access3",
+      "protocol": "tcp",
+      "external_port": 22003,
+      "guest_port": 22,
+      "allowed_sources": []
+    }
+  ]
+}
