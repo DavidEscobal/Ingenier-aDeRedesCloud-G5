@@ -134,7 +134,7 @@ def main():
                     rc=item['process'].wait(timeout=20)
                     threads[list(captures).index(dest)].join(timeout=2)
                     text=''.join(item['lines']); (out/('broadcast-'+peer+'-at-'+dest+'.txt')).write_text(text)
-                    count=sum(bool(re.search(r'\bARP,',line)) for line in item['lines'])
+                    count=sum(bool(re.search(r'\bARP\b',line)) for line in item['lines'])
                     record('broadcast-'+peer+'-at-'+dest,rc in (0,124) and count==(3 if dest==peer else 0),{'frames':count,'expected':3 if dest==peer else 0,'rc':rc})
             finally:
                 for item in captures.values():
