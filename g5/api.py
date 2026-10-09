@@ -233,7 +233,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, {'ok': True, 'simulated': app.backend.simulated})
             owner, admin = app.identity(self.headers.get('Authorization', ''))
             if self.command == 'GET' and path == '/openapi.json':
-                return self.reply(200, json.loads((Path(__file__).parent.parent / 'docs' / 'openapi.json').read_text()))
+                return self.reply(200, json.loads((Path(__file__).parent.parent / 'api' / 'openapi.json').read_text()))
             require(not self.headers.get('Transfer-Encoding'), 'Use Content-Length, no chunked')
             length = int(self.headers.get('Content-Length', '0'))
             require(length >= 0, 'Content-Length inválido')
