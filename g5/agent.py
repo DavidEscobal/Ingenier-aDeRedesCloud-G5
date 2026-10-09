@@ -884,14 +884,19 @@ class Agent:
 
     def qinq_capture(self, **_):
         ensure(self.cfg['role'] == 'switch', 'Capturar QinQ en OFS')
-        args = ['tcpdump', '-l', '-i', 'any', '-nn', '-e', '-c', '6', 'ether proto 0x88a8']
-        try:
-            result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    universal_newlines=True, timeout=20)
-            return {'stdout': result.stdout, 'stderr': result.stderr, 'returncode': result.returncode}
-        except subprocess.TimeoutExpired as exc:
-            out = exc.stdout or b''
-            return {'stdout': out.decode(errors='replace') if isinstance(out, bytes) else out, 'returncode': 124}
+        # Una captura por puerto fisico: con "-i any" (Linux cooked) el kernel retira las etiquetas y no se ven los VID.
+        procs = {}
+        for iface in self.cfg['data_ports']:
+            procs[iface] = subprocess.Popen(['timeout', '20', 'tcpdump', '-l', '-i', iface, '-nn', '-e', '-c', '6', 'vlan'],
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        lines, errors, codes = [], [], []
+        for iface, proc in procs.items():
+            stdout, stderr = proc.communicate()
+            codes.append(proc.returncode)
+            lines.extend(iface + ' ' + line for line in stdout.splitlines() if line.strip())
+            errors.append(iface + ': ' + stderr.strip())
+        return {'stdout': '\n'.join(lines), 'stderr': '\n'.join(errors),
+                'returncode': 0 if 0 in codes else 124}
 
     def delete(self, sid, **_):
         path = self.manifest_path(sid)
