@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G5 Cloud Console</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1b1f24;--muted:#5d6672;--line:#dde1e6;--accent:#2563eb;--ok:#15803d;--warn:#b45309;--bad:#b91c1c;
+--w1:#2563eb;--w2:#0d9488;--w3:#c2410c;--gw:#6b7280;--chip:#eef1f5;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1216;--panel:#171b21;--ink:#e6e9ee;--muted:#9aa4b1;--line:#2a3039;--accent:#60a5fa;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;
+--w1:#60a5fa;--w2:#2dd4bf;--w3:#fb923c;--gw:#9ca3af;--chip:#222832}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+header h1{font-size:16px;margin:0;font-weight:650}
+header .sub{color:var(--muted);font-size:13px}
+header .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+main>div{min-width:0}
+main{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px 20px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:12px 16px}header{flex-wrap:wrap;padding:10px 16px}header .right{margin-left:0}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 10px;font-weight:600;display:flex;align-items:center;gap:8px}
+h2 .grow{flex:1}
+button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:6px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--bad)}
+button.danger.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+button.small{padding:2px 8px;font-size:12px}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--chip);font-size:12px;font-weight:600}
+.s-READY,.s-SUCCEEDED,.ok{color:var(--ok)}.s-ERROR,.s-FAILED,.s-ERROR_CLEANUP,.bad{color:var(--bad)}
+.s-PENDING,.s-RUNNING,.s-CREATING,.s-DELETING,.s-STOPPED,.warn{color:var(--warn)}.s-DELETED{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:5px 6px}
+td{border-bottom:1px solid var(--line);padding:5px 6px;vertical-align:top}
+tr.sel td{background:var(--chip)}
+tr.click{cursor:pointer}
+.mono{font-family:var(--mono);font-size:12px}
+.muted{color:var(--muted)}
+.node{display:grid;grid-template-columns:70px 1fr;gap:2px 8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.node:last-child{border-bottom:0}
+.bar{height:6px;background:var(--chip);border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.meters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px}
+.tpl{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.tpl:last-child{border-bottom:0}.tpl div{flex:1}
+.ops{margin-top:8px;font-size:13px}
+.ops div{padding:3px 0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.toolbar .title{font-size:16px;font-weight:650;margin-right:6px}
+.grid2{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:16px}
+@media (max-width:1150px){.grid2{grid-template-columns:1fr}}
+svg text{fill:var(--ink);font-size:12px;font-family:system-ui,sans-serif}
+svg .edge{stroke:var(--muted);stroke-width:2}
+svg .acc{stroke:var(--gw);stroke-width:2;stroke-dasharray:5 4}
+svg .lbl{fill:var(--muted);font-size:10px}
+pre{background:var(--chip);padding:10px;border-radius:6px;overflow:auto;max-height:280px;font-size:12px;margin:8px 0 0;white-space:pre-wrap}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.empty{color:var(--muted);padding:24px;text-align:center}
+#toast{position:fixed;bottom:16px;right:16px;max-width:420px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;display:none;z-index:5}
+.events{max-height:260px;overflow:auto}
+a{color:var(--accent)}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>G5 Cloud Console</h1>
+  <span class="sub">Driver Linux · Cluster R2</span>
+  <div class="right"><span id="cap" class="chip">conectando…</span><button id="refresh">Actualizar</button></div>
+</header>
+<main>
+  <div>
+    <section>
+      <h2><span class="grow">Workers y nodos</span><button class="small" id="nodesBtn">Revisar</button></h2>
+      <div id="nodes" class="muted">Pulsa «Revisar» para consultar a los agentes (doctor por SSH).</div>
+    </section>
+    <section>
+      <h2>Desplegar topología</h2>
+      <div id="templates" class="muted">Cargando plantillas…</div>
+      <div id="ops" class="ops"></div>
+    </section>
+    <section>
+      <h2>Imágenes</h2>
+      <div id="images" class="muted">—</div>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2><span class="grow">Slices</span><label class="muted" style="text-transform:none;font-weight:400"><input type="checkbox" id="showDeleted"> ver eliminados</label></h2>
+      <div id="slices" class="scroll"></div>
+    </section>
+    <section id="detail"><div class="empty">Selecciona un slice para ver su topología, VMs y eventos.</div></section>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hex = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2,'0')).join('');
+const WCOL = {server1:'var(--w1)', server2:'var(--w2)', server3:'var(--w3)'};
+const state = {slices: [], selected: null, detail: null, diag: null, runs: {}, ops: {}};
+
+async function http(method, path, body) {
+  const headers = {'Content-Type': 'application/json'};
+  if (method !== 'GET') { headers['X-G5-UI'] = '1'; headers['X-Idempotency-Key'] = hex(); }
+  const r = await fetch(path, {method, headers, body: method === 'GET' ? undefined : JSON.stringify(body || {})});
+  const data = await r.json().catch(() => ({error: 'Respuesta no JSON'}));
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
+const api = (m, p, b) => http(m, '/api' + p, b);
+function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.style.background = bad ? 'var(--bad)' : ''; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 5000); }
+const chip = s => `<span class="chip s-${esc(s)}">${esc(s)}</span>`;
+const short = id => esc(String(id).slice(0, 8));
+const gb = b => (b / 1024 ** 3).toFixed(2) + ' GiB';
+
+async function loadCap() {
+  try { const c = await api('GET', '/v1/capabilities');
+    $('#cap').innerHTML = `${c.simulated ? '<b class="warn">SIMULADO</b>' : '<b class="ok">backend real</b>'} · v${esc(c.version)} · ${esc(c.network.join(','))}`;
+  } catch (e) { $('#cap').innerHTML = '<b class="bad">API no disponible</b>'; }
+}
+
+async function loadNodes() {
+  $('#nodes').textContent = 'Consultando agentes…';
+  try {
+    const nodes = await api('GET', '/v1/nodes');
+    $('#nodes').innerHTML = nodes.map(n => {
+      const head = `<b style="color:${WCOL[n.node] || 'var(--gw)'}">${esc(n.node)}</b><span>${n.ok ? '<span class="ok">● ok</span>' : '<span class="bad">● ' + esc((n.problems || [n.error]).join('; ')) + '</span>'}${n.enabled === false ? ' <span class="chip warn">drenado</span>' : ''}</span>`;
+      if (!n.capacity) return `<div class="node">${head}</div>`;
+      const a = n.allocated, c = n.capacity;
+      const m = (label, used, cap, unit) => `<div>${label} ${used}/${cap}${unit}<div class="bar"><i style="width:${Math.min(100, 100 * used / cap)}%"></i></div></div>`;
+      return `<div class="node">${head}<span></span><div class="meters">${m('vCPU', a.vcpus, c.vcpus, '')}${m('RAM', +(a.memory_mb / 1024).toFixed(1), +(c.memory_mb / 1024).toFixed(1), ' GiB')}${m('Disco', +(+a.disk_gb).toFixed(1), c.disk_gb, '')}</div></div>`;
+    }).join('');
+  } catch (e) { $('#nodes').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+
+async function loadImages() {
+  try { const imgs = await api('GET', '/v1/images');
+    $('#images').innerHTML = imgs.length ? `<table><tr><th>Nombre</th><th>SHA256</th><th>Virtual</th></tr>${imgs.map(i => `<tr><td>${esc(i.name)}</td><td class="mono">${esc(i.id.slice(0, 10))}…</td><td>${gb(i.virtual_size)}</td></tr>`).join('')}</table>` : 'Sin imágenes en el catálogo.';
+  } catch (e) { $('#images').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+
+async function loadTemplates() {
+  try { const t = await http('GET', '/ui/templates');
+    $('#templates').innerHTML = t.length ? t.map(x => `<div class="tpl"><div><b>${esc(x.name.toUpperCase())}</b><br><span class="muted">${x.vms} VMs · ${x.links.length} enlaces · Internet: ${esc(x.internet.join(', ') || '—')}${x.ports && x.ports.length ? ' · SSH ' + esc(x.ports.join('/')) : ''}</span></div><button class="primary" data-deploy="${esc(x.name)}">Desplegar</button></div>`).join('')
+      : 'No hay plantillas en generated/. Ejecuta antes <span class="mono">python3 -m g5.demo build …</span>';
+  } catch (e) { $('#templates').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+
+async function loadSlices() {
+  try {
+    [state.slices, state.runs] = await Promise.all([api('GET', '/v1/slices'), http('GET', '/ui/runs')]);
+    const all = $('#showDeleted').checked, rows = state.slices.filter(s => all || s.status !== 'DELETED').reverse();
+    $('#slices').innerHTML = rows.length ? `<table><tr><th>ID</th><th>Nombre</th><th>Estado</th><th>Reservas</th><th>Evidencias</th></tr>${rows.map(s =>
+      `<tr class="click ${s.id === state.selected ? 'sel' : ''}" data-slice="${esc(s.id)}"><td class="mono">${short(s.id)}</td><td>${esc(s.name)}</td><td>${chip(s.status)}</td><td>${s.reserved ? 'sí' : 'no'}</td><td class="mono muted">${esc((state.runs[s.id] || []).join(', ') || '—')}</td></tr>`).join('')}</table>`
+      : '<div class="empty">No hay slices activos. Despliega una plantilla.</div>';
+  } catch (e) { $('#slices').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+
+function track(job, label) {
+  state.ops[job.id] = {label, status: job.status || 'PENDING', t0: Date.now()};
+  renderOps();
+  const tick = async () => {
+    try { const j = await api('GET', '/v1/operations/' + job.id);
+      state.ops[job.id].status = j.status; state.ops[job.id].error = j.error; renderOps();
+      if (j.status === 'SUCCEEDED' || j.status === 'FAILED') {
+        toast(`${label}: ${j.status}`, j.status === 'FAILED');
+        await loadSlices(); if (state.selected === j.slice_id) await select(j.slice_id);
+        return;
+      }
+    } catch (e) { state.ops[job.id].error = e.message; renderOps(); }
+    setTimeout(tick, 2000);
+  };
+  setTimeout(tick, 1000);
+}
+function renderOps() {
+  $('#ops').innerHTML = Object.entries(state.ops).slice(-6).reverse().map(([id, o]) =>
+    `<div>${chip(o.status)} ${esc(o.label)} <span class="muted mono">${short(id)} · ${Math.round((Date.now() - o.t0) / 1000)} s</span>${o.error ? `<div class="bad">${esc(o.error)}</div>` : ''}</div>`).join('');
+}
+
+async function deploy(name, btn) {
+  btn.disabled = true;
+  try { const r = await http('POST', '/ui/deploy', {template: name});
+    toast(`Desplegando ${name}; evidencias en ${r.run}`);
+    state.selected = r.job.slice_id; track(r.job, 'Crear ' + name); await loadSlices();
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+}
+
+function layout(name, vms) {
+  const n = vms.map(v => v.name).sort();
+  const P = {};
+  if (name === 'ex1' && n.length === 6) Object.assign(P, {vm6:[250,35], vm5:[250,115], vm4:[250,195], vm1:[115,270], vm3:[385,270], vm2:[250,340]});
+  else if (name === 'bus') n.forEach((v, i) => P[v] = [55 + i * 82, 170]);
+  else if (name === 'lineal') n.forEach((v, i) => P[v] = [60 + i * 84, i % 2 ? 300 : 180]);
+  else n.forEach((v, i) => { const a = -2 * Math.PI / 3 + 2 * Math.PI * i / n.length; P[v] = [250 + 150 * Math.cos(a), 240 + 130 * Math.sin(a)]; });
+  return P;
+}
+
+function topology(row) {
+  const plan = row.plan, P = layout(row.name, plan.vms), edges = [], acc = [], buses = [];
+  for (const net of plan.networks) {
+    const ends = plan.vms.filter(v => v.nics.some(c => c.network === net.name));
+    if (ends.length > 2) buses.push([ends.map(v => v.name), net]);
+    else if (ends.length === 2) edges.push([ends[0].name, ends[1].name, net]);
+    else if (ends.length === 1) acc.push([ends[0].name, net]);
+  }
+  const GW = row.name === 'ex1' ? [250, 418] : (row.name === 'lineal' || row.name === 'bus') ? [250, 32] : [430, 40];
+  let s = `<svg viewBox="0 0 520 445" width="100%" role="img" aria-label="Topología del slice">`;
+  for (const [vm, net] of acc) { const [x, y] = P[vm]; s += `<line class="acc" x1="${x}" y1="${y}" x2="${GW[0]}" y2="${GW[1]}"/><text class="lbl" x="${x + (GW[0] - x) * 0.4 + (x < GW[0] ? -6 : 6)}" y="${y + (GW[1] - y) * 0.4}" text-anchor="${x < GW[0] ? 'end' : 'start'}">${esc(net.name)} · C${net.cvid}</text>`; }
+  buses.forEach(([names, net], k) => { const xs = names.map(v => P[v][0]), y = 290 + 40 * k;
+    s += `<line class="edge" style="stroke-width:5" x1="${Math.min(...xs) - 20}" y1="${y}" x2="${Math.max(...xs) + 20}" y2="${y}"/><text class="lbl" x="${Math.min(...xs) - 20}" y="${y + 18}">segmento compartido ${esc(net.name)} · C${net.cvid} · ${esc(net.cidr)}</text>`;
+    for (const v of names) s += `<line class="edge" x1="${P[v][0]}" y1="${P[v][1]}" x2="${P[v][0]}" y2="${y}"/>`; });
+  for (const [a, b, net] of edges) { const [x1, y1] = P[a], [x2, y2] = P[b]; s += `<line class="edge" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><text class="lbl" x="${(x1 + x2) / 2 + 5}" y="${(y1 + y2) / 2 - 5}">C${net.cvid}</text>`; }
+  if (acc.length) s += `<rect x="${GW[0] - 66}" y="${GW[1] - 22}" width="132" height="42" rx="6" fill="var(--panel)" stroke="var(--gw)" stroke-width="2"/><text x="${GW[0]}" y="${GW[1] - 4}" text-anchor="middle">server4 · gateway</text><text class="lbl" x="${GW[0]}" y="${GW[1] + 11}" text-anchor="middle">netns del slice + NAT</text>`;
+  for (const v of plan.vms) { const [x, y] = P[v.name], d = state.diag && state.diag.nodes[v.worker] && state.diag.nodes[v.worker].vms ? state.diag.nodes[v.worker].vms[v.name] : null;
+    const ring = d ? (d.running ? 'var(--ok)' : 'var(--bad)') : 'var(--line)';
+    s += `<circle cx="${x}" cy="${y}" r="26" fill="${WCOL[v.worker] || 'var(--gw)'}" stroke="${ring}" stroke-width="4"/><text x="${x}" y="${y + 4}" text-anchor="middle" style="fill:#fff;font-weight:650">${esc(v.name)}</text><text class="lbl" x="${x}" y="${y + 42}" text-anchor="middle">${esc(v.worker)} · ${esc(v.guest ? v.guest.os : '')}</text>`; }
+  s += `</svg><div class="legend">${Object.entries(WCOL).map(([w, c]) => `<span><span class="dot" style="background:${c}"></span>${w}</span>`).join('')}<span>S-VLAN ${esc(plan.svid)} (802.1ad)</span><span>Cn = C-VLAN del enlace</span></div>`;
+  return s;
+}
+
+function vmTable(row) {
+  const nodes = state.diag ? state.diag.nodes : {};
+  return `<table><tr><th>VM</th><th>Worker</th><th>SO</th><th>PID</th><th>Estado</th><th>NICs</th><th></th></tr>${row.plan.vms.map(v => {
+    const d = nodes[v.worker] && nodes[v.worker].vms ? nodes[v.worker].vms[v.name] : null;
+    const os = v.guest ? v.guest.os : '';
+    const act = row.status !== 'READY' ? '' : os === 'ubuntu' ? `<button class="small" data-console="${esc(v.name)}">Consola VNC</button>` : `<button class="small" data-probe="${esc(v.name)}">Probe</button>`;
+    return `<tr><td><b>${esc(v.name)}</b>${v.internet ? ' <span class="chip">Internet</span>' : ''}</td><td>${esc(v.worker)}</td><td>${esc(os)}</td><td class="mono">${d ? esc(d.pid || '—') : '…'}</td><td>${d ? (d.running ? '<span class="ok">running</span>' : '<span class="bad">detenida</span>') : '…'}</td>
+      <td class="mono">${v.nics.map(c => `${esc(c.name || c.network)} ${esc(c.ip)}`).join('<br>')}</td><td>${act}<div id="out-${esc(v.name)}"></div></td></tr>`; }).join('')}</table>`;
+}
+
+function netTable(row) {
+  return `<table><tr><th>Red</th><th>CIDR</th><th>C-VLAN</th><th>Extremos</th></tr>${row.plan.networks.map(n => `<tr><td>${esc(n.name)}</td><td class="mono">${esc(n.cidr)}</td><td>${esc(n.cvid)}</td><td class="mono">${row.plan.vms.filter(v => v.nics.some(c => c.network === n.name)).map(v => esc(v.name) + ' ' + esc(v.nics.find(c => c.network === n.name).ip)).join(' — ')}</td></tr>`).join('')}</table>`;
+}
+
+async function select(id) {
+  state.selected = id; state.diag = null; loadSlices();
+  const box = $('#detail'); box.innerHTML = '<div class="empty">Cargando…</div>';
+  try {
+    const [row, events] = await Promise.all([api('GET', '/v1/slices/' + id), api('GET', '/v1/slices/' + id + '/events')]);
+    state.detail = row; renderDetail(events);
+    if (row.status !== 'DELETED') api('GET', '/v1/slices/' + id + '/diagnostics').then(d => { if (state.selected === id) { state.diag = d; renderDetail(events); } }).catch(e => toast('Diagnóstico: ' + e.message, true));
+  } catch (e) { box.innerHTML = `<div class="bad">${esc(e.message)}</div>`; }
+}
+
+function renderDetail(events) {
+  const row = state.detail, live = row.status !== 'DELETED';
+  $('#detail').innerHTML = `
+  <div class="toolbar"><span class="title">${esc(row.name)}</span>${chip(row.status)}<span class="chip">S-VLAN ${esc(row.plan.svid)}</span><span class="mono muted">${esc(row.id)}</span>
+    <span style="flex:1"></span>
+    ${live ? `<button data-act="snapshot">Guardar evidencias</button><button data-act="stop">Detener</button><button data-act="start">Iniciar</button><button class="danger" data-act="delete">Borrar slice</button>` : ''}</div>
+  <div class="grid2"><div>${topology(row)}</div><div class="scroll">${vmTable(row)}</div></div>
+  <h2 style="margin-top:16px">Redes del slice</h2><div class="scroll">${netTable(row)}</div>
+  <h2 style="margin-top:16px">Eventos (más recientes primero)</h2>
+  <div class="events"><table>${events.slice(0, 200).map(e => `<tr><td class="mono muted">${new Date(e.timestamp * 1000).toLocaleTimeString()}</td><td><b class="${e.event === 'RETRY' ? 'warn' : /ERROR|FAIL/.test(e.event) ? 'bad' : ''}">${esc(e.event)}</b></td><td class="mono">${esc(String(e.detail).slice(0, 200))}</td></tr>`).join('')}</table></div>
+  <div id="actOut"></div>`;
+}
+
+async function action(act, btn) {
+  const id = state.selected;
+  if (act === 'delete' && !btn.classList.contains('armed')) { btn.classList.add('armed'); btn.textContent = 'Confirmar borrado'; setTimeout(() => { btn.classList.remove('armed'); btn.textContent = 'Borrar slice'; }, 4000); return; }
+  btn.disabled = true;
+  try {
+    if (act === 'snapshot') { const r = await http('POST', '/ui/snapshot', {slice_id: id}); $('#actOut').innerHTML = `<pre>${esc(r.output)}</pre>`; toast('Evidencias guardadas en ' + r.run); }
+    else { const job = await api(act === 'delete' ? 'DELETE' : 'POST', '/v1/slices/' + id + (act === 'delete' ? '' : '/' + act)); track(job, ({delete: 'Borrar', stop: 'Detener', start: 'Iniciar'})[act] + ' ' + state.detail.name); }
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+}
+
+async function consoleFor(vm, btn) {
+  btn.disabled = true;
+  try { const r = await api('POST', `/v1/slices/${state.selected}/vms/${vm}/console`, {ttl: 600});
+    const out = $('#out-' + vm); const until = new Date(r.expires_at * 1000).toLocaleTimeString();
+    out.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Abrir noVNC</a> <span class="muted">vence ${until}</span>`;
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+}
+
+function probeFor(vm) {
+  const v = state.detail.plan.vms.find(x => x.name === vm);
+  const peers = [];
+  for (const c of v.nics) for (const o of state.detail.plan.vms) if (o.name !== vm) for (const d of o.nics) if (d.network === c.network) peers.push([o.name, d.ip]);
+  $('#out-' + vm).innerHTML = `<div style="margin-top:6px"><select id="pt-${esc(vm)}"><option value="">ip addr / route</option>${peers.map(([n, ip]) => `<option value="${esc(ip)}">ping ${esc(n)} ${esc(ip)}</option>`).join('')}</select> <button class="small" data-runprobe="${esc(vm)}">Ejecutar</button><div id="po-${esc(vm)}"></div></div>`;
+}
+async function runProbe(vm, btn) {
+  const target = $('#pt-' + vm).value; btn.disabled = true; $('#po-' + vm).innerHTML = '<span class="muted">Ejecutando por consola serie…</span>';
+  try { const r = await api('POST', `/v1/slices/${state.selected}/vms/${vm}/probe`, target ? {kind: 'ping', target} : {kind: 'addresses'});
+    $('#po-' + vm).innerHTML = `<pre>rc=${esc(r.returncode)}\n${esc(r.stdout)}</pre>`;
+  } catch (e) { $('#po-' + vm).innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  btn.disabled = false;
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button,tr[data-slice]'); if (!b) return;
+  const d = b.dataset;
+  if (d.deploy) deploy(d.deploy, b);
+  else if (d.slice) select(d.slice);
+  else if (d.act) action(d.act, b);
+  else if (d.console) consoleFor(d.console, b);
+  else if (d.probe) probeFor(d.probe);
+  else if (d.runprobe) runProbe(d.runprobe, b);
+  else if (b.id === 'nodesBtn') loadNodes();
+  else if (b.id === 'refresh') { refresh(); if (state.selected) select(state.selected); }
+});
+$('#showDeleted').addEventListener('change', loadSlices);
+function refresh() { loadCap(); loadImages(); loadTemplates(); loadSlices(); }
+refresh();
+setInterval(loadSlices, 10000);
+setInterval(renderOps, 1000);
+</script>
+</body>
+</html>

@@ -120,7 +120,7 @@ def serial_execute(path, command, username, password, timeout=180):
                 sock.sendall((username+'\n').encode());buf='';auth+=1
             elif re.search(r'(?im)^password:\s*$',buf):
                 sock.sendall((password+'\n').encode());buf=''
-            elif re.search(r'(?m)^[^\n]*[$#][ \t]*$',buf):
+            elif re.search(r'(?m)^[^\n$#]*[$#][ \t]*$',buf):
                 break
             if time.monotonic()-last>8:
                 sock.sendall(b'\n');last=time.monotonic()
