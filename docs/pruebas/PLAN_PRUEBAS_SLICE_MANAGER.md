@@ -1,12 +1,13 @@
 # Plan de pruebas — Módulo 1: Slice Manager (R1C)
 
 **Proyecto:** PUCP Private Cloud Orchestrator — Grupo 5 · TEL141 2026-2
-**Entregable:** LAB6, Informe Previo, Actividad 2 (plan de pruebas del módulo «Slice Manager»).
+**Entregable:** LAB6 (guía `GUIA_LAB6_TEL141_2026-2`), Informe Previo, Actividad 2: plan de pruebas del módulo «Slice Manager» considerando los requerimientos de EX1 y EX2. Entrega: jueves 5 de noviembre de 2026.
 **Versión del código evaluada:** rama `fase2`, commit `70966bc` (driver Linux EX1 + driver OpenStack de fase 2).
 **Fecha de corte de resultados:** 2026-11-03.
 
 > Formato de la guía LAB6 (§3.2): casos `X.Y.Z` con 9 campos. `X = 1` es el módulo Slice Manager.
-> Resultado: **PASS** (obtenido = esperado), **FAIL** (distinto), **NT** (no realizado; se indica el motivo).
+> Tipos de prueba de la guía (§3.1): Unitaria, Integración, Funcional y Rendimiento.
+> Resultado: **PASS** (obtenido = esperado), **FAIL** (distinto), **NT** (no realizado: cambiaron los requerimientos o no se cumplieron los requisitos; se indica el motivo).
 > Solo se marca PASS con salida verificable. Se distingue el entorno de cada resultado:
 > **[AUT]** prueba automática con backend simulado (MemoryBackend / OpenStack falso), Windows + stubs;
 > **[REAL]** ejecución sobre el clúster OpenStack de la topología de fase 2.
@@ -27,21 +28,43 @@ recuperable y estados) están en `g5/api.py`, `g5/model.py`, `g5/store.py`, `g5/
 | Pruebas automáticas | `PYTHONPATH=tools/winshim python -m unittest discover -s tests -v` → 83 pruebas OK (`docs/evidencias/F1/suite_unittest_20261103.txt`) |
 | Limitaciones | [AUT] no valida SSH/KVM/OVS reales ni bloqueos `flock` entre procesos. El clúster Linux de fase 2 aún no tiene `cluster.json` propio: los casos Linux reales quedan NT |
 
+### 0.1 Estado de implementación de Slice Manager (corte 2026-11-03)
+
+El plan cubre **todas** las funciones que el HLD (§4.3) y las rúbricas EX1/EX2 asignan a Slice Manager.
+Las que todavía no están implementadas se incluyen con su resultado esperado y quedan **NT** («no se
+cumplieron los requisitos» de la guía): se ejecutarán cuando la fase correspondiente esté lista.
+
+| Función de Slice Manager | Estado | Fase |
+|---|---|---|
+| API REST, autenticación por token, validación del body | Implementado (EX1) | — |
+| Modelado OOP del slice y contrato de driver (Linux / OpenStack) | Implementado | F1 |
+| Admisión atómica, reservas, idempotencia | Implementado (EX1) | — |
+| Ejecución asíncrona con reintentos, compensación y estados | Implementado (EX1 + OpenStack) | F1 |
+| Despliegue y borrado en OpenStack | Implementado y probado en el clúster | F1 |
+| Roles académicos (admin/profesor/alumno), login y cuotas | Pendiente | F2 |
+| Topology Manager: 5 topologías, combinación, borradores, importar/exportar | Pendiente (hay ex1/lineal/anillo fijas) | F2 |
+| Edición de un slice desplegado con control de versión | Pendiente | F2 |
+| Selección de destinos con VM Placement y zona de disponibilidad | Pendiente (worker manual en Linux; Nova elige en OpenStack) | F3 |
+| Vista de consumo de recursos del sistema | Parcial (`/v1/nodes` en Linux) | F3 |
+| Plan de red y seguridad (salida a Internet, security groups, acceso externo) | Pendiente en OpenStack; existe en Linux EX1 | F4 |
+
 ## Resumen de resultados
 
-| Sección | Casos | PASS [REAL] | PASS [AUT] | Evidencia por adjuntar | NT |
-|---|---:|---:|---:|---:|---:|
-| 1.1 Autenticación y autorización | 4 | 0 | 3 | 0 | 1 |
-| 1.2 Validación del body | 4 | 0 | 4 | 0 | 0 |
-| 1.3 Modelado y orden del plan | 2 | 1 | 1 | 0 | 0 |
-| 1.4 Admisión, reservas y concurrencia | 5 | 0 | 5 | 0 | 0 |
-| 1.5 Creación de slices | 5 | 1 | 2 | 1 | 1 |
-| 1.6 Consulta, seguimiento y acceso | 4 | 3 | 1 | 0 | 0 |
-| 1.7 Eliminación | 5 | 1 | 4 | 0 | 0 |
-| 1.8 Fallos, reintentos y compensación | 4 | 0 | 4 | 0 | 0 |
-| 1.9 Rendimiento | 4 | 2 | 0 | 0 | 2 |
-| 1.10 Ciclo de vida (detener/reanudar) | 1 | 0 | 1 | 0 | 0 |
-| **Total** | **38** | **8** | **25** | **1** | **4** |
+| Sección | Casos | PASS [REAL] | PASS [AUT] | NT |
+|---|---:|---:|---:|---:|
+| 1.1 Autenticación y autorización | 5 | 0 | 3 | 2 |
+| 1.2 Validación del body | 5 | 0 | 4 | 1 |
+| 1.3 Modelado, topologías y borradores | 5 | 1 | 1 | 3 |
+| 1.4 Admisión, reservas, concurrencia y placement | 8 | 0 | 5 | 3 |
+| 1.5 Creación de slices | 5 | 2 | 2 | 1 |
+| 1.6 Consulta, seguimiento y acceso | 5 | 3 | 1 | 1 |
+| 1.7 Eliminación | 5 | 1 | 4 | 0 |
+| 1.8 Fallos, reintentos y compensación | 4 | 0 | 4 | 0 |
+| 1.9 Rendimiento | 4 | 2 | 0 | 2 |
+| 1.10 Ciclo de vida (detener/reanudar) | 1 | 0 | 1 | 0 |
+| 1.11 Edición de slices desplegados | 2 | 0 | 0 | 2 |
+| 1.12 Red y seguridad del slice | 2 | 0 | 0 | 2 |
+| **Total** | **51** | **9** | **25** | **17** |
 
 En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 
@@ -53,7 +76,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.1.1 |
-| Tipo de prueba | Integración (API HTTP ↔ identidad) |
+| Tipo de prueba | Integración (API ↔ identidad) |
 | Objetivos | Verificar que ninguna operación protegida se ejecuta sin un Bearer token válido y que los tokens no se guardan en claro. |
 | Prerrequisitos | API levantada; `keys.json` con hashes SHA-256 de tokens. |
 | Procedimiento | 1) `GET /v1/slices` con `Authorization: Bearer bad`. 2) Revisar `keys.json`. |
@@ -66,7 +89,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.1.2 |
-| Tipo de prueba | Funcional / Seguridad |
+| Tipo de prueba | Funcional (seguridad) |
 | Objetivos | Comprobar que un usuario no ve ni opera slices ajenos (se responde 404 para no revelar su existencia). |
 | Prerrequisitos | Un slice creado por `profesor` (admin); token de `alumno` (rol user). |
 | Procedimiento | `GET /v1/slices/{id}` con el token del alumno, en un slice Linux y en uno OpenStack. |
@@ -79,7 +102,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.1.3 |
-| Tipo de prueba | Funcional / Seguridad |
+| Tipo de prueba | Funcional (seguridad) |
 | Objetivos | Verificar que un usuario sin rol admin/service no administra workers ni imágenes. |
 | Prerrequisitos | Token de rol `user`. |
 | Procedimiento | `PATCH /v1/nodes/server1 {"enabled": false}` con el token de usuario. |
@@ -92,7 +115,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.1.4 |
-| Tipo de prueba | Funcional / Seguridad |
+| Tipo de prueba | Funcional (seguridad) |
 | Objetivos | Verificar que un alumno no puede crear ni borrar slices (HLD §2.6). |
 | Prerrequisitos | Roles admin/profesor/alumno en IAM. |
 | Procedimiento | `POST /v1/slices` con token de alumno. |
@@ -100,6 +123,19 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Resultado obtenido | **NT** |
 | Evidencias | — |
 | Comentarios | La implementación actual solo distingue `user` y `admin/service`; los roles académicos y el login se implementan en la fase F2. |
+
+### 1.1.5 CUOTAS POR CURSO
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.1.5 |
+| Tipo de prueba | Funcional (seguridad) |
+| Objetivos | Impedir que un profesor supere la cuota de vCPU, RAM o VMs asignada a su curso. |
+| Prerrequisitos | IAM con cursos y cuotas (F2). |
+| Procedimiento | 1) Asignar a un curso una cuota de 4 vCPU. 2) Crear slices del curso hasta superarla. |
+| Resultados esperados | El slice que excede la cuota se rechaza con HTTP 409 y motivo «cuota del curso excedida»; sin reservas parciales. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | HLD §3.3 (capa 2). La cuota no sustituye la verificación de capacidad real. |
 
 ## 1.2 Validación del body de las solicitudes
 
@@ -155,7 +191,20 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Evidencias | `test_missing_image_and_no_partial_reservations`, `test_unknown_image_is_rejected_before_admission`. |
 | Comentarios | HLD §4.2.5 (referencia de imagen no disponible: rechazo explícito). |
 
-## 1.3 Modelado (OOP) y orden del plan
+### 1.2.5 IMPORTACIÓN DE UNA TOPOLOGÍA CON ESQUEMA INVÁLIDO
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.2.5 |
+| Tipo de prueba | Unitaria |
+| Objetivos | Rechazar plantillas JSON importadas con versión de esquema desconocida, nodos repetidos o enlaces a nodos inexistentes. |
+| Prerrequisitos | Topology Manager con importación (F2). |
+| Procedimiento | Importar tres JSON: versión de esquema inexistente, nodo duplicado y enlace a un nodo ausente. |
+| Resultados esperados | HTTP 400 con el error de cada caso; no se guarda la plantilla ni se crea slice. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R1B-I-08; HLD §4.2.5. |
+
+## 1.3 Modelado (OOP), topologías y borradores
 
 ### 1.3.1 ORDEN CORRECTO DE CREACIÓN EN OPENSTACK
 | Campo | Contenido |
@@ -183,7 +232,46 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Evidencias | `test_edges_and_broadcast_domains`, `test_lineal_and_ring_have_correct_degrees`. |
 | Comentarios | Malla, árbol y bus se agregan en F2 (EX2-R1B-I-03). |
 
-## 1.4 Admisión, reservas y concurrencia
+### 1.3.3 TOPOLOGÍAS MALLA, ÁRBOL Y BUS
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.3.3 |
+| Tipo de prueba | Unitaria |
+| Objetivos | Generar las topologías predefinidas restantes con el grafo correcto para N nodos. |
+| Prerrequisitos | Generadores de topologías (F2). |
+| Procedimiento | Generar malla, árbol y bus con N = 4 y validar enlaces y grados. |
+| Resultados esperados | Malla: N(N−1)/2 enlaces; árbol: N−1 enlaces y sin ciclos; bus: un segmento compartido por las N VMs. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R1B-I-03. |
+
+### 1.3.4 COMBINAR TOPOLOGÍAS Y AGREGAR NODOS Y ENLACES A UN BORRADOR
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.3.4 |
+| Tipo de prueba | Funcional |
+| Objetivos | Editar un slice aún no desplegado combinando dos topologías y agregando nodos y enlaces. |
+| Prerrequisitos | Borradores y editor (F2). |
+| Procedimiento | 1) Crear un borrador lineal de 3 nodos. 2) Unirle un anillo de 3 nodos con un enlace. 3) Agregar un nodo y un enlace. |
+| Resultados esperados | El borrador valida: 7 nodos y los enlaces esperados; no se despliega nada. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R1B-I-04/05; EX1-R1B-D-04. |
+
+### 1.3.5 GUARDAR UN BORRADOR Y RETOMAR LA EDICIÓN
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.3.5 |
+| Tipo de prueba | Funcional |
+| Objetivos | Verificar que un borrador persiste y se recupera para seguir editándolo. |
+| Prerrequisitos | Borradores persistentes (F2). |
+| Procedimiento | 1) Guardar un borrador. 2) Reiniciar la API. 3) Recuperarlo, editarlo y desplegarlo. |
+| Resultados esperados | El borrador recuperado es idéntico al guardado; el despliegue usa la versión editada. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R1B-I-06/09; EX1-R1-D-09. |
+
+## 1.4 Admisión, reservas, concurrencia y placement
 
 ### 1.4.1 ADMISIÓN ATÓMICA (TODO O NADA)
 | Campo | Contenido |
@@ -202,7 +290,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.4.2 |
-| Tipo de prueba | Rendimiento / Concurrencia |
+| Tipo de prueba | Rendimiento (concurrencia) |
 | Objetivos | Verificar que 12 solicitudes simultáneas no reservan más de lo disponible. |
 | Prerrequisitos | Capacidad para exactamente 2 slices. |
 | Procedimiento | 12 hilos crean el mismo diseño con claves distintas. |
@@ -249,6 +337,45 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Resultado obtenido | **PASS [AUT]** |
 | Evidencias | `test_drain_worker_blocks_new_requests`, `test_readding_store_cannot_remove_reserved_worker`. |
 | Comentarios | EX1-R1-D-03 / EX1-R2-D-04. |
+
+### 1.4.6 ASIGNACIÓN AUTOMÁTICA DE HOSTS POR VM PLACEMENT EN LA ZONA PEDIDA
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.4.6 |
+| Tipo de prueba | Integración (Slice Manager ↔ VM Placement) |
+| Objetivos | Verificar que Slice Manager obtiene un destino por VM sin que el usuario indique el worker, dentro de la zona solicitada, y que el host real coincide. |
+| Prerrequisitos | VM Placement (F3); zonas definidas; fijación de host en Nova (microversión ≥ 2.74). |
+| Procedimiento | 1) Crear un slice sin `worker` pidiendo la zona Z. 2) Comparar el plan de Placement con el host real (Nova / agente). |
+| Resultados esperados | Todas las VMs en hosts de la zona Z; host real = host planificado; reservas confirmadas una sola vez. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R4-I-02/04. |
+
+### 1.4.7 RECHAZO EXPLICADO POR FALTA DE CAPACIDAD
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.4.7 |
+| Tipo de prueba | Funcional |
+| Objetivos | Rechazar un slice que no cabe completo, indicando la razón, sin reservas residuales. |
+| Prerrequisitos | VM Placement (F3). |
+| Procedimiento | Pedir un slice cuya demanda total supera la capacidad de la zona. |
+| Resultados esperados | HTTP 409 con motivo por recurso (CPU/RAM/disco) y host descartado; ninguna reserva ni recurso creado. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R4-I-03. Hoy existe el rechazo por capacidad por worker en Linux (caso 1.4.1). |
+
+### 1.4.8 LÍMITE DE TIEMPO DE PLANIFICACIÓN
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.4.8 |
+| Tipo de prueba | Rendimiento |
+| Objetivos | Verificar que la planificación de un slice grande respeta el plazo configurado. |
+| Prerrequisitos | VM Placement con plazo configurable (F3). |
+| Procedimiento | Planificar un slice de 30 VMs con un plazo de 2 s. |
+| Resultados esperados | Plan dentro del plazo o PLANNING_TIMEOUT sin reservas parciales. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R4-D-06; HLD §4.7.4. |
 
 ## 1.5 Creación de slices
 
@@ -300,15 +427,15 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Prerrequisitos | Caso 1.5.3 activo; túnel 50080. |
 | Procedimiento | Iniciar sesión en Horizon (dominio Cloud), seleccionar `g5-<id>`, revisar Instances y Network Topology. |
 | Resultados esperados | 3 instancias Active y topología lineal de 2 redes. |
-| Resultado obtenido | **Ejecutado — evidencia por adjuntar** |
-| Evidencias | Capturas a guardar en `docs/evidencias/F1/` (`TC-1.5.4_*.png`). |
-| Comentarios | EX2-R3-I-06, R3-D-05. Se marcará PASS al adjuntar las capturas. |
+| Resultado obtenido | **PASS [REAL]** — el proyecto `g5-be4b301b…` aparece por separado en Horizon (Resumen del uso: 3 vCPU, 12 GB disco, 1,5 GB RAM), junto a `lab5`. |
+| Evidencias | `docs/evidencias/F1/TC-1.5.4_horizon_resumen_uso.png`. |
+| Comentarios | EX2-R3-I-06, R3-D-05. Conviene agregar capturas de Compute → Instances y Network Topology del mismo proyecto. |
 
 ### 1.5.5 MISMO NÚCLEO PARA LINUX Y OPENSTACK
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.5.5 |
-| Tipo de prueba | Integración (independencia de la infraestructura) |
+| Tipo de prueba | Integración (Slice Manager ↔ drivers Linux y OpenStack) |
 | Objetivos | Verificar que la misma API, Store y Engine despliegan slices de ambos proveedores. |
 | Prerrequisitos | Ninguno. |
 | Procedimiento | Crear un slice `provider=linux` y otro `provider=openstack` y procesarlos con el mismo Engine. |
@@ -362,7 +489,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.6.4 |
-| Tipo de prueba | Funcional / Seguridad |
+| Tipo de prueba | Funcional (seguridad) |
 | Objetivos | Entregar al dueño una URL de consola temporal sin exponer credenciales de infraestructura. |
 | Prerrequisitos | Caso 1.5.3; túnel 56080. |
 | Procedimiento | `POST /v1/slices/{id}/vms/vm1/console`. Linux: probar expiración y revocación del token. |
@@ -370,6 +497,19 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Resultado obtenido | **PASS [REAL]** (OpenStack) · **PASS [AUT]** (Linux) |
 | Evidencias | `consola_vm1_g5` (token omitido) en la evidencia de 1.5.3; `test_console_token_expiration_revocation_and_slice_state`. |
 | Comentarios | EX2-R1B-I-15. |
+
+### 1.6.5 CONSUMO DE RECURSOS DEL SISTEMA
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.6.5 |
+| Tipo de prueba | Funcional |
+| Objetivos | Mostrar la capacidad total, asignada y disponible por host en ambos clústeres. |
+| Prerrequisitos | Inventario y monitoreo de ambos clústeres (F3). |
+| Procedimiento | Consultar el inventario de recursos antes y después de crear un slice. |
+| Resultados esperados | Los valores asignados aumentan exactamente en lo pedido por el slice; ambos clústeres listados. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R1B-I-12, EX2-R4-I-01. Hoy solo existe `/v1/nodes` para Linux. |
 
 ## 1.7 Eliminación
 
@@ -403,7 +543,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.7.3 |
-| Tipo de prueba | Unitaria / Concurrencia |
+| Tipo de prueba | Unitaria (concurrencia) |
 | Objetivos | Impedir operaciones incompatibles sobre el mismo slice. |
 | Prerrequisitos | Slice READY con un borrado pendiente. |
 | Procedimiento | Solicitar `reconcile` mientras el borrado está pendiente. |
@@ -429,7 +569,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.7.5 |
-| Tipo de prueba | Integración / Recuperación |
+| Tipo de prueba | Integración (recuperación) |
 | Objetivos | Verificar que el borrado encuentra por nombre recursos creados cuyo UUID no llegó a registrarse (corte a mitad de operación). |
 | Prerrequisitos | Slice OpenStack READY; diario de redes y puertos sin UUID. |
 | Procedimiento | Vaciar `external_id` en el diario y borrar. |
@@ -483,7 +623,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.8.4 |
-| Tipo de prueba | Integración / Recuperación |
+| Tipo de prueba | Integración (recuperación) |
 | Objetivos | Verificar que repetir un despliegue (reinicio del ejecutor, respuesta perdida) no duplica VMs ni recursos. |
 | Prerrequisitos | Ninguno. |
 | Procedimiento | Repetir el despliegue tras un reinicio simulado; perder la respuesta de `vm_ensure`; volver a desplegar un slice OpenStack ya creado. |
@@ -524,7 +664,7 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Campo | Contenido |
 |---|---|
 | Número de caso | 1.9.3 |
-| Tipo de prueba | Rendimiento / Concurrencia |
+| Tipo de prueba | Rendimiento (concurrencia) |
 | Objetivos | Crear 2 slices en paralelo y medir tiempos y aislamiento. |
 | Prerrequisitos | Disco suficiente en los workers (9 GB c/u). |
 | Procedimiento | Dos `create` simultáneos con plantillas pequeñas. |
@@ -561,6 +701,62 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Evidencias | `test_stop_start_keeps_disks_networks_and_reservations`, `test_stop_and_start_keep_resources`. |
 | Comentarios | HLD F8. |
 
+## 1.11 Edición de slices desplegados
+
+### 1.11.1 AGREGAR UNA VM A UN SLICE DESPLEGADO
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.11.1 |
+| Tipo de prueba | Funcional |
+| Objetivos | Aplicar un cambio incremental a un slice READY sin afectar las VMs existentes. |
+| Prerrequisitos | Edición con plan incremental (F2). |
+| Procedimiento | 1) Slice lineal READY. 2) Solicitar agregar una VM conectada al último nodo. 3) Verificar las VMs previas. |
+| Resultados esperados | Estado UPDATING → READY; la VM nueva queda conectada; las anteriores conservan su ID y su host. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R1B-I-13; HLD F7. |
+
+### 1.11.2 EDICIÓN CON VERSIÓN OBSOLETA
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.11.2 |
+| Tipo de prueba | Unitaria |
+| Objetivos | Rechazar un cambio basado en una versión que otro usuario ya modificó. |
+| Prerrequisitos | Control de versión del slice (F2). |
+| Procedimiento | Dos usuarios editan la misma versión; el segundo envía su cambio después del primero. |
+| Resultados esperados | El segundo recibe HTTP 409 y debe revisar los cambios. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX1-R1-D-10; HLD §4.1.6. |
+
+## 1.12 Red y seguridad del slice
+
+### 1.12.1 SALIDA A INTERNET SOLO PARA LAS VMS AUTORIZADAS EN OPENSTACK
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.12.1 |
+| Tipo de prueba | Funcional |
+| Objetivos | Verificar que solo las VMs marcadas con salida a Internet la obtienen. |
+| Prerrequisitos | Plan de red y router hacia `external` (F4). |
+| Procedimiento | 1) Slice con vm1 autorizada y vm2 sin autorización. 2) `ping 8.8.8.8` desde ambas. |
+| Resultados esperados | vm1 responde; vm2 no tiene salida. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R5-I-04. |
+
+### 1.12.2 REGLAS DE SEGURIDAD DEL SLICE EN OPENSTACK
+| Campo | Contenido |
+|---|---|
+| Número de caso | 1.12.2 |
+| Tipo de prueba | Funcional |
+| Objetivos | Aplicar security groups según lo declarado (p. ej. solo SSH desde un origen). |
+| Prerrequisitos | Security groups por slice (F4). |
+| Procedimiento | 1) Slice con regla «TCP 22 desde 10.8.0.0/24». 2) Probar SSH desde un origen permitido y otro no. |
+| Resultados esperados | Permitido conecta; no permitido se rechaza. |
+| Resultado obtenido | **NT** — función pendiente de implementación. |
+| Evidencias | — |
+| Comentarios | EX2-R5-I-03. |
+
 ---
 
 ## Trazabilidad con EX1/EX2
@@ -572,11 +768,17 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | EX1-R1C-D-03 Sin race condition / overcommitting | 1.4.1, 1.4.2 |
 | EX1-R1C-D-04/05 Monitoreo y consistencia | 1.6.3, 1.8.3 |
 | EX1-R1C-D-06 Autenticación y autorización | 1.1.1–1.1.4 |
+| EX1-R1-D-09/10 Retomar edición; concurrencia al editar | 1.3.5, 1.11.2 |
 | EX2-R1B-I-01 Independencia de la infraestructura | 1.5.5, 1.5.3 |
 | EX2-R1B-I-02 Concurrencia de usuarios | 1.4.2, 1.9.3 |
-| EX2-R1B-I-11/13/15 Listar, borrar, consola | 1.6.1, 1.7.1–1.7.2, 1.6.4 |
+| EX2-R1B-I-03/04/05/06 Topologías, combinar, editar, borradores | 1.3.2–1.3.5 |
+| EX2-R1B-I-07/08/09 Exportar/importar topologías | 1.2.5, 1.3.5 |
+| EX2-R1B-I-11/12/13/15 Listar, consumo, borrar/editar, consola | 1.6.1, 1.6.5, 1.7.1–1.7.2, 1.11.1, 1.6.4 |
 | EX2-R3-I-02/03/04/05/06 OpenStack | 1.5.3, 1.9.1, 1.7.2, 1.5.4 |
+| EX2-R4-I-01/02/03/04 VM Placement | 1.6.5, 1.4.6, 1.4.7 |
+| EX2-R4-D-06 Tiempo de planificación | 1.4.8 |
 | EX2-R5-I-01 VLAN sin túneles | 1.5.3 |
+| EX2-R5-I-03/04 Seguridad y salida a Internet | 1.12.2, 1.12.1 |
 
 ## Cómo reproducir
 

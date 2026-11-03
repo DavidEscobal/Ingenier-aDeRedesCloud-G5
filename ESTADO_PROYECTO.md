@@ -85,6 +85,13 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
   Evidencia: `docs/evidencias/F1/TC-1.7.2_*.json`. API temporal detenida.
 - Riesgo observado: con 3 VMs de 4 GB el disco de worker1/worker2 llega a 8/9 GB. Coordinar pruebas.
 
+## LAB6 2026-2 (guía `GUIA_LAB6_TEL141_2026-2`)
+- **Informe previo: jueves 5 de noviembre de 2026.** Evaluación continua (explicación del plan): domingo 8 de noviembre, 23:59.
+  Las fechas del enunciado del proyecto son de 2025-2 y no se usan para el calendario.
+- Actividad 2: `docs/pruebas/PLAN_PRUEBAS_SLICE_MANAGER.md` y `.docx` — 51 casos (9 PASS [REAL], 25 PASS [AUT],
+  17 NT por funciones pendientes de F2–F4). El plan está redactado; Slice Manager **no** está completo.
+- Actividad 1: la ejecuta el grupo en el headnode con `docs/pruebas/LAB6_ACTIVIDAD1_GUIA_EJECUCION.md`.
+
 ## Prioridades
 1. Auditar la arquitectura G5.
 2. Revisar cobertura de criterios EX1 y EX2.
