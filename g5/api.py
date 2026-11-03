@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from .agent import inspect_image
 from .backend import SSHBackend, MemoryBackend, RemoteError
 from .console import Consoles
+from .drivers import default_drivers
 from .engine import Engine
 from .model import Fault, require, validate, digest, fields, canonical
 from .store import Store
@@ -25,8 +26,8 @@ from .store import Store
 class Application:
     def __init__(self, config, state, keys, simulate=False, backend=None):
         self.config = config
-        self.store = Store(state, config)
         self.backend = backend or (MemoryBackend(config) if simulate else SSHBackend(config))
+        self.store = Store(state, config, default_drivers(config, self.backend))
         self.engine = Engine(self.store, self.backend)
         self.consoles = Consoles(self.store, self.backend)
         self.keys = keys

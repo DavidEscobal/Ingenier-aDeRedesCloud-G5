@@ -1,20 +1,22 @@
 """Reservas, estado y cola durables en transacciones SQLite cortas."""
 import contextlib
-import ipaddress
 import json
 import sqlite3
 import time
 import uuid
 from pathlib import Path
-from .model import Fault, require, canonical, fingerprint, disk_bytes
+from .domain import provider_of
+from .model import require, canonical, fingerprint
 
 
 class Store:
-    def __init__(self, directory, config):
+    def __init__(self, directory, config, drivers=None):
+        from .drivers import default_drivers
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
         self.path = str(self.directory / 'cluster.db')
         self.config = config
+        self.drivers = drivers or default_drivers(config)
         with self.tx() as db:
             db.executescript('''
             CREATE TABLE IF NOT EXISTS slices(id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT,
@@ -86,43 +88,10 @@ class Store:
             if existing:
                 return existing
             sid = uuid.uuid4().hex
-            used = {r[0] for r in db.execute('SELECT svid FROM leases')}
-            svid = next((v for v in range(self.config['svid_range'][0], self.config['svid_range'][1] + 1) if v not in used), None)
-            require(svid is not None, 'Pool de S-VLAN agotado', 409)
-            used_slots = {r[0] for r in db.execute('SELECT slot FROM leases')}
-            pool = ipaddress.ip_network(self.config['transit_pool'])
-            slot = next((x for x in range(pool.num_addresses // 4) if x not in used_slots), None)
-            require(slot is not None, 'Pool de tránsito agotado', 409)
             plan = json.loads(canonical(spec))
-            plan.update(id=sid, svid=svid, transit=str(ipaddress.ip_network((int(pool.network_address) + slot * 4, 30))))
-            for network in plan['networks']:
-                network['gateway'] = str(ipaddress.ip_network(network['cidr']).network_address + 1)
-            for vm in plan['vms']:
-                worker = vm['worker']
-                require(db.execute('SELECT enabled FROM nodes WHERE id=?', (worker,)).fetchone()[0], 'Worker en mantenimiento', 409)
-                image = db.execute('SELECT * FROM images WHERE id=?', (vm['image'],)).fetchone()
-                require(image is not None, 'Imagen no registrada: ' + vm['image'], 404)
-                vm['disk_bytes'] = disk_bytes(vm['disk_gb'], self.config.get('disk_unit', 'GiB'))
-                require(image['virtual_size'] <= vm['disk_bytes'], 'Disco menor que la imagen base', 409)
-                vm['image_bytes'] = image['size']
-                used_r = db.execute('SELECT COALESCE(SUM(cpu),0),COALESCE(SUM(mem),0),COALESCE(SUM(disk),0) FROM allocations WHERE worker=?', (worker,)).fetchone()
-                capacity = self.config['workers'][worker]['capacity']
-                require(all(used_r[i] + vm[k] <= capacity[k] for i, k in enumerate(('vcpus', 'memory_mb', 'disk_gb'))),
-                        'Capacidad reservable insuficiente en ' + worker, 409)
-                used_vnc = {r[0] for r in db.execute('SELECT vnc FROM allocations WHERE worker=?', (worker,))}
-                vnc = next((p for p in range(5900, 6900) if p not in used_vnc), None)
-                require(vnc is not None, 'Puertos VNC agotados', 409)
-                vm['vnc'] = vnc
-                for idx, nic in enumerate(vm['nics']):
-                    h = fingerprint([sid, vm['name'], idx])
-                    nic['mac'] = '02:' + ':'.join(h[i:i+2] for i in range(0, 10, 2))
-                db.execute('INSERT INTO allocations VALUES(?,?,?,?,?,?,?,?)',
-                           (sid, vm['name'], worker, vm['vcpus'], vm['memory_mb'], vm['disk_gb'], vm['image'], vnc))
-            for pub in plan['publications']:
-                require(not db.execute('SELECT 1 FROM ports WHERE protocol=? AND port=?', (pub['protocol'], pub['external_port'])).fetchone(),
-                        'Puerto externo reservado', 409)
-                db.execute('INSERT INTO ports VALUES(?,?,?)', (pub['protocol'], pub['external_port'], sid))
-            db.execute('INSERT INTO leases VALUES(?,?,?)', (svid, sid, slot))
+            plan['id'] = sid
+            # Cada proveedor reserva lo suyo dentro de esta misma transacción: todo o nada.
+            self.drivers[provider_of(spec)].reserve(db, sid, plan)
             db.execute('INSERT INTO slices VALUES(?,?,?,?,?,?,1)', (sid, owner, spec['name'], canonical(spec), canonical(plan), 'QUEUED'))
             return self._job(db, sid, owner, key, value, 'create')
 
