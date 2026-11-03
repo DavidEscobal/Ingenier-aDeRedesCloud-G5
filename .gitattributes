@@ -1,0 +1,6 @@
+# Saltos de línea LF en el repositorio, sin importar el sistema de cada integrante.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.qcow2 binary
