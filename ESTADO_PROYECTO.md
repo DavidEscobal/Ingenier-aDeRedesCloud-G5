@@ -69,6 +69,22 @@ Evidencia: `docs/evidencias/F0/inventario_openstack_20261103.json` (sin tokens).
 - Flavor `512MBRAM_1VCPUs_4GBRoot`; imagen `cirros` (qcow2, pública).
 - Cuotas `cloud_admin`: 10 instancias, 20 cores, 50 GB RAM; Neutron 100 redes / 500 puertos.
 
+## Fase 1 — implementación y primera prueba real (2026-11-03)
+Commits en `fase2`: refactor `LinuxDriver` (08534ef), Store multiproveedor (8ddde75), cliente REST
+OpenStack (6d30f56), driver OpenStack (9fd8024), API multiproveedor (f23b9cb). 83 pruebas automáticas OK
+(Windows con stubs, OpenStack falso). No se ha hecho push.
+
+Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` del app server, API temporal en
+127.0.0.1:8085, base `state-f1`):
+- **TC-1.5.3 PASS** — `templates/os-lineal.json` creado por la API G5 en 20,3 s: proyecto `g5-be4b301b…`,
+  redes vlan/physnet1 (VLAN 103 y 345, sin túneles), 4 puertos con IPs fijas, vm1/vm3 en worker2 y vm2 en
+  worker1 (enlaces entre hosts), todas ACTIVE. Evidencia: `docs/evidencias/F1/TC-1.5.3_*.json`.
+  Capturas de Horizon y ping realizadas por el usuario (pendiente incorporarlas a `docs/evidencias/F1/`).
+- **TC-1.7.2 PASS** — borrado por la API G5 en 18,1 s: sin proyecto, servidores, redes, subredes ni puertos
+  `g5-*`; diario con 12 recursos DELETED; OpenStack quedó igual que antes (solo lab5 y la red external).
+  Evidencia: `docs/evidencias/F1/TC-1.7.2_*.json`. API temporal detenida.
+- Riesgo observado: con 3 VMs de 4 GB el disco de worker1/worker2 llega a 8/9 GB. Coordinar pruebas.
+
 ## Prioridades
 1. Auditar la arquitectura G5.
 2. Revisar cobertura de criterios EX1 y EX2.

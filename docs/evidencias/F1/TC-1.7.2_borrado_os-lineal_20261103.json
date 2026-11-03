@@ -1,0 +1,76 @@
+{
+ "caso": "TC-1.7.2 Eliminación de slice OpenStack sin recursos huérfanos",
+ "fecha_utc": "2026-11-03T15:47:44Z",
+ "version_codigo": "commit f23b9cb",
+ "operacion_g5": {
+  "action": "delete",
+  "attempts": 1,
+  "created": 1793720828.3485508,
+  "error": null,
+  "id": "23e1822150f648a98ef2729b4c81457c",
+  "owner": "infra-manager",
+  "slice_id": "be4b301b4b83408f90b7d9a105f57ad4",
+  "status": "SUCCEEDED",
+  "updated": 1793720846.4493384
+ },
+ "slice_g5": {
+  "id": "be4b301b4b83408f90b7d9a105f57ad4",
+  "name": "os-lineal",
+  "provider": "openstack",
+  "reserved": 0,
+  "status": "DELETED"
+ },
+ "diario_recursos_g5": "ver tabla resources en state-f1/cluster.db",
+ "openstack_directo": {
+  "proyecto_g5_existe": false,
+  "proyectos": [
+   "admin",
+   "cloud_admin",
+   "lab5",
+   "service"
+  ],
+  "servidores_g5": [],
+  "redes_g5": [],
+  "subredes_g5": [],
+  "puertos_g5": [],
+  "servidores_restantes": [
+   [
+    "instance_2",
+    "ACTIVE",
+    "worker3"
+   ],
+   [
+    "instance_1",
+    "ACTIVE",
+    "worker1"
+   ]
+  ],
+  "redes_restantes": [
+   "external",
+   "link_1"
+  ],
+  "hypervisors": [
+   {
+    "host": "worker2",
+    "vcpus_used": 0,
+    "ram_used_mb": 512,
+    "disk_used_gb": 0,
+    "running_vms": 0
+   },
+   {
+    "host": "worker3",
+    "vcpus_used": 1,
+    "ram_used_mb": 1024,
+    "disk_used_gb": 4,
+    "running_vms": 1
+   },
+   {
+    "host": "worker1",
+    "vcpus_used": 1,
+    "ram_used_mb": 1024,
+    "disk_used_gb": 4,
+    "running_vms": 1
+   }
+  ]
+ }
+}

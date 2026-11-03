@@ -1,0 +1,265 @@
+{
+ "caso": "TC-1.5.3 Creación de slice lineal en OpenStack mediante la API G5",
+ "fecha_utc": "2026-11-03T15:26:59Z",
+ "version_codigo": "commit f23b9cb",
+ "solicitud": {
+  "name": "os-lineal",
+  "provider": "openstack",
+  "networks": [
+   {
+    "name": "link12",
+    "cidr": "192.168.11.0/28",
+    "dhcp": true
+   },
+   {
+    "name": "link23",
+    "cidr": "192.168.12.0/28",
+    "dhcp": true
+   }
+  ],
+  "vms": [
+   {
+    "name": "vm1",
+    "image": "cirros",
+    "vcpus": 1,
+    "memory_mb": 512,
+    "disk_gb": 4,
+    "nics": [
+     {
+      "network": "link12",
+      "ip": "192.168.11.2"
+     }
+    ]
+   },
+   {
+    "name": "vm2",
+    "image": "cirros",
+    "vcpus": 1,
+    "memory_mb": 512,
+    "disk_gb": 4,
+    "nics": [
+     {
+      "network": "link12",
+      "ip": "192.168.11.3"
+     },
+     {
+      "network": "link23",
+      "ip": "192.168.12.2"
+     }
+    ]
+   },
+   {
+    "name": "vm3",
+    "image": "cirros",
+    "vcpus": 1,
+    "memory_mb": 512,
+    "disk_gb": 4,
+    "nics": [
+     {
+      "network": "link23",
+      "ip": "192.168.12.3"
+     }
+    ]
+   }
+  ]
+ },
+ "operacion_g5": {
+  "action": "create",
+  "attempts": 1,
+  "created": 1793719577.287985,
+  "error": null,
+  "id": "3d3ee0ed61154b0586765f806ea08110",
+  "owner": "infra-manager",
+  "slice_id": "be4b301b4b83408f90b7d9a105f57ad4",
+  "status": "SUCCEEDED",
+  "updated": 1793719597.6080077
+ },
+ "slice_g5": {
+  "id": "be4b301b4b83408f90b7d9a105f57ad4",
+  "name": "os-lineal",
+  "provider": "openstack",
+  "reserved": 1,
+  "status": "READY"
+ },
+ "diagnostico_g5": {
+  "ok": true,
+  "project": "g5-be4b301b4b83408f90b7d9a105f57ad4",
+  "provider": "openstack",
+  "servers": {
+   "vm1": {
+    "host": "worker2",
+    "id": "1edac58d-84ab-45ad-b963-3e4283d45e35",
+    "status": "ACTIVE"
+   },
+   "vm2": {
+    "host": "worker1",
+    "id": "edc970a4-7aaa-4f17-80e6-f2a27c921db0",
+    "status": "ACTIVE"
+   },
+   "vm3": {
+    "host": "worker2",
+    "id": "73789f23-7b14-488e-8a1e-6b3b9b26bc6a",
+    "status": "ACTIVE"
+   }
+  },
+  "simulated": false,
+  "slice_id": "be4b301b4b83408f90b7d9a105f57ad4"
+ },
+ "consola_vm1_g5": {
+  "provider": "openstack",
+  "url": "http://127.0.0.1:56080/vnc_auto.html?path=%3Ftoken%3D<omitido>"
+ },
+ "openstack_directo": {
+  "proyecto": {
+   "id": "40f4f92c814a4ff494f1f55a6d086d1a",
+   "name": "g5-be4b301b4b83408f90b7d9a105f57ad4",
+   "domain_id": "c814fd851c1c4837a0e8ab07c74fe375"
+  },
+  "redes": [
+   {
+    "name": "g5-be4b301b-link12",
+    "type": "vlan",
+    "physnet": "physnet1",
+    "vlan": 103,
+    "port_security": false,
+    "status": "ACTIVE"
+   },
+   {
+    "name": "g5-be4b301b-link23",
+    "type": "vlan",
+    "physnet": "physnet1",
+    "vlan": 345,
+    "port_security": false,
+    "status": "ACTIVE"
+   }
+  ],
+  "subredes": [
+   {
+    "name": "g5-be4b301b-link23",
+    "cidr": "192.168.12.0/28",
+    "dhcp": true,
+    "gateway": null
+   },
+   {
+    "name": "g5-be4b301b-link12",
+    "cidr": "192.168.11.0/28",
+    "dhcp": true,
+    "gateway": null
+   }
+  ],
+  "puertos": [
+   {
+    "name": "",
+    "owner": "network:dhcp",
+    "ips": [
+     "192.168.11.1"
+    ],
+    "status": "ACTIVE",
+    "host": "headnode"
+   },
+   {
+    "name": "g5-be4b301b-vm1-link12",
+    "owner": "compute:nova",
+    "ips": [
+     "192.168.11.2"
+    ],
+    "status": "ACTIVE",
+    "host": "worker2"
+   },
+   {
+    "name": "",
+    "owner": "network:dhcp",
+    "ips": [
+     "192.168.12.1"
+    ],
+    "status": "ACTIVE",
+    "host": "headnode"
+   },
+   {
+    "name": "g5-be4b301b-vm3-link23",
+    "owner": "compute:nova",
+    "ips": [
+     "192.168.12.3"
+    ],
+    "status": "ACTIVE",
+    "host": "worker2"
+   },
+   {
+    "name": "g5-be4b301b-vm2-link23",
+    "owner": "compute:nova",
+    "ips": [
+     "192.168.12.2"
+    ],
+    "status": "ACTIVE",
+    "host": "worker1"
+   },
+   {
+    "name": "g5-be4b301b-vm2-link12",
+    "owner": "compute:nova",
+    "ips": [
+     "192.168.11.3"
+    ],
+    "status": "ACTIVE",
+    "host": "worker1"
+   }
+  ],
+  "servidores": [
+   {
+    "name": "g5-be4b301b-vm3",
+    "status": "ACTIVE",
+    "host": "worker2",
+    "addresses": {
+     "g5-be4b301b-link23": [
+      "192.168.12.3"
+     ]
+    }
+   },
+   {
+    "name": "g5-be4b301b-vm2",
+    "status": "ACTIVE",
+    "host": "worker1",
+    "addresses": {
+     "g5-be4b301b-link12": [
+      "192.168.11.3"
+     ],
+     "g5-be4b301b-link23": [
+      "192.168.12.2"
+     ]
+    }
+   },
+   {
+    "name": "g5-be4b301b-vm1",
+    "status": "ACTIVE",
+    "host": "worker2",
+    "addresses": {
+     "g5-be4b301b-link12": [
+      "192.168.11.2"
+     ]
+    }
+   }
+  ],
+  "hypervisors": [
+   {
+    "host": "worker2",
+    "vcpus_used": 2,
+    "ram_used_mb": 1536,
+    "disk_used_gb": 8,
+    "running_vms": 2
+   },
+   {
+    "host": "worker3",
+    "vcpus_used": 1,
+    "ram_used_mb": 1024,
+    "disk_used_gb": 4,
+    "running_vms": 1
+   },
+   {
+    "host": "worker1",
+    "vcpus_used": 2,
+    "ram_used_mb": 1536,
+    "disk_used_gb": 8,
+    "running_vms": 2
+   }
+  ]
+ }
+}
