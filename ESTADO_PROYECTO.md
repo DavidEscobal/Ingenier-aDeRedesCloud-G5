@@ -1,40 +1,42 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
+> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-03 (cierre de la sesión F0 + F1 + LAB6).
+
 ## Estado general
-Actualmente estamos en fase de análisis y planificación de implementación.
+- **F0 (auditoría) y F1 (núcleo de Slice Manager agnóstico + driver OpenStack) terminadas.**
+  Crear, consultar y borrar un slice en OpenStack desde la API G5 funciona y está probado en el clúster real.
+- Código en `github.com/DavidEscobal/Ingenier-aDeRedesCloud-G5`, rama **`fase2`** (sincronizada; `main` = EX1 sin tocar).
+  El repositorio es **público**; el enunciado pide privado (lo decide el dueño, David Escobal).
+- Suite automática: **83 pruebas OK** (`PYTHONPATH=tools/winshim python -m unittest discover -s tests`).
+- **Slice Manager NO está completo**: faltan roles académicos, Topology Manager, borradores, edición, VM Placement
+  y red/seguridad en OpenStack (ver "Próxima sesión").
 
-## Objetivo inmediato
-Comenzar la implementación real de la arquitectura del proyecto,
-alineada con los criterios de EX1 y EX2, y con especial prioridad
-en los componentes necesarios para el plan de pruebas de Slice Manager
-solicitado en el Laboratorio 6.
+## Implementación actual (rama `fase2`)
+| Componente | Archivo | Estado |
+|---|---|---|
+| API REST (multiproveedor), auth por token, OpenAPI 2.1.0 | `g5/api.py`, `api/openapi.json` | Implementado |
+| Validación genérica + por proveedor | `g5/model.py`, `g5/drivers/*` | Implementado |
+| Contrato `ProviderDriver` + `OpContext` | `g5/drivers/base.py`, `g5/domain.py` | Implementado |
+| Driver Linux (EX1: QEMU/OVS/QinQ/NAT) | `g5/drivers/linux.py`, `g5/agent.py` | Implementado (config de fase 1; falta `cluster.json` de fase 2) |
+| Driver OpenStack (proyecto por slice, VLAN, puertos, VMs, consola) | `g5/drivers/openstack/` | Implementado y probado en real |
+| Store: reservas, idempotencia, `provider`, diario `resources` | `g5/store.py` | Implementado |
+| Engine: cola local, reintentos, compensación, estados | `g5/engine.py` | Implementado |
+| CLI / demo / web mínima (EX1) | `g5/cli.py`, `g5/demo.py`, `g5/web.py` | Existente (web solo plantillas Linux) |
+| Plantillas | `templates/ex1.json`, `lineal.json`, `anillo.json` (Linux, fijas), `templates/os-lineal.json` | Fijas; sin generadores |
 
-## Documentación disponible
-- CLAUDE.md
-- AGENTS.md
-- Arquitectura_md/
-- Laboratorio_md/
-- requerimientos_md/
-- requerimientos_md/rubrica_md/
-- requerimientos_md/trazabilidad_md/
+Historial de la auditoría F0 del código EX1: commit `b04a466`; limitaciones originales: worker obligatorio,
+plantillas escritas a mano, secuencia Linux fija (resuelto con `LinuxDriver`), web con token admin, sin Topology
+Manager / Placement / IAM con login.
 
-## Implementación actual
-Auditoría F0 (2026-11-03) del repositorio EX1
-`github.com/DavidEscobal/Ingenier-aDeRedesCloud-G5`, commit `b04a466` (12-oct-2026).
-Clonado solo para lectura; todavía no está integrado en este workspace.
-
-- Paquete `g5/` (~2 800 líneas, solo biblioteca estándar; `websockify` para la consola):
-  `api`, `model`, `store`, `engine`, `backend`, `agent`, `console`, `cli`, `demo`, `web`, `manage`.
-- Suite `tests/`: 60 pruebas, **OK** en Windows con Python 3.12 usando stubs de `fcntl`/`pwd`
-  (sin bloqueo real entre procesos). No se ejecutó en Linux ni sobre la infraestructura.
-- Reutilizable: agente Linux (QEMU/OVS/QinQ/NAT/dnsmasq), reservas SQLite atómicas,
-  idempotencia, compensación, tokens de consola, cliente HTTP.
-- Limitaciones verificadas en código: el `worker` es obligatorio por VM y la capacidad sale
-  del JSON de configuración; plantillas ex1/lineal/anillo escritas a mano (VMs, IPs, CVIDs y
-  workers fijos); secuencia de despliegue Linux fija en `engine.py`; modelo de solicitud
-  ligado a Linux (CVID, IP manual, SO ubuntu/cirros, /20–/27); la web usa siempre el token
-  admin; no hay Topology Manager, VM Placement, driver OpenStack, IAM con login ni monitoreo
-  histórico. La configuración de ejemplo es de fase 1 (10.0.10.0/24, server4 como gateway, OFS).
+## Estado de la infraestructura (para no romper nada)
+- **App server** (`ssh g5-app`, 10.20.11.248): código desplegado en `~/g5-orchestrator` (commit f23b9cb),
+  credenciales locales de la API en `config/` (600), base de la prueba en `state-f1/`. **API detenida.**
+  Credenciales OpenStack en `~/.g5/openstack.env` (600, no leer ni imprimir).
+- Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
+- **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
+  `~/.ssh/authorized_keys.bak-20261103`. No se tocó iptables.
+- **OpenStack**: igual que el inventario inicial (solo `lab5` con 2 VMs y la red `external`). Ningún recurso `g5-*`.
+- Acceso desde la PC del usuario: alias `g5-app` y `g5-gw` en `~/.ssh/config` con la llave `id_ed25519_g5`.
 
 ## Inventario de fase 2 verificado (2026-11-03, solo lectura)
 - app server: `app`, 10.20.11.248/24 (DHCP), Ubuntu 20.04.2, Python 3.8.10; sin interfaz en MGMT 1/2.
@@ -72,14 +74,14 @@ Evidencia: `docs/evidencias/F0/inventario_openstack_20261103.json` (sin tokens).
 ## Fase 1 — implementación y primera prueba real (2026-11-03)
 Commits en `fase2`: refactor `LinuxDriver` (08534ef), Store multiproveedor (8ddde75), cliente REST
 OpenStack (6d30f56), driver OpenStack (9fd8024), API multiproveedor (f23b9cb). 83 pruebas automáticas OK
-(Windows con stubs, OpenStack falso). No se ha hecho push.
+(Windows con stubs, OpenStack falso). Publicado en `origin/fase2`.
 
 Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` del app server, API temporal en
 127.0.0.1:8085, base `state-f1`):
 - **TC-1.5.3 PASS** — `templates/os-lineal.json` creado por la API G5 en 20,3 s: proyecto `g5-be4b301b…`,
   redes vlan/physnet1 (VLAN 103 y 345, sin túneles), 4 puertos con IPs fijas, vm1/vm3 en worker2 y vm2 en
   worker1 (enlaces entre hosts), todas ACTIVE. Evidencia: `docs/evidencias/F1/TC-1.5.3_*.json`.
-  Capturas de Horizon y ping realizadas por el usuario (pendiente incorporarlas a `docs/evidencias/F1/`).
+  Horizon: `docs/evidencias/F1/TC-1.5.4_horizon_resumen_uso.png` (faltan capturas de Instances/Topology y ping).
 - **TC-1.7.2 PASS** — borrado por la API G5 en 18,1 s: sin proyecto, servidores, redes, subredes ni puertos
   `g5-*`; diario con 12 recursos DELETED; OpenStack quedó igual que antes (solo lab5 y la red external).
   Evidencia: `docs/evidencias/F1/TC-1.7.2_*.json`. API temporal detenida.
@@ -92,18 +94,38 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
   17 NT por funciones pendientes de F2–F4). El plan está redactado; Slice Manager **no** está completo.
 - Actividad 1: la ejecuta el grupo en el headnode con `docs/pruebas/LAB6_ACTIVIDAD1_GUIA_EJECUCION.md`.
 
-## Prioridades
-1. Auditar la arquitectura G5.
-2. Revisar cobertura de criterios EX1 y EX2.
-3. Proponer plan maestro de implementación por fases.
-4. Identificar los componentes mínimos para comenzar a probar Slice Manager.
-5. Diseñar estructura de repositorio y estrategia de documentación final.
+## Pendientes que dependen del grupo o de permisos
+| Pendiente | Quién | Nota |
+|---|---|---|
+| Informe previo LAB6 (Actividad 1 en el headnode + pasar el plan al template PAIDEIA) | Grupo | **Jueves 5 nov** |
+| Explicación del plan de pruebas (evaluación continua) | Grupo | Domingo 8 nov 23:59 |
+| `sudo loginctl enable-linger ubuntu` en el app server | Usuario | Para que `g5-tunnels` arranque tras reiniciar |
+| Agregar `permitopen="192.168.202.1:8778"` (Placement) a la llave del gateway | Usuario | Necesario en F3 |
+| Aclarar autoría de las reglas `LAB5_DIRECT` (origen 10.8.0.168) en el gateway | Grupo | D-05 en pausa hasta entonces |
+| Repositorio privado + coach `fernandoguzmann` como colaborador (triage) | David Escobal | Requisito del enunciado |
+| No recrear `cloud_admin`, no tocar proyectos `g5-*`, abrir túneles LAB6 en laptops (no en el app server) | Grupo | Evita romper el orquestador |
+| Decidir qué nodo Linux hace de gateway de slices en fase 2 | Grupo | Necesario para el `cluster.json` Linux |
+| Carpeta `requerimientos_md/Imagenes/` sin commitear (captura de un portal externo) | Usuario | Decidir si se versiona |
+
+## Próxima sesión: F2 — Topology Manager, borradores, edición y roles (R1B)
+Abrir **una sesión nueva** (contexto liviano). Leer `CLAUDE.md`, este archivo y `docs/pruebas/PLAN_PRUEBAS_SLICE_MANAGER.md`.
+Pasos propuestos (cada uno con tests y commit propio, sin tocar infraestructura):
+1. **Generadores de topologías** (`g5/topology/`): lineal, anillo, malla, árbol, bus para N nodos, independientes del
+   proveedor; esquema JSON versionado (`schema_version`). Casos 1.3.2–1.3.3.
+2. **Borradores persistentes**: tabla `drafts` (dueño, versión, contenido); API `POST/GET/PUT /v1/drafts`, combinar
+   topologías y agregar nodos/enlaces; desplegar un borrador como slice. Casos 1.3.4–1.3.5.
+3. **Exportar/importar** plantillas con validación de esquema (sin credenciales ni IDs de ejecución). Casos 1.2.5.
+4. **IAM mínimo**: login con expiración y roles admin/profesor/alumno; filtrar por dueño/curso. Casos 1.1.4–1.1.5.
+5. **Edición de slices desplegados** con control de versión (409 si la versión es obsoleta). Casos 1.11.1–1.11.2.
+6. **Interfaz web** sobre esos endpoints (listar, crear desde plantilla o borrador eligiendo Linux/OpenStack, estado,
+   diagnóstico, consola, borrar). La web EX1 (`g5/web.py`) sirve de base.
+Luego: F3 (VM Placement, R4) → configuración Linux de fase 2 → F4 (red y seguridad, R5).
 
 ## Decisiones aprobadas (2026-11-03)
 | ID | Decisión | Motivo | Pendiente de verificar |
 |---|---|---|---|
 | D-01 | El orquestador G5 corre en la VM **app server** de la topología de fase 2 (no en headnode ni en server4). | La topología grupal prevé `app` para la aplicación; headnode queda solo para el control de OpenStack. Reemplaza la propuesta del HLD §3.6 (contradicción C6). | Versión de Python, acceso desde `app` a MGMT 1 (192.168.201.0/24) y MGMT 2 (192.168.202.0/24), resolución de `controller`, puertos expuestos. |
-| D-02 | El driver OpenStack usa un **cliente REST propio** (`requests`) contra Keystone, Nova, Neutron y Glance; no `openstacksdk`. | Transparencia del uso de tokens y APIs (rúbrica LAB6) y facilidad para simular con mocks. | Microversión de Nova soportada (descubrirla, no fijarla). |
+| D-02 | El driver OpenStack usa un **cliente REST propio** (biblioteca estándar `urllib`, igual que el resto de EX1) contra Keystone, Nova, Neutron y Glance; no `openstacksdk`. | Transparencia del uso de tokens y APIs (rúbrica LAB6) y facilidad para simular con mocks. | Microversión de Nova soportada (descubrirla, no fijarla). |
 | D-03 | **Un proyecto OpenStack por slice.** | Permite ver cada slice por separado en Horizon (R3, EX2-R3-D-05 / R3-I-06) y simplifica el borrado. | Permisos del usuario de servicio para crear proyectos y asignar roles en el dominio `Cloud`. |
 | D-06 | **Vigente:** el app server accede a las APIs OpenStack por **túneles SSH a través del gateway** (puerto 22): `127.0.0.1:55000/58774/59696/59292/56080/50080` → `192.168.202.1:5000/8774/9696/9292/6080/80`. D-05 queda **en pausa**. | En el gateway hay 4 reglas DNAT activas no guardadas (`LAB5_DIRECT`, origen 10.8.0.168) de autoría desconocida; no se toca iptables hasta que el grupo aclare quién las puso y por qué. Los túneles además cifran el tráfico. | Mantener los túneles vivos (reinicio automático); confirmar con el grupo el origen de `LAB5_DIRECT`. |
 | D-05 | (En pausa) El app server accede a las APIs OpenStack mediante **DNAT en el gateway** (alternativa LAB6 §4.3), restringido a origen `10.20.11.248`: 55000→5000, 58774→8774, 59696→9696, 59292→9292, 56080→6080, 50080→80 hacia `192.168.202.1`. Aprobado por el grupo y el profesor ("con mucho cuidado"). | El app server no tiene interfaz en MGMT 2; el gateway sí (ens5 192.168.202.10) y ya hace DNAT de SSH. Evita depender de túneles. | Riesgo aceptado: tráfico HTTP sin cifrar en 10.20.11.0/24 (credenciales/tokens). Mitigación: origen restringido, respaldo de reglas antes de cambiar, `netfilter-persistent save` solo tras verificar. Vigilar cambio de IP del app server (DHCP) y recreación del gateway. |
@@ -115,9 +137,3 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
 - No modificar infraestructura sin autorización.
 - No exponer credenciales ni tokens.
 - Mantener trazabilidad entre requerimientos, módulos, pruebas y evidencias.
-
-## Próximo paso
-Fase 0: incorporar al workspace el código fuente real de EX1 (ZIP o repositorio
-GitHub), ejecutar su suite de pruebas y mapearlo a los módulos de la arquitectura.
-Después, inventario de solo lectura de la infraestructura (con autorización) para
-verificar los puntos pendientes de D-01 a D-03.

@@ -31,8 +31,14 @@ de slices sobre Linux Cluster y OpenStack.
 9. Reportar contradicciones entre documentos.
 
 ## Objetivo actual
-Desarrollar la Experiencia del Laboratorio 6
-de TEL141.
+Ver ESTADO_PROYECTO.md (sección «Próxima sesión»).
+F0 y F1 terminadas; siguiente: F2 (Topology Manager,
+borradores, edición y roles — R1B), en la rama `fase2`.
 
-Primero analizar los requerimientos y proponer
-un plan de implementación.
+## Cómo trabajar en este repo
+- Tests: `PYTHONPATH=tools/winshim python -m unittest discover -s tests`
+  (en Linux, sin PYTHONPATH). Commit por paso, tests en verde.
+- Fechas: usar la guía LAB6 2026-2, no el cronograma 2025-2 del enunciado.
+- App server: `ssh g5-app`; gateway: `ssh g5-gw`. Avisar y pedir
+  autorización antes de crear recursos o cambiar configuración remota.
+- Nunca leer ni imprimir `~/.g5/openstack.env` ni tokens.
