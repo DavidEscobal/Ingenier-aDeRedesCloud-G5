@@ -21,8 +21,23 @@ class ProviderDriver:
     deploy:   crea y verifica los recursos; devuelve un texto para el evento READY.
     cleanup:  elimina los recursos del slice; si falla, eleva excepción y no se liberan reservas.
     stop:     detiene las VMs conservando discos, redes y reservas.
+    preflight: comprobación previa a aceptar una solicitud (sin efectos).
+    inspect:  estado real observado de los recursos del slice (diagnóstico).
+    console:  acceso temporal a la consola de una VM.
     """
     name = None
+
+    def capabilities(self):
+        return {}
+
+    def preflight(self, spec):
+        return None
+
+    def inspect(self, plan, store):
+        raise NotImplementedError
+
+    def console(self, store, sid, vm_name):
+        raise NotImplementedError
 
     def validate(self, spec):
         raise NotImplementedError

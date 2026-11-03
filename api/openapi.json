@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Driver Linux Grupo 5 — implementación R2",
-    "version": "2.0.0",
-    "description": "Driver Linux EX1: seis VMs Ubuntu/CirrOS, tres workers, QinQ, overlays QCOW2, inicialización de invitados y consola con token. La demo y las plantillas resueltas consumen esta API."
+    "title": "API del orquestador Grupo 5 — drivers Linux y OpenStack",
+    "version": "2.1.0",
+    "description": "Ciclo de vida de slices sobre dos proveedores. provider=linux (por defecto, EX1): QEMU/OVS/QinQ con worker explícito. provider=openstack: un proyecto Keystone por slice, redes VLAN de Neutron, puertos e instancias Nova."
   },
   "servers": [
     {
@@ -451,7 +451,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SliceRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SliceRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenStackSliceRequest"
+                  }
+                ]
               }
             }
           }
@@ -1175,6 +1182,13 @@
             },
             "minItems": 0,
             "maxItems": 128
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "linux"
+            ],
+            "default": "linux"
           }
         },
         "required": [
@@ -1402,6 +1416,125 @@
           }
         },
         "description": "Ubuntu requiere username,password_hash,ssh_authorized_keys; CirrOS usa las credenciales configuradas en el agente."
+      },
+      "OpenStackNetwork": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "cidr"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "cidr": {
+            "type": "string",
+            "description": "IPv4 privada RFC1918, prefijo /16../29"
+          },
+          "dhcp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OpenStackNIC": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "network"
+        ],
+        "properties": {
+          "network": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string",
+            "description": "Opcional; si falta, Neutron asigna"
+          }
+        }
+      },
+      "OpenStackVM": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "image",
+          "vcpus",
+          "memory_mb",
+          "disk_gb",
+          "nics"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "image": {
+            "type": "string",
+            "description": "Nombre de la imagen en Glance"
+          },
+          "vcpus": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "memory_mb": {
+            "type": "integer",
+            "minimum": 64
+          },
+          "disk_gb": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nics": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/OpenStackNIC"
+            }
+          }
+        }
+      },
+      "OpenStackSliceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "provider",
+          "networks",
+          "vms"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openstack"
+            ]
+          },
+          "networks": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/OpenStackNetwork"
+            }
+          },
+          "vms": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/OpenStackVM"
+            }
+          }
+        }
       }
     }
   }

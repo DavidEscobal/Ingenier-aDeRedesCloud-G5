@@ -1,14 +1,16 @@
 """Driver OpenStack de punta a punta contra un OpenStack falso con estado."""
 import copy
 import hashlib
+import http.client
 import json
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
-from g5.api import Application
+from g5.api import Application, Server
 from g5.backend import MemoryBackend
-from g5.drivers.openstack.session import Session
+from g5.drivers.openstack.session import Session, load_env_file
 from g5.model import Fault, validate
 from openstack_fake import FakeCloud, FakeOpenStack, USER
 
@@ -22,7 +24,7 @@ LINEAL = {'name': 'lineal-os', 'provider': 'openstack',
                    'nics': [{'network': 'link2', 'ip': '192.168.12.5'}]}]}
 
 
-class OpenStackDriverTests(unittest.TestCase):
+class OpenStackFixture(unittest.TestCase):
     def setUp(self):
         self.fake = FakeOpenStack()
         self.cloud = FakeCloud(self.fake)
@@ -50,6 +52,8 @@ class OpenStackDriverTests(unittest.TestCase):
         c = self.cloud
         return (len(c.projects), len(c.networks), len(c.subnets), len(c.ports), len(c.servers))
 
+
+class OpenStackDriverTests(OpenStackFixture):
     def test_validation_is_provider_specific(self):
         spec = validate(LINEAL, self.cfg)
         self.assertEqual(spec['networks'][0]['dhcp'], False)
@@ -142,6 +146,66 @@ class OpenStackDriverTests(unittest.TestCase):
         self.app.engine.process_one(); self.app.engine.process_one()
         rows = [self.store.get_slice(j['slice_id']) for j in jobs]
         self.assertEqual([(r['provider'], r['status']) for r in rows], [('linux', 'READY'), ('openstack', 'READY')])
+
+
+class OpenStackAPITests(OpenStackFixture):
+    """Mismo flujo, ahora por la API HTTP real del orquestador (paso 7)."""
+    def setUp(self):
+        super().setUp()
+        self.app.keys = [{'subject': 'profesor', 'role': 'admin', 'sha256': hashlib.sha256(b'admin-token').hexdigest()},
+                         {'subject': 'alumno', 'role': 'user', 'sha256': hashlib.sha256(b'user-token').hexdigest()}]
+        self.server = Server(('127.0.0.1', 0), self.app)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        self.server.shutdown(); self.server.server_close(); self.thread.join()
+        super().tearDown()
+
+    def call(self, method, path, body=None, token='admin-token', key='http-key-0001'):
+        c = http.client.HTTPConnection('127.0.0.1', self.server.server_address[1])
+        c.request(method, path, json.dumps(body or {}), {'Authorization': 'Bearer ' + token, 'Idempotency-Key': key,
+                                                          'Content-Type': 'application/json'})
+        r = c.getresponse(); code, value = r.status, json.loads(r.read()); c.close()
+        return code, value
+
+    def test_template_lifecycle_over_http(self):
+        spec = json.loads((ROOT / 'templates/os-lineal.json').read_text())
+        code, job = self.call('POST', '/v1/slices', spec)
+        self.assertEqual(code, 202)
+        self.app.engine.process_one()
+        sid = job['slice_id']
+        listing = self.call('GET', '/v1/slices')[1]
+        self.assertEqual([(x['provider'], x['status']) for x in listing], [('openstack', 'READY')])
+        self.assertEqual(self.counts(), (2, 2, 2, 4, 3))
+        self.assertEqual(len(self.cloud.flavors), 1)  # reutilizó el flavor de LAB5 (1 vCPU, 512 MB, 4 GB)
+        diagnostics = self.call('GET', '/v1/slices/%s/diagnostics' % sid)[1]
+        self.assertTrue(diagnostics['ok'])
+        self.assertEqual(set(diagnostics['servers']), {'vm1', 'vm2', 'vm3'})
+        code, console = self.call('POST', '/v1/slices/%s/vms/vm2/console' % sid)
+        self.assertEqual(code, 201)
+        self.assertTrue(console['url'].startswith('http://127.0.0.1:56080/'))
+        self.assertEqual(self.call('GET', '/v1/slices/' + sid, token='user-token')[0], 404)
+        self.assertEqual(self.call('POST', '/v1/slices/%s/vms/vm1/probe' % sid, {'kind': 'addresses'})[0], 409)
+        self.assertIn('openstack', self.call('GET', '/v1/capabilities')[1]['providers'])
+        code, delete = self.call('DELETE', '/v1/slices/' + sid, key='http-delete-1')
+        self.assertEqual(code, 202)
+        self.app.engine.process_one()
+        self.assertEqual(self.call('GET', '/v1/operations/' + delete['id'])[1]['status'], 'SUCCEEDED')
+        self.assertEqual(self.counts(), (1, 0, 0, 0, 0))
+
+    def test_unknown_image_is_rejected_before_admission(self):
+        spec = copy.deepcopy(LINEAL)
+        spec['vms'][0]['image'] = 'ubuntu-que-no-existe'
+        code, error = self.call('POST', '/v1/slices', spec)
+        self.assertEqual(code, 409)
+        self.assertIn('ubuntu-que-no-existe', error['error'])
+        self.assertEqual(self.store.rows('SELECT * FROM slices'), [])
+
+    def test_openrc_loader_keeps_only_os_variables(self):
+        path = Path(self.temp.name) / 'openstack.env'
+        path.write_text('# comentario\nexport OS_USERNAME=cloud_admin\nexport OS_PASSWORD="x y"\nexport PATH=/tmp\n')
+        self.assertEqual(load_env_file(path), {'OS_USERNAME': 'cloud_admin', 'OS_PASSWORD': 'x y'})
 
 
 if __name__ == '__main__':

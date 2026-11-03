@@ -39,6 +39,22 @@ def expires_epoch(value):
     raise OpenStackError('Fecha de expiración de token no reconocida: %s' % value)
 
 
+def load_env_file(path):
+    """Lee un openrc (`export OS_X=valor`) y devuelve solo las variables OS_*; no imprime nada."""
+    values = {}
+    with open(path, encoding='utf-8') as source:
+        for line in source:
+            line = line.strip()
+            if line.startswith('export '):
+                line = line[len('export '):]
+            if '=' not in line or line.startswith('#'):
+                continue
+            key, value = line.split('=', 1)
+            if key.startswith('OS_'):
+                values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
 class Session:
     def __init__(self, cfg, environ=None):
         env = os.environ if environ is None else environ

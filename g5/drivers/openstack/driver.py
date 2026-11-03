@@ -91,6 +91,28 @@ class OpenStackDriver(ProviderDriver):
     def validate(self, spec):
         return validate_spec(spec, self.cfg)
 
+    def capabilities(self):
+        return {'network': ['neutron-vlan'], 'images': ['glance'], 'console': 'nova-novnc',
+                'isolation': 'un proyecto Keystone por slice', 'placement': 'Nova Scheduler (VM Placement G5 en F3)'}
+
+    def preflight(self, spec):
+        # Antes de admitir: Keystone responde y cada imagen existe en Glance (rechazo sin efectos).
+        for name in sorted({vm['image'] for vm in spec['vms']}):
+            self.image(name)
+
+    def inspect(self, plan, store):
+        servers = {}
+        for row in store.resources(plan['id']):
+            if row['kind'] != 'server' or not row['external_id'] or row['status'] == 'DELETED':
+                continue
+            try:
+                s = self.call('GET', 'compute', '/servers/' + row['external_id'])['server']
+                servers[row['name']] = {'id': s['id'], 'status': s['status'], 'host': s.get('OS-EXT-SRV-ATTR:host')}
+            except OpenStackError as exc:
+                servers[row['name']] = {'status': 'UNKNOWN', 'error': str(exc)}
+        ok = bool(servers) and all(s['status'] == 'ACTIVE' for s in servers.values())
+        return {'servers': servers, 'ok': ok, 'project': plan.get('project_name'), 'simulated': False}
+
     # ---- admisión -------------------------------------------------------------------------
     def reserve(self, db, sid, plan):
         # Sin llamadas de red dentro de la transacción SQLite: solo se fijan nombres estables.

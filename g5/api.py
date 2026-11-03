@@ -17,7 +17,9 @@ from urllib.parse import urlsplit
 from .agent import inspect_image
 from .backend import SSHBackend, MemoryBackend, RemoteError
 from .console import Consoles
+from .domain import provider_of
 from .drivers import default_drivers
+from .drivers.openstack.session import load_env_file
 from .engine import Engine
 from .model import Fault, require, validate, digest, fields, canonical
 from .store import Store
@@ -60,10 +62,12 @@ class Application:
     def route(self, method, path, body, owner, admin, key):
         s = self.store
         if method == 'GET' and path == '/v1/capabilities':
-            return 200, {'driver': 'linux', 'version': '2.0.0', 'simulated': self.backend.simulated,
+            return 200, {'driver': 'linux', 'version': '2.1.0', 'simulated': self.backend.simulated,
                          'network': ['802.1ad-qinq'], 'images': ['qcow2'], 'console': 'novnc-token',
                          'topologies': ['ex1', 'lineal', 'anillo'], 'disk_unit': self.config.get('disk_unit', 'GiB'),
-                         'lifecycle': ['create', 'inspect', 'start', 'stop', 'delete', 'reconcile'], 'live_migration': False}
+                         'lifecycle': ['create', 'inspect', 'start', 'stop', 'delete', 'reconcile'], 'live_migration': False,
+                         'providers': {name: driver.capabilities() for name, driver in s.drivers.items()
+                                       if name != 'openstack' or 'openstack' in self.config}}
         if method == 'GET' and path == '/v1/nodes':
             require(admin, 'Requiere rol admin/service', 403)
             return 200, self.nodes()
@@ -103,7 +107,7 @@ class Application:
             return 200, self.backend.call(node, 'cache_gc', all_unused=body.get('all_unused', False))
         if path == '/v1/slices':
             if method == 'GET':
-                return 200, s.rows('SELECT id,owner,name,status,reserved FROM slices' + ('' if admin else ' WHERE owner=?'), () if admin else (owner,))
+                return 200, s.rows('SELECT id,owner,name,provider,status,reserved FROM slices' + ('' if admin else ' WHERE owner=?'), () if admin else (owner,))
             if method == 'POST':
                 spec = validate(body, self.config)
                 # La misma petición ya aceptada conserva respuesta incluso si un nodo cayó después.
@@ -111,10 +115,7 @@ class Application:
                     existing = s._existing(db, owner, key, {'action': 'create', 'spec': spec})
                 if existing:
                     return 202, existing
-                targets = {v['worker'] for v in spec['vms']} | {self.config['gateway']['name'], self.config['switch']['name']}
-                for node in sorted(targets):
-                    report = self.backend.call(node, 'doctor')
-                    require(report['ok'], 'Preflight falló en ' + node + ': ' + '; '.join(report.get('problems', [])), 503)
+                s.drivers[provider_of(spec)].preflight(spec)
                 with self.image_lock:
                     job = s.create(owner, key, spec)
                 s.event(job['slice_id'], job['id'], 'ACCEPTED', owner)
@@ -138,21 +139,21 @@ class Application:
             if method == 'GET' and sub == 'events':
                 return 200, s.rows('SELECT * FROM events WHERE slice_id=? ORDER BY seq DESC LIMIT 1000', (sid,))
             if method == 'GET' and sub == 'diagnostics':
-                results = {}
-                for node in self.engine.participants(row['plan']):
-                    try:
-                        results[node] = self.backend.call(node, 'inspect', sid=sid)
-                    except Exception as exc:
-                        results[node] = {'ok': False, 'error': str(exc)}
-                return 200, {'slice_id': sid, 'nodes': results, 'simulated': self.backend.simulated}
+                return 200, dict(s.drivers[row['provider']].inspect(row['plan'], s), slice_id=sid, provider=row['provider'])
         match = re.fullmatch(r'/v1/slices/([0-9a-f]{32})/vms/([a-z][a-z0-9-]{0,31})/console', path)
         if match and method == 'POST':
             fields(body, ('ttl',))
-            return 201, self.consoles.issue(match.group(1), match.group(2), owner, admin, body.get('ttl', 120))
+            row = s.get_slice(match.group(1), owner, admin)
+            if row['provider'] == 'linux':
+                return 201, self.consoles.issue(match.group(1), match.group(2), owner, admin, body.get('ttl', 120))
+            require(row['status'] == 'READY', 'Slice no disponible', 409)
+            s.event(row['id'], None, 'CONSOLE', owner + '/' + match.group(2))
+            return 201, s.drivers[row['provider']].console(s, row['id'], match.group(2))
         match = re.fullmatch(r'/v1/slices/([0-9a-f]{32})/vms/([a-z][a-z0-9-]{0,31})/probe', path)
         if match and method == 'POST':
             fields(body, ('kind', 'target', 'packet_bytes'))
             row = s.get_slice(match.group(1), owner, admin)
+            require(row['provider'] == 'linux', 'Sondeo serie disponible solo en el driver Linux', 409)
             require(row['status'] == 'READY', 'Slice no disponible', 409)
             require(not self.backend.simulated, 'Sondeo requiere hardware real', 409)
             vm = next((v for v in row['plan']['vms'] if v['name'] == match.group(2)), None)
@@ -283,6 +284,7 @@ def main():
     p.add_argument('--port', type=int, default=8085)
     p.add_argument('--cert'); p.add_argument('--key')
     p.add_argument('--simulate', action='store_true')
+    p.add_argument('--openstack-env', default='~/.g5/openstack.env', help='openrc con OS_* (permisos 600)')
     args = p.parse_args()
     require(args.host in ('127.0.0.1', '::1', 'localhost') or (args.cert and args.key), 'Para escuchar en red se exige certificado y clave TLS')
     os.umask(0o077)
@@ -290,6 +292,11 @@ def main():
     lock = (Path(args.state) / 'api.lock').open('a')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     config = json.loads(Path(args.config).read_text())
+    env_file = Path(args.openstack_env).expanduser()
+    if 'openstack' in config and env_file.exists():
+        # Las variables ya presentes en el entorno (p. ej. systemd) tienen prioridad.
+        for name, value in load_env_file(env_file).items():
+            os.environ.setdefault(name, value)
     keys = json.loads(Path(args.keys).read_text())
     require(keys, 'Configure al menos una identidad API')
     app = Application(config, args.state, keys, args.simulate)

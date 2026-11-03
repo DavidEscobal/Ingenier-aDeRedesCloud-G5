@@ -119,6 +119,25 @@ class LinuxDriver(ProviderDriver):
     def validate(self, spec):
         return validate_spec(spec, self.cfg)
 
+    def capabilities(self):
+        return {'network': ['802.1ad-qinq'], 'images': ['qcow2'], 'console': 'novnc-token',
+                'topologies': ['ex1', 'lineal', 'anillo'], 'placement': 'worker explícito en la solicitud'}
+
+    def preflight(self, spec):
+        targets = {v['worker'] for v in spec['vms']} | {self.cfg['gateway']['name'], self.cfg['switch']['name']}
+        for node in sorted(targets):
+            report = self.backend.call(node, 'doctor')
+            require(report['ok'], 'Preflight falló en ' + node + ': ' + '; '.join(report.get('problems', [])), 503)
+
+    def inspect(self, plan, store):
+        results = {}
+        for node in self.participants(plan):
+            try:
+                results[node] = self.backend.call(node, 'inspect', sid=plan['id'])
+            except Exception as exc:
+                results[node] = {'ok': False, 'error': str(exc)}
+        return {'nodes': results, 'simulated': self.backend.simulated}
+
     def reserve(self, db, sid, plan):
         used = {r[0] for r in db.execute('SELECT svid FROM leases')}
         svid = next((v for v in range(self.cfg['svid_range'][0], self.cfg['svid_range'][1] + 1) if v not in used), None)

@@ -101,5 +101,24 @@
       "ens8"
     ]
   },
-  "disk_unit": "GiB"
+  "disk_unit": "GiB",
+  "openstack": {
+    "_comment": "Driver OpenStack (fase 2). Credenciales OS_* en ~/.g5/openstack.env (nunca aquí). URLs vía túneles D-06.",
+    "auth_url": "http://controller:5000/v3",
+    "endpoint_map": {
+      "http://controller:5000": "http://127.0.0.1:55000",
+      "http://controller:8774": "http://127.0.0.1:58774",
+      "http://controller:9696": "http://127.0.0.1:59696",
+      "http://controller:9292": "http://127.0.0.1:59292"
+    },
+    "console_map": {
+      "http://controller:6080": "http://127.0.0.1:56080"
+    },
+    "domain": "Cloud",
+    "role": "admin",
+    "parallel_servers": 3,
+    "server_timeout": 300,
+    "poll_interval": 2,
+    "create_flavors": false
+  }
 }
