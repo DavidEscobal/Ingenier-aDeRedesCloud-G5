@@ -1,0 +1,105 @@
+# Suite automática G5 — commit 70966bc — 2026-11-03T15:50:55Z
+# Entorno: Windows, Python 3.12.10, PYTHONPATH=tools/winshim (stubs fcntl/pwd), MemoryBackend + OpenStack falso
+test_bad_publication_rejected (test_cluster.AdmissionTests.test_bad_publication_rejected) ... ok
+test_capacity_failure_rolls_back_entire_request (test_cluster.AdmissionTests.test_capacity_failure_rolls_back_entire_request) ... ok
+test_concurrent_admission_cannot_overcommit (test_cluster.AdmissionTests.test_concurrent_admission_cannot_overcommit) ... ok
+test_concurrent_same_idempotency_key (test_cluster.AdmissionTests.test_concurrent_same_idempotency_key) ... ok
+test_conflicting_idempotency_payload_is_rejected (test_cluster.AdmissionTests.test_conflicting_idempotency_payload_is_rejected) ... ok
+test_drain_worker_blocks_new_requests (test_cluster.AdmissionTests.test_drain_worker_blocks_new_requests) ... ok
+test_duplicate_ip_rejected (test_cluster.AdmissionTests.test_duplicate_ip_rejected) ... ok
+test_duplicate_public_port_rejected_atomically (test_cluster.AdmissionTests.test_duplicate_public_port_rejected_atomically) ... ok
+test_duplicate_request_returns_same_operation (test_cluster.AdmissionTests.test_duplicate_request_returns_same_operation) ... ok
+test_injection_names (test_cluster.AdmissionTests.test_injection_names) ... ok
+test_invalid_node (test_cluster.AdmissionTests.test_invalid_node) ... ok
+test_management_and_transit_overlap_rejected (test_cluster.AdmissionTests.test_management_and_transit_overlap_rejected) ... ok
+test_missing_image_and_no_partial_reservations (test_cluster.AdmissionTests.test_missing_image_and_no_partial_reservations) ... ok
+test_no_bool_resource (test_cluster.AdmissionTests.test_no_bool_resource) ... ok
+test_reuse_inner_vlan_and_cidr_isolated_by_outer_vlan (test_cluster.AdmissionTests.test_reuse_inner_vlan_and_cidr_isolated_by_outer_vlan) ... ok
+test_unknown_fields (test_cluster.AdmissionTests.test_unknown_fields) ... ok
+test_cache_protects_orphan_overlay_backing_file (test_cluster.AgentTests.test_cache_protects_orphan_overlay_backing_file) ... ok
+test_cache_real_files_only_unused_removed (test_cluster.AgentTests.test_cache_real_files_only_unused_removed) ... ok
+test_existing_unmarked_ovs_resource_is_not_adopted (test_cluster.AgentTests.test_existing_unmarked_ovs_resource_is_not_adopted) ... ok
+test_firewall_targets_exact_public_port_and_source (test_cluster.AgentTests.test_firewall_targets_exact_public_port_and_source) ... ok
+test_openapi_routes_available_over_authenticated_api (test_cluster.AgentTests.test_openapi_routes_available_over_authenticated_api) ... ok
+test_path_traversal_rejected_by_privileged_agent (test_cluster.AgentTests.test_path_traversal_rejected_by_privileged_agent) ... ok
+test_real_qinq_command_builder (test_cluster.AgentTests.test_real_qinq_command_builder) ... ok
+test_remote_corrupt_image_not_published (test_cluster.AgentTests.test_remote_corrupt_image_not_published) ... ok
+test_ssh_checks_host_key_and_never_uses_shell_flag (test_cluster.AgentTests.test_ssh_checks_host_key_and_never_uses_shell_flag) ... ok
+test_tombstone_blocks_late_work_after_delete (test_cluster.AgentTests.test_tombstone_blocks_late_work_after_delete) ... ok
+test_console_token_expiration_revocation_and_slice_state (test_cluster.SecurityAndHTTPTests.test_console_token_expiration_revocation_and_slice_state) ... ok
+test_real_http_auth_create_poll_and_diagnostics (test_cluster.SecurityAndHTTPTests.test_real_http_auth_create_poll_and_diagnostics) ... {"method":"GET","path":"/v1/slices","time":1793721057.4991245}
+{"method":"POST","path":"/v1/slices","time":1793721057.5125124}
+{"method":"GET","path":"/v1/operations/b332541d8a6241d0a86d628693f09035","time":1793721057.549303}
+{"method":"GET","path":"/v1/slices/1c04b5c16c784c85b1d6f71263fb4caf/diagnostics","time":1793721057.5513513}
+{"method":"GET","path":"/v1/capabilities","time":1793721057.552724}
+ok
+test_token_never_stored_in_plaintext (test_cluster.SecurityAndHTTPTests.test_token_never_stored_in_plaintext) ... ok
+test_user_cannot_administer_nodes (test_cluster.SecurityAndHTTPTests.test_user_cannot_administer_nodes) ... ok
+test_user_cannot_read_another_slice (test_cluster.SecurityAndHTTPTests.test_user_cannot_read_another_slice) ... ok
+test_bad_image_hash_never_enters_catalog (test_cluster.WorkflowTests.test_bad_image_hash_never_enters_catalog) ... ok
+test_delete_one_slice_preserves_other (test_cluster.WorkflowTests.test_delete_one_slice_preserves_other) ... ok
+test_full_lifecycle_removes_unused_bases_and_own_resources (test_cluster.WorkflowTests.test_full_lifecycle_removes_unused_bases_and_own_resources) ... ok
+test_gc_preserves_pinned_image_then_removes_unused (test_cluster.WorkflowTests.test_gc_preserves_pinned_image_then_removes_unused) ... ok
+test_lost_response_after_vm_creation_is_idempotent (test_cluster.WorkflowTests.test_lost_response_after_vm_creation_is_idempotent) ... ok
+test_permanent_create_failure_compensates (test_cluster.WorkflowTests.test_permanent_create_failure_compensates) ... ok
+test_readding_store_cannot_remove_reserved_worker (test_cluster.WorkflowTests.test_readding_store_cannot_remove_reserved_worker) ... ok
+test_reconcile_failure_does_not_destroy_existing_disks (test_cluster.WorkflowTests.test_reconcile_failure_does_not_destroy_existing_disks) ... ok
+test_restart_replays_running_job_without_duplicate_vms (test_cluster.WorkflowTests.test_restart_replays_running_job_without_duplicate_vms) ... ok
+test_simultaneous_delete_and_reconcile_are_exclusive (test_cluster.WorkflowTests.test_simultaneous_delete_and_reconcile_are_exclusive) ... ok
+test_smart_image_deletion_rejects_referenced_base (test_cluster.WorkflowTests.test_smart_image_deletion_rejects_referenced_base) ... ok
+test_stop_start_keeps_disks_networks_and_reservations (test_cluster.WorkflowTests.test_stop_start_keeps_disks_networks_and_reservations) ... ok
+test_temporary_failure_retries_successfully (test_cluster.WorkflowTests.test_temporary_failure_retries_successfully) ... ok
+test_unknown_cleanup_holds_reservations_until_retry (test_cluster.WorkflowTests.test_unknown_cleanup_holds_reservations_until_retry) ... ok
+test_edges_and_broadcast_domains (test_ex1.EX1Tests.test_edges_and_broadcast_domains) ... ok
+test_exact_vm_workers_flavors (test_ex1.EX1Tests.test_exact_vm_workers_flavors) ... ok
+test_fractional_disk_exact_sector_size_and_invalid_values (test_ex1.EX1Tests.test_fractional_disk_exact_sector_size_and_invalid_values) ... ok
+test_full_six_vm_lifecycle_auto_gc (test_ex1.EX1Tests.test_full_six_vm_lifecycle_auto_gc) ... ok
+test_gc_retains_shared_base_until_last_reference (test_ex1.EX1Tests.test_gc_retains_shared_base_until_last_reference) ... ok
+test_gc_targeted_does_not_remove_other_unused_base (test_ex1.EX1Tests.test_gc_targeted_does_not_remove_other_unused_base) ... ok
+test_head_gateway_supports_local_and_external_dnat (test_ex1.EX1Tests.test_head_gateway_supports_local_and_external_dnat) ... ok
+test_larger_base_rejected_without_rounding_flavor (test_ex1.EX1Tests.test_larger_base_rejected_without_rounding_flavor) ... ok
+test_lineal_and_ring_have_correct_degrees (test_ex1.EX1Tests.test_lineal_and_ring_have_correct_degrees) ... ok
+test_nic_and_credentials_validation (test_ex1.EX1Tests.test_nic_and_credentials_validation) ... ok
+test_process_report_does_not_invent_pids (test_ex1.EX1Tests.test_process_report_does_not_invent_pids) ... ok
+test_publications_and_default_routes_only_vm1_vm3 (test_ex1.EX1Tests.test_publications_and_default_routes_only_vm1_vm3) ... ok
+test_remote_prepare_rejects_integer_truncation (test_ex1.EX1Tests.test_remote_prepare_rejects_integer_truncation) ... ok
+test_retries_guest_setup_transient_failure (test_ex1.EX1Tests.test_retries_guest_setup_transient_failure) ... ok
+test_two_full_slices_admission_requires_capacity (test_ex1.EX1Tests.test_two_full_slices_admission_requires_capacity) ... ok
+test_openrc_loader_keeps_only_os_variables (test_openstack_driver.OpenStackAPITests.test_openrc_loader_keeps_only_os_variables) ... ok
+test_template_lifecycle_over_http (test_openstack_driver.OpenStackAPITests.test_template_lifecycle_over_http) ... {"method":"POST","path":"/v1/slices","time":1793721061.1279263}
+{"method":"GET","path":"/v1/slices","time":1793721061.4333608}
+{"method":"GET","path":"/v1/slices/2666195ea4dc42249c64b76c488d1b21/diagnostics","time":1793721061.4421856}
+{"method":"POST","path":"/v1/slices/2666195ea4dc42249c64b76c488d1b21/vms/vm2/console","time":1793721061.4545841}
+{"method":"GET","path":"/v1/slices/2666195ea4dc42249c64b76c488d1b21","time":1793721061.457878}
+{"method":"POST","path":"/v1/slices/2666195ea4dc42249c64b76c488d1b21/vms/vm1/probe","time":1793721061.4609938}
+{"method":"GET","path":"/v1/capabilities","time":1793721061.4621797}
+{"method":"DELETE","path":"/v1/slices/2666195ea4dc42249c64b76c488d1b21","time":1793721061.4700086}
+{"method":"GET","path":"/v1/operations/d3b5ead418714b63a4206d093fc2e253","time":1793721061.599006}
+ok
+test_unknown_image_is_rejected_before_admission (test_openstack_driver.OpenStackAPITests.test_unknown_image_is_rejected_before_admission) ... {"method":"POST","path":"/v1/slices","time":1793721062.622245}
+ok
+test_cleanup_finds_resources_missing_from_journal (test_openstack_driver.OpenStackDriverTests.test_cleanup_finds_resources_missing_from_journal) ... ok
+test_console_url_goes_through_tunnel (test_openstack_driver.OpenStackDriverTests.test_console_url_goes_through_tunnel) ... ok
+test_create_and_delete_without_leftovers (test_openstack_driver.OpenStackDriverTests.test_create_and_delete_without_leftovers) ... ok
+test_linux_and_openstack_slices_share_the_same_core (test_openstack_driver.OpenStackDriverTests.test_linux_and_openstack_slices_share_the_same_core) ... ok
+test_missing_flavor_without_permission_fails_cleanly (test_openstack_driver.OpenStackDriverTests.test_missing_flavor_without_permission_fails_cleanly) ... ok
+test_nova_error_is_compensated (test_openstack_driver.OpenStackDriverTests.test_nova_error_is_compensated) ... ok
+test_replayed_deploy_does_not_duplicate_resources (test_openstack_driver.OpenStackDriverTests.test_replayed_deploy_does_not_duplicate_resources) ... ok
+test_stop_and_start_keep_resources (test_openstack_driver.OpenStackDriverTests.test_stop_and_start_keep_resources) ... ok
+test_validation_is_provider_specific (test_openstack_driver.OpenStackDriverTests.test_validation_is_provider_specific) ... ok
+test_errors_are_explicit_and_never_include_secrets (test_openstack_session.SessionTests.test_errors_are_explicit_and_never_include_secrets) ... ok
+test_expired_token_401_reauthenticates_once (test_openstack_session.SessionTests.test_expired_token_401_reauthenticates_once) ... ok
+test_get_retries_5xx_but_post_does_not (test_openstack_session.SessionTests.test_get_retries_5xx_but_post_does_not) ... ok
+test_missing_credentials_lists_names_only (test_openstack_session.SessionTests.test_missing_credentials_lists_names_only) ... ok
+test_project_scoped_tokens_are_cached_separately (test_openstack_session.SessionTests.test_project_scoped_tokens_are_cached_separately) ... ok
+test_token_catalog_rewrite_and_header (test_openstack_session.SessionTests.test_token_catalog_rewrite_and_header) ... ok
+test_token_is_reused_until_close_to_expiry (test_openstack_session.SessionTests.test_token_is_reused_until_close_to_expiry) ... ok
+test_unreachable_endpoint_retries_then_fails (test_openstack_session.SessionTests.test_unreachable_endpoint_retries_then_fails) ... ok
+test_ex1_database_is_migrated_and_old_slices_are_linux (test_store_provider.StoreProviderTests.test_ex1_database_is_migrated_and_old_slices_are_linux) ... ok
+test_resource_journal_lifecycle (test_store_provider.StoreProviderTests.test_resource_journal_lifecycle) ... ok
+test_unknown_resource_cannot_be_updated (test_store_provider.StoreProviderTests.test_unknown_resource_cannot_be_updated) ... ok
+
+----------------------------------------------------------------------
+Ran 83 tests in 24.779s
+
+OK

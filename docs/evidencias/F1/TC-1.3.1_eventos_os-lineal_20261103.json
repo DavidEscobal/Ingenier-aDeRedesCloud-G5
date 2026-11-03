@@ -1,0 +1,242 @@
+{
+ "caso": "TC-1.3.1 / 1.5.3 / 1.7.2 — eventos y diario de recursos del slice os-lineal",
+ "slice_id": "be4b301b4b83408f90b7d9a105f57ad4",
+ "fuente": "state-f1/cluster.db en el app server",
+ "eventos": [
+  {
+   "seq": 1,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "ACCEPTED",
+   "detail": "infra-manager",
+   "utc": "2026-11-03T15:26:17.293Z"
+  },
+  {
+   "seq": 2,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "START",
+   "detail": "create",
+   "utc": "2026-11-03T15:26:17.374Z"
+  },
+  {
+   "seq": 3,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "project g5-be4b301b4b83408f90b7d9a105f57ad4",
+   "utc": "2026-11-03T15:26:18.172Z"
+  },
+  {
+   "seq": 4,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_PROJECT",
+   "detail": "g5-be4b301b4b83408f90b7d9a105f57ad4",
+   "utc": "2026-11-03T15:26:18.688Z"
+  },
+  {
+   "seq": 5,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "network link12",
+   "utc": "2026-11-03T15:26:19.803Z"
+  },
+  {
+   "seq": 6,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "subnet link12",
+   "utc": "2026-11-03T15:26:20.304Z"
+  },
+  {
+   "seq": 7,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "network link23",
+   "utc": "2026-11-03T15:26:20.555Z"
+  },
+  {
+   "seq": 8,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "subnet link23",
+   "utc": "2026-11-03T15:26:20.887Z"
+  },
+  {
+   "seq": 9,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_NETWORKS",
+   "detail": "link12, link23",
+   "utc": "2026-11-03T15:26:20.897Z"
+  },
+  {
+   "seq": 10,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "port vm1.link12",
+   "utc": "2026-11-03T15:26:21.365Z"
+  },
+  {
+   "seq": 11,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "port vm3.link23",
+   "utc": "2026-11-03T15:26:21.459Z"
+  },
+  {
+   "seq": 12,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "port vm2.link12",
+   "utc": "2026-11-03T15:26:21.596Z"
+  },
+  {
+   "seq": 13,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "port vm2.link23",
+   "utc": "2026-11-03T15:26:22.088Z"
+  },
+  {
+   "seq": 14,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "server vm1",
+   "utc": "2026-11-03T15:26:23.136Z"
+  },
+  {
+   "seq": 15,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "server vm3",
+   "utc": "2026-11-03T15:26:24.316Z"
+  },
+  {
+   "seq": 16,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_CREATED",
+   "detail": "server vm2",
+   "utc": "2026-11-03T15:26:24.541Z"
+  },
+  {
+   "seq": 17,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "OS_PLACED",
+   "detail": "vm1@worker2, vm2@worker1, vm3@worker2",
+   "utc": "2026-11-03T15:26:37.595Z"
+  },
+  {
+   "seq": 18,
+   "job": "3d3ee0ed61154b0586765f806ea08110",
+   "event": "READY",
+   "detail": "Instancias ACTIVE en Nova: vm1@worker2, vm2@worker1, vm3@worker2",
+   "utc": "2026-11-03T15:26:37.603Z"
+  },
+  {
+   "seq": 19,
+   "job": null,
+   "event": "CONSOLE",
+   "detail": "infra-manager/vm1",
+   "utc": "2026-11-03T15:26:59.528Z"
+  },
+  {
+   "seq": 20,
+   "job": null,
+   "event": "CONSOLE",
+   "detail": "infra-manager/vm1",
+   "utc": "2026-11-03T15:41:43.179Z"
+  },
+  {
+   "seq": 21,
+   "job": "23e1822150f648a98ef2729b4c81457c",
+   "event": "START",
+   "detail": "delete",
+   "utc": "2026-11-03T15:47:08.505Z"
+  },
+  {
+   "seq": 22,
+   "job": "23e1822150f648a98ef2729b4c81457c",
+   "event": "OS_DELETED",
+   "detail": "g5-be4b301b4b83408f90b7d9a105f57ad4",
+   "utc": "2026-11-03T15:47:26.434Z"
+  },
+  {
+   "seq": 23,
+   "job": "23e1822150f648a98ef2729b4c81457c",
+   "event": "DELETED",
+   "detail": "Eliminación confirmada en todos los destinos; reservas liberadas",
+   "utc": "2026-11-03T15:47:26.444Z"
+  }
+ ],
+ "diario_recursos": [
+  {
+   "kind": "project",
+   "name": "g5-be4b301b4b83408f90b7d9a105f57ad4",
+   "external_id": "40f4f92c814a4ff494f1f55a6d086d1a",
+   "status": "DELETED"
+  },
+  {
+   "kind": "network",
+   "name": "link12",
+   "external_id": "833385c3-7540-469c-99bf-cf7a490c2933",
+   "status": "DELETED"
+  },
+  {
+   "kind": "subnet",
+   "name": "link12",
+   "external_id": "f8839029-edc6-4d81-b467-45b09938ef89",
+   "status": "DELETED"
+  },
+  {
+   "kind": "network",
+   "name": "link23",
+   "external_id": "daa0dfdd-0d6a-4a18-b0ba-cdb8af8e5e0e",
+   "status": "DELETED"
+  },
+  {
+   "kind": "subnet",
+   "name": "link23",
+   "external_id": "539af3cf-7e93-42a6-9d44-ccb937b56f49",
+   "status": "DELETED"
+  },
+  {
+   "kind": "port",
+   "name": "vm1.link12",
+   "external_id": "43ecfdbc-a244-4cd5-8de0-239d59d888bb",
+   "status": "DELETED"
+  },
+  {
+   "kind": "port",
+   "name": "vm2.link12",
+   "external_id": "fae019f2-d99d-4826-bd63-c0eb361494a0",
+   "status": "DELETED"
+  },
+  {
+   "kind": "port",
+   "name": "vm3.link23",
+   "external_id": "8125009a-fe10-4da6-9430-70b46483d8fc",
+   "status": "DELETED"
+  },
+  {
+   "kind": "server",
+   "name": "vm1",
+   "external_id": "1edac58d-84ab-45ad-b963-3e4283d45e35",
+   "status": "DELETED"
+  },
+  {
+   "kind": "port",
+   "name": "vm2.link23",
+   "external_id": "95465694-e82d-416b-bc46-a182b01bc84e",
+   "status": "DELETED"
+  },
+  {
+   "kind": "server",
+   "name": "vm3",
+   "external_id": "73789f23-7b14-488e-8a1e-6b3b9b26bc6a",
+   "status": "DELETED"
+  },
+  {
+   "kind": "server",
+   "name": "vm2",
+   "external_id": "edc970a4-7aaa-4f17-80e6-f2a27c921db0",
+   "status": "DELETED"
+  }
+ ]
+}
