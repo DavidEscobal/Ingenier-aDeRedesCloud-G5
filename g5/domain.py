@@ -7,7 +7,7 @@ Cada driver añade al plan sus propios campos (p. ej. S-VLAN y VNC en Linux).
 from .model import require
 
 DEFAULT_PROVIDER = 'linux'
-PROVIDERS = ('linux',)
+PROVIDERS = ('linux', 'openstack')
 
 
 def provider_of(spec_or_plan):

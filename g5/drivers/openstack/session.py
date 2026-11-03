@@ -86,7 +86,8 @@ class Session:
                 if endpoint['interface'] == self.interface:
                     catalog[service['type']] = self.rewrite(endpoint['url']).rstrip('/')
         return {'token': token, 'expires': expires_epoch(data['token']['expires_at']),
-                'catalog': catalog, 'project': data['token'].get('project', {})}
+                'catalog': catalog, 'project': data['token'].get('project', {}),
+                'user': data['token'].get('user', {})}
 
     def _auth(self, project_id=None, refresh=False):
         with self._lock:
@@ -100,6 +101,9 @@ class Session:
 
     def project(self, project_id=None):
         return self._auth(project_id)['project']
+
+    def user(self):
+        return self._auth()['user']
 
     def endpoint(self, service, project_id=None):
         catalog = self._auth(project_id)['catalog']
