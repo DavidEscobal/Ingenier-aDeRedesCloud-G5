@@ -35,7 +35,12 @@ class Store:
                 timestamp REAL, event TEXT, detail TEXT);
             CREATE TABLE IF NOT EXISTS tokens(hash TEXT PRIMARY KEY, slice_id TEXT, vm TEXT, port INTEGER,
                 expires REAL, revoked INTEGER DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS resources(slice_id TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL,
+                external_id TEXT, status TEXT NOT NULL, created REAL, updated REAL, PRIMARY KEY(slice_id,kind,name));
             ''')
+            # Migración de bases EX1: los slices existentes pertenecen al driver Linux.
+            if 'provider' not in {r['name'] for r in db.execute('PRAGMA table_info(slices)')}:
+                db.execute("ALTER TABLE slices ADD COLUMN provider TEXT NOT NULL DEFAULT 'linux'")
             for node in config['workers']:
                 db.execute('INSERT OR IGNORE INTO nodes(id) VALUES(?)', (node,))
             missing = [r[0] for r in db.execute('SELECT DISTINCT worker FROM allocations') if r[0] not in config['workers']]
@@ -91,8 +96,10 @@ class Store:
             plan = json.loads(canonical(spec))
             plan['id'] = sid
             # Cada proveedor reserva lo suyo dentro de esta misma transacción: todo o nada.
-            self.drivers[provider_of(spec)].reserve(db, sid, plan)
-            db.execute('INSERT INTO slices VALUES(?,?,?,?,?,?,1)', (sid, owner, spec['name'], canonical(spec), canonical(plan), 'QUEUED'))
+            provider = provider_of(spec)
+            self.drivers[provider].reserve(db, sid, plan)
+            db.execute('INSERT INTO slices(id,owner,name,spec,plan,status,reserved,provider) VALUES(?,?,?,?,?,?,1,?)',
+                       (sid, owner, spec['name'], canonical(spec), canonical(plan), 'QUEUED', provider))
             return self._job(db, sid, owner, key, value, 'create')
 
     def mutate(self, sid, owner, admin, key, action):
@@ -150,3 +157,21 @@ class Store:
     def status(self, sid, value):
         with self.tx() as db:
             db.execute('UPDATE slices SET status=? WHERE id=?', (value, sid))
+
+    # Diario de recursos del proveedor (UUID de OpenStack, etc.). Se registra PENDING antes de
+    # pedir la creación, para que un corte deje rastro de lo que pudo quedar creado.
+    def resource_pending(self, sid, kind, name):
+        now = time.time()
+        with self.tx() as db:
+            db.execute("INSERT OR IGNORE INTO resources(slice_id,kind,name,status,created,updated) VALUES(?,?,?,'PENDING',?,?)",
+                       (sid, kind, name, now, now))
+            return dict(db.execute('SELECT * FROM resources WHERE slice_id=? AND kind=? AND name=?', (sid, kind, name)).fetchone())
+
+    def resource_set(self, sid, kind, name, status, external_id=None):
+        with self.tx() as db:
+            cursor = db.execute('UPDATE resources SET status=?,external_id=COALESCE(?,external_id),updated=? WHERE slice_id=? AND kind=? AND name=?',
+                                (status, external_id, time.time(), sid, kind, name))
+            require(cursor.rowcount == 1, 'Recurso no registrado: %s/%s' % (kind, name), 500)
+
+    def resources(self, sid):
+        return self.rows('SELECT * FROM resources WHERE slice_id=? ORDER BY created', (sid,))
