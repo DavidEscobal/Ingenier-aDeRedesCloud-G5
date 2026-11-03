@@ -36,6 +36,39 @@ Clonado solo para lectura; todavía no está integrado en este workspace.
   admin; no hay Topology Manager, VM Placement, driver OpenStack, IAM con login ni monitoreo
   histórico. La configuración de ejemplo es de fase 1 (10.0.10.0/24, server4 como gateway, OFS).
 
+## Inventario de fase 2 verificado (2026-11-03, solo lectura)
+- app server: `app`, 10.20.11.248/24 (DHCP), Ubuntu 20.04.2, Python 3.8.10; sin interfaz en MGMT 1/2.
+- gateway: 10.20.11.245 (ens3), 192.168.201.10 (ens4, MGMT 1), 192.168.202.10 (ens5, MGMT 2); `ip_forward=1`;
+  `iptables-persistent` instalado; FORWARD policy ACCEPT; MASQUERADE de salida por ens3.
+- Gestión (de `/etc/iptables/rules.v4`, mayo 2025): server1–4 = 192.168.201.1–4, ovs1 = .201.5;
+  headnode = 192.168.202.1, worker1–3 = .202.2–4, ovs2 = .202.5.
+- Desde el gateway responden Keystone (300), Nova (200), Neutron (200), Glance (300), noVNC (404 en raíz), Horizon (200).
+- Desde el app server no responde ninguna API (sin ruta a 192.168.202.0/24, sin DNAT de APIs).
+- Control Network (diagrama de fase 2, líneas rojas app↔OVS_1/OVS_2): el app server tiene `ens4` y `ens5`
+  UP **sin IP**; el gateway tiene `ens6` y `ens7` DOWN (probables troncales hacia OVS_1/OVS_2). Sin configurar.
+  Relevante para R5-I-06 (control dinámico del switch) y R5-I-04 (salida a Internet); se planifica en F4.
+- Túneles D-06 activos en el app server (llave `~/.ssh/id_ed25519_g5_gw`, autorizada en el gateway con
+  `restrict`, `from="10.20.11.248"` y `permitopen` a los 6 puertos). Keystone respondió 201 con token
+  acotado a `cloud_admin`/`Cloud` (roles admin, member, reader). El catálogo anuncia `http://controller:<puerto>`
+  y también Placement en :8778, que aún no tiene túnel.
+- Los túneles corren como servicio systemd de usuario `g5-tunnels` (`~/.config/systemd/user/g5-tunnels.service`,
+  `Restart=always`, 10 s, máx. 20 reinicios en 10 min). Probado: tras matar el proceso se relanzó solo (NRestarts=1).
+  **Pendiente:** `sudo loginctl enable-linger ubuntu` (Linger=no) para que arranque tras reiniciar el app server sin sesión abierta.
+
+## Inventario OpenStack (2026-11-03, solo lectura)
+Evidencia: `docs/evidencias/F0/inventario_openstack_20261103.json` (sin tokens).
+- Servicios: Keystone, Nova (conductor/scheduler en headnode; compute en worker1–3, todos `up`),
+  Neutron (agentes OVS en headnode y workers, DHCP, L3, metadata vivos), Glance, Placement en catálogo.
+- Nova API v2.1, microversión 2.1–**2.87** (permite fijar host ≥2.74).
+- Zonas: `nova` = worker1–3; `internal` = headnode. No hay más zonas definidas.
+- Hypervisors (4 vCPU, 3935 MB, **9 GB disco** cada uno): worker1 y worker3 con 1 VM (4 GB disco usados),
+  worker2 vacío. El disco es el recurso más escaso.
+- Redes: `link_1` (lab5) **vlan / physnet1 / VLAN 319**, port security desactivado; `external` flat/physnet0
+  172.20.15.0/24 compartida. No hay redes VXLAN ni routers.
+- Proyectos del dominio `Cloud`: `cloud_admin`, `lab5` (instance_1 en worker1, instance_2 en worker3; no tocar).
+- Flavor `512MBRAM_1VCPUs_4GBRoot`; imagen `cirros` (qcow2, pública).
+- Cuotas `cloud_admin`: 10 instancias, 20 cores, 50 GB RAM; Neutron 100 redes / 500 puertos.
+
 ## Prioridades
 1. Auditar la arquitectura G5.
 2. Revisar cobertura de criterios EX1 y EX2.
@@ -49,6 +82,8 @@ Clonado solo para lectura; todavía no está integrado en este workspace.
 | D-01 | El orquestador G5 corre en la VM **app server** de la topología de fase 2 (no en headnode ni en server4). | La topología grupal prevé `app` para la aplicación; headnode queda solo para el control de OpenStack. Reemplaza la propuesta del HLD §3.6 (contradicción C6). | Versión de Python, acceso desde `app` a MGMT 1 (192.168.201.0/24) y MGMT 2 (192.168.202.0/24), resolución de `controller`, puertos expuestos. |
 | D-02 | El driver OpenStack usa un **cliente REST propio** (`requests`) contra Keystone, Nova, Neutron y Glance; no `openstacksdk`. | Transparencia del uso de tokens y APIs (rúbrica LAB6) y facilidad para simular con mocks. | Microversión de Nova soportada (descubrirla, no fijarla). |
 | D-03 | **Un proyecto OpenStack por slice.** | Permite ver cada slice por separado en Horizon (R3, EX2-R3-D-05 / R3-I-06) y simplifica el borrado. | Permisos del usuario de servicio para crear proyectos y asignar roles en el dominio `Cloud`. |
+| D-06 | **Vigente:** el app server accede a las APIs OpenStack por **túneles SSH a través del gateway** (puerto 22): `127.0.0.1:55000/58774/59696/59292/56080/50080` → `192.168.202.1:5000/8774/9696/9292/6080/80`. D-05 queda **en pausa**. | En el gateway hay 4 reglas DNAT activas no guardadas (`LAB5_DIRECT`, origen 10.8.0.168) de autoría desconocida; no se toca iptables hasta que el grupo aclare quién las puso y por qué. Los túneles además cifran el tráfico. | Mantener los túneles vivos (reinicio automático); confirmar con el grupo el origen de `LAB5_DIRECT`. |
+| D-05 | (En pausa) El app server accede a las APIs OpenStack mediante **DNAT en el gateway** (alternativa LAB6 §4.3), restringido a origen `10.20.11.248`: 55000→5000, 58774→8774, 59696→9696, 59292→9292, 56080→6080, 50080→80 hacia `192.168.202.1`. Aprobado por el grupo y el profesor ("con mucho cuidado"). | El app server no tiene interfaz en MGMT 2; el gateway sí (ens5 192.168.202.10) y ya hace DNAT de SSH. Evita depender de túneles. | Riesgo aceptado: tráfico HTTP sin cifrar en 10.20.11.0/24 (credenciales/tokens). Mitigación: origen restringido, respaldo de reglas antes de cambiar, `netfilter-persistent save` solo tras verificar. Vigilar cambio de IP del app server (DHCP) y recreación del gateway. |
 | D-04 | Primera fase de implementación: F0 (auditoría) y luego F1 (núcleo de Slice Manager agnóstico + driver OpenStack mínimo: crear, consultar y eliminar un slice lineal). | Cubre la experiencia del LAB6, R3-I y R1B-I-01, y fija el modelo del que dependen R1B, R4 y R5. | — |
 
 ## Restricciones

@@ -1,0 +1,1869 @@
+{
+ "agents": {
+  "data": {
+   "agents": [
+    {
+     "admin_state_up": true,
+     "agent_type": "L3 agent",
+     "alive": true,
+     "availability_zone": "nova",
+     "binary": "neutron-l3-agent",
+     "configurations": {
+      "agent_mode": "legacy",
+      "ex_gw_ports": 0,
+      "extensions": [],
+      "floating_ips": 0,
+      "handle_internal_only_routers": true,
+      "interface_driver": "openvswitch",
+      "interfaces": 0,
+      "log_agent_heartbeats": false,
+      "routers": 0
+     },
+     "created_at": "2026-10-22 01:49:08",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:34",
+     "host": "headnode",
+     "id": "0631e9aa-671c-4a80-8131-5307a538b85f",
+     "resources_synced": null,
+     "started_at": "2026-11-03 01:45:31",
+     "topic": "l3_agent"
+    },
+    {
+     "admin_state_up": true,
+     "agent_type": "Open vSwitch agent",
+     "alive": true,
+     "availability_zone": null,
+     "binary": "neutron-openvswitch-agent",
+     "configurations": {
+      "arp_responder_enabled": false,
+      "baremetal_smartnic": false,
+      "bridge_mappings": {
+       "physnet0": "br-provider",
+       "physnet1": "br-vlan"
+      },
+      "datapath_type": "system",
+      "devices": 0,
+      "enable_distributed_routing": false,
+      "extensions": [],
+      "in_distributed_mode": false,
+      "integration_bridge": "br-int",
+      "l2_population": false,
+      "log_agent_heartbeats": false,
+      "ovs_capabilities": {
+       "datapath_types": [
+        "netdev",
+        "system"
+       ],
+       "iface_types": [
+        "erspan",
+        "geneve",
+        "gre",
+        "internal",
+        "ip6erspan",
+        "ip6gre",
+        "lisp",
+        "patch",
+        "stt",
+        "system",
+        "tap",
+        "vxlan"
+       ]
+      },
+      "ovs_hybrid_plug": false,
+      "resource_provider_bandwidths": {},
+      "resource_provider_hypervisors": {
+       "br-provider": "headnode",
+       "br-vlan": "headnode"
+      },
+      "resource_provider_inventory_defaults": {
+       "allocation_ratio": 1.0,
+       "min_unit": 1,
+       "reserved": 0,
+       "step_size": 1
+      },
+      "tunnel_types": [],
+      "tunneling_ip": null,
+      "vhostuser_socket_dir": "/var/run/openvswitch"
+     },
+     "created_at": "2026-10-22 01:49:19",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:32",
+     "host": "headnode",
+     "id": "28510a07-d1a5-4499-be0f-62652b15e8e6",
+     "resources_synced": null,
+     "started_at": "2026-11-03 01:44:31",
+     "topic": "N/A"
+    },
+    {
+     "admin_state_up": true,
+     "agent_type": "Metadata agent",
+     "alive": true,
+     "availability_zone": null,
+     "binary": "neutron-metadata-agent",
+     "configurations": {
+      "log_agent_heartbeats": false,
+      "metadata_proxy_socket": "/var/lib/neutron/metadata_proxy",
+      "nova_metadata_host": "controller",
+      "nova_metadata_port": 8775
+     },
+     "created_at": "2026-10-22 01:48:53",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:29",
+     "host": "headnode",
+     "id": "633a8b06-aeb8-4f1a-81d6-794d50a98268",
+     "resources_synced": null,
+     "started_at": "2026-11-03 01:44:24",
+     "topic": "N/A"
+    },
+    {
+     "admin_state_up": true,
+     "agent_type": "Open vSwitch agent",
+     "alive": true,
+     "availability_zone": null,
+     "binary": "neutron-openvswitch-agent",
+     "configurations": {
+      "arp_responder_enabled": false,
+      "baremetal_smartnic": false,
+      "bridge_mappings": {
+       "physnet1": "br-vlan"
+      },
+      "datapath_type": "system",
+      "devices": 1,
+      "enable_distributed_routing": false,
+      "extensions": [],
+      "in_distributed_mode": false,
+      "integration_bridge": "br-int",
+      "l2_population": false,
+      "log_agent_heartbeats": false,
+      "ovs_capabilities": {
+       "datapath_types": [
+        "netdev",
+        "system"
+       ],
+       "iface_types": [
+        "erspan",
+        "geneve",
+        "gre",
+        "internal",
+        "ip6erspan",
+        "ip6gre",
+        "lisp",
+        "patch",
+        "stt",
+        "system",
+        "tap",
+        "vxlan"
+       ]
+      },
+      "ovs_hybrid_plug": false,
+      "resource_provider_bandwidths": {},
+      "resource_provider_hypervisors": {
+       "br-vlan": "worker1"
+      },
+      "resource_provider_inventory_defaults": {
+       "allocation_ratio": 1.0,
+       "min_unit": 1,
+       "reserved": 0,
+       "step_size": 1
+      },
+      "tunnel_types": [],
+      "tunneling_ip": null,
+      "vhostuser_socket_dir": "/var/run/openvswitch"
+     },
+     "created_at": "2026-10-22 14:12:53",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:10",
+     "host": "worker1",
+     "id": "74813b61-0681-4f26-831b-8046a69dd0ba",
+     "resources_synced": null,
+     "started_at": "2026-10-22 14:13:23",
+     "topic": "N/A"
+    },
+    {
+     "admin_state_up": true,
+     "agent_type": "Open vSwitch agent",
+     "alive": true,
+     "availability_zone": null,
+     "binary": "neutron-openvswitch-agent",
+     "configurations": {
+      "arp_responder_enabled": false,
+      "baremetal_smartnic": false,
+      "bridge_mappings": {
+       "physnet1": "br-vlan"
+      },
+      "datapath_type": "system",
+      "devices": 0,
+      "enable_distributed_routing": false,
+      "extensions": [],
+      "in_distributed_mode": false,
+      "integration_bridge": "br-int",
+      "l2_population": false,
+      "log_agent_heartbeats": false,
+      "ovs_capabilities": {
+       "datapath_types": [
+        "netdev",
+        "system"
+       ],
+       "iface_types": [
+        "erspan",
+        "geneve",
+        "gre",
+        "internal",
+        "ip6erspan",
+        "ip6gre",
+        "lisp",
+        "patch",
+        "stt",
+        "system",
+        "tap",
+        "vxlan"
+       ]
+      },
+      "ovs_hybrid_plug": false,
+      "resource_provider_bandwidths": {},
+      "resource_provider_hypervisors": {
+       "br-vlan": "worker2"
+      },
+      "resource_provider_inventory_defaults": {
+       "allocation_ratio": 1.0,
+       "min_unit": 1,
+       "reserved": 0,
+       "step_size": 1
+      },
+      "tunnel_types": [],
+      "tunneling_ip": null,
+      "vhostuser_socket_dir": "/var/run/openvswitch"
+     },
+     "created_at": "2026-10-22 14:22:55",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:31",
+     "host": "worker2",
+     "id": "b84e440b-e90c-435c-835f-4dd469fbda9d",
+     "resources_synced": null,
+     "started_at": "2026-10-22 14:23:25",
+     "topic": "N/A"
+    },
+    {
+     "admin_state_up": true,
+     "agent_type": "Open vSwitch agent",
+     "alive": true,
+     "availability_zone": null,
+     "binary": "neutron-openvswitch-agent",
+     "configurations": {
+      "arp_responder_enabled": false,
+      "baremetal_smartnic": false,
+      "bridge_mappings": {
+       "physnet1": "br-vlan"
+      },
+      "datapath_type": "system",
+      "devices": 1,
+      "enable_distributed_routing": false,
+      "extensions": [],
+      "in_distributed_mode": false,
+      "integration_bridge": "br-int",
+      "l2_population": false,
+      "log_agent_heartbeats": false,
+      "ovs_capabilities": {
+       "datapath_types": [
+        "netdev",
+        "system"
+       ],
+       "iface_types": [
+        "erspan",
+        "geneve",
+        "gre",
+        "internal",
+        "ip6erspan",
+        "ip6gre",
+        "lisp",
+        "patch",
+        "stt",
+        "system",
+        "tap",
+        "vxlan"
+       ]
+      },
+      "ovs_hybrid_plug": false,
+      "resource_provider_bandwidths": {},
+      "resource_provider_hypervisors": {
+       "br-vlan": "worker3"
+      },
+      "resource_provider_inventory_defaults": {
+       "allocation_ratio": 1.0,
+       "min_unit": 1,
+       "reserved": 0,
+       "step_size": 1
+      },
+      "tunnel_types": [],
+      "tunneling_ip": null,
+      "vhostuser_socket_dir": "/var/run/openvswitch"
+     },
+     "created_at": "2026-10-22 14:33:17",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:25",
+     "host": "worker3",
+     "id": "c439ee00-d51a-465f-b411-a7e68b0b41b6",
+     "resources_synced": null,
+     "started_at": "2026-10-22 14:33:47",
+     "topic": "N/A"
+    },
+    {
+     "admin_state_up": true,
+     "agent_type": "DHCP agent",
+     "alive": true,
+     "availability_zone": "nova",
+     "binary": "neutron-dhcp-agent",
+     "configurations": {
+      "dhcp_driver": "neutron.agent.linux.dhcp.Dnsmasq",
+      "dhcp_lease_duration": 86400,
+      "log_agent_heartbeats": false,
+      "networks": 1,
+      "ports": 1,
+      "subnets": 1
+     },
+     "created_at": "2026-10-22 01:49:07",
+     "description": null,
+     "heartbeat_timestamp": "2026-11-03 13:52:29",
+     "host": "headnode",
+     "id": "f2603aa7-586e-46c2-846a-b8f5df80f5b1",
+     "resources_synced": null,
+     "started_at": "2026-11-03 01:44:25",
+     "topic": "dhcp_agent"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "auth": {
+  "domain": "Cloud",
+  "project": "cloud_admin",
+  "roles": [
+   "admin",
+   "member",
+   "reader"
+  ],
+  "token": "<omitido>",
+  "user": "cloud_admin"
+ },
+ "availability_zones": {
+  "data": {
+   "availabilityZoneInfo": [
+    {
+     "hosts": {
+      "headnode": {
+       "nova-conductor": {
+        "active": true,
+        "available": true,
+        "updated_at": "2026-11-03T13:52:36.000000"
+       },
+       "nova-scheduler": {
+        "active": true,
+        "available": true,
+        "updated_at": "2026-11-03T13:52:38.000000"
+       }
+      }
+     },
+     "zoneName": "internal",
+     "zoneState": {
+      "available": true
+     }
+    },
+    {
+     "hosts": {
+      "worker1": {
+       "nova-compute": {
+        "active": true,
+        "available": true,
+        "updated_at": "2026-11-03T13:52:35.000000"
+       }
+      },
+      "worker2": {
+       "nova-compute": {
+        "active": true,
+        "available": true,
+        "updated_at": "2026-11-03T13:52:33.000000"
+       }
+      },
+      "worker3": {
+       "nova-compute": {
+        "active": true,
+        "available": true,
+        "updated_at": "2026-11-03T13:52:39.000000"
+       }
+      }
+     },
+     "zoneName": "nova",
+     "zoneState": {
+      "available": true
+     }
+    }
+   ]
+  },
+  "http": 200
+ },
+ "catalog": {
+  "compute": "http://controller:8774/v2.1",
+  "identity": "http://controller:5000/v3/",
+  "image": "http://controller:9292",
+  "network": "http://controller:9696",
+  "placement": "http://controller:8778"
+ },
+ "compute_services": {
+  "data": {
+   "services": [
+    {
+     "binary": "nova-conductor",
+     "disabled_reason": null,
+     "host": "headnode",
+     "id": 1,
+     "state": "up",
+     "status": "enabled",
+     "updated_at": "2026-11-03T13:52:36.000000",
+     "zone": "internal"
+    },
+    {
+     "binary": "nova-scheduler",
+     "disabled_reason": null,
+     "host": "headnode",
+     "id": 3,
+     "state": "up",
+     "status": "enabled",
+     "updated_at": "2026-11-03T13:52:28.000000",
+     "zone": "internal"
+    },
+    {
+     "binary": "nova-compute",
+     "disabled_reason": null,
+     "host": "worker2",
+     "id": 9,
+     "state": "up",
+     "status": "enabled",
+     "updated_at": "2026-11-03T13:52:33.000000",
+     "zone": "nova"
+    },
+    {
+     "binary": "nova-compute",
+     "disabled_reason": null,
+     "host": "worker3",
+     "id": 10,
+     "state": "up",
+     "status": "enabled",
+     "updated_at": "2026-11-03T13:52:29.000000",
+     "zone": "nova"
+    },
+    {
+     "binary": "nova-compute",
+     "disabled_reason": null,
+     "host": "worker1",
+     "id": 11,
+     "state": "up",
+     "status": "enabled",
+     "updated_at": "2026-11-03T13:52:35.000000",
+     "zone": "nova"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "flavors": {
+  "data": {
+   "flavors": [
+    {
+     "OS-FLV-DISABLED:disabled": false,
+     "OS-FLV-EXT-DATA:ephemeral": 0,
+     "disk": 4,
+     "id": "97b18566-0513-469d-8bc5-1de0c8b430be",
+     "links": [
+      {
+       "href": "http://127.0.0.1:58774/v2.1/flavors/97b18566-0513-469d-8bc5-1de0c8b430be",
+       "rel": "self"
+      },
+      {
+       "href": "http://127.0.0.1:58774/flavors/97b18566-0513-469d-8bc5-1de0c8b430be",
+       "rel": "bookmark"
+      }
+     ],
+     "name": "512MBRAM_1VCPUs_4GBRoot",
+     "os-flavor-access:is_public": true,
+     "ram": 512,
+     "rxtx_factor": 1.0,
+     "swap": "",
+     "vcpus": 1
+    }
+   ]
+  },
+  "http": 200
+ },
+ "generated_utc": "2026-11-03T13:52:36Z",
+ "hypervisors": {
+  "data": {
+   "hypervisors": [
+    {
+     "cpu_info": "{\"arch\": \"x86_64\", \"model\": \"Haswell-noTSX-IBRS\", \"vendor\": \"Intel\", \"topology\": {\"cells\": 1, \"sockets\": 4, \"cores\": 1, \"threads\": 1}, \"features\": [\"umip\", \"pse36\", \"nx\", \"tsc_adjust\", \"invpcid\", \"cmov\", \"clflush\", \"de\", \"movbe\", \"rdtscp\", \"apic\", \"pse\", \"tsc-deadline\", \"popcnt\", \"fxsr\", \"pge\", \"bmi1\", \"sep\", \"cx8\", \"ibpb\", \"rdrand\", \"vmx\", \"msr\", \"erms\", \"sse4.1\", \"pclmuldq\", \"arch-capabilities\", \"xsaveopt\", \"xsave\", \"mca\", \"mtrr\", \"skip-l1dfl-vmentry\", \"lahf_lm\", \"pcid\", \"fma\", \"lm\", \"amd-ssbd\", \"sse2\", \"ibrs\", \"sse\", \"tsc\", \"spec-ctrl\", \"ssbd\", \"pat\", \"ss\", \"ssse3\", \"smep\", \"pschange-mc-no\", \"fsgsbase\", \"avx\", \"mmx\", \"abm\", \"pae\", \"stibp\", \"sse4.2\", \"f16c\", \"hypervisor\", \"md-clear\", \"mce\", \"fpu\", \"pni\", \"syscall\", \"x2apic\", \"avx2\", \"aes\", \"vme\", \"amd-stibp\", \"cx16\", \"bmi2\", \"arat\", \"pdpe1gb\"]}",
+     "current_workload": 0,
+     "disk_available_least": 5,
+     "free_disk_gb": 9,
+     "free_ram_mb": 3423,
+     "host_ip": "192.168.202.3",
+     "hypervisor_hostname": "worker2",
+     "hypervisor_type": "QEMU",
+     "hypervisor_version": 4002001,
+     "id": 1,
+     "local_gb": 9,
+     "local_gb_used": 0,
+     "memory_mb": 3935,
+     "memory_mb_used": 512,
+     "running_vms": 0,
+     "service": {
+      "disabled_reason": null,
+      "host": "worker2",
+      "id": 9
+     },
+     "state": "up",
+     "status": "enabled",
+     "vcpus": 4,
+     "vcpus_used": 0
+    },
+    {
+     "cpu_info": "{\"arch\": \"x86_64\", \"model\": \"Haswell-noTSX-IBRS\", \"vendor\": \"Intel\", \"topology\": {\"cells\": 1, \"sockets\": 4, \"cores\": 1, \"threads\": 1}, \"features\": [\"movbe\", \"pse\", \"erms\", \"nx\", \"de\", \"pse36\", \"rdtscp\", \"stibp\", \"aes\", \"umip\", \"sep\", \"pat\", \"f16c\", \"pni\", \"syscall\", \"spec-ctrl\", \"fpu\", \"sse4.2\", \"lm\", \"tsc-deadline\", \"vme\", \"amd-ssbd\", \"pge\", \"pae\", \"amd-stibp\", \"fma\", \"rdrand\", \"hypervisor\", \"ssbd\", \"abm\", \"arch-capabilities\", \"invpcid\", \"ibrs\", \"xsave\", \"msr\", \"cmov\", \"clflush\", \"md-clear\", \"popcnt\", \"ibpb\", \"smep\", \"arat\", \"pclmuldq\", \"sse\", \"avx2\", \"vmx\", \"pschange-mc-no\", \"fsgsbase\", \"mca\", \"sse2\", \"mtrr\", \"lahf_lm\", \"pcid\", \"ss\", \"bmi2\", \"mmx\", \"ssse3\", \"tsc_adjust\", \"apic\", \"bmi1\", \"cx16\", \"cx8\", \"x2apic\", \"xsaveopt\", \"fxsr\", \"mce\", \"avx\", \"skip-l1dfl-vmentry\", \"pdpe1gb\", \"sse4.1\", \"tsc\"]}",
+     "current_workload": 0,
+     "disk_available_least": 1,
+     "free_disk_gb": 5,
+     "free_ram_mb": 2911,
+     "host_ip": "192.168.202.4",
+     "hypervisor_hostname": "worker3",
+     "hypervisor_type": "QEMU",
+     "hypervisor_version": 4002001,
+     "id": 2,
+     "local_gb": 9,
+     "local_gb_used": 4,
+     "memory_mb": 3935,
+     "memory_mb_used": 1024,
+     "running_vms": 1,
+     "service": {
+      "disabled_reason": null,
+      "host": "worker3",
+      "id": 10
+     },
+     "state": "up",
+     "status": "enabled",
+     "vcpus": 4,
+     "vcpus_used": 1
+    },
+    {
+     "cpu_info": "{\"arch\": \"x86_64\", \"model\": \"Haswell-noTSX-IBRS\", \"vendor\": \"Intel\", \"topology\": {\"cells\": 1, \"sockets\": 4, \"cores\": 1, \"threads\": 1}, \"features\": [\"avx2\", \"tsc_adjust\", \"arch-capabilities\", \"amd-ssbd\", \"skip-l1dfl-vmentry\", \"vmx\", \"mmx\", \"xsave\", \"popcnt\", \"mtrr\", \"rdtscp\", \"cmov\", \"pse\", \"mce\", \"bmi1\", \"tsc-deadline\", \"rdrand\", \"lm\", \"aes\", \"apic\", \"stibp\", \"pcid\", \"fma\", \"ibrs\", \"fpu\", \"pge\", \"movbe\", \"smep\", \"pschange-mc-no\", \"ssse3\", \"abm\", \"pae\", \"sse4.2\", \"umip\", \"f16c\", \"fxsr\", \"sep\", \"pse36\", \"md-clear\", \"clflush\", \"invpcid\", \"x2apic\", \"arat\", \"de\", \"pat\", \"sse2\", \"nx\", \"spec-ctrl\", \"bmi2\", \"cx8\", \"sse\", \"msr\", \"erms\", \"fsgsbase\", \"xsaveopt\", \"ibpb\", \"pclmuldq\", \"ss\", \"pni\", \"hypervisor\", \"avx\", \"mca\", \"ssbd\", \"sse4.1\", \"amd-stibp\", \"cx16\", \"lahf_lm\", \"tsc\", \"pdpe1gb\", \"vme\", \"syscall\"]}",
+     "current_workload": 0,
+     "disk_available_least": 2,
+     "free_disk_gb": 5,
+     "free_ram_mb": 2911,
+     "host_ip": "192.168.202.2",
+     "hypervisor_hostname": "worker1",
+     "hypervisor_type": "QEMU",
+     "hypervisor_version": 4002001,
+     "id": 3,
+     "local_gb": 9,
+     "local_gb_used": 4,
+     "memory_mb": 3935,
+     "memory_mb_used": 1024,
+     "running_vms": 1,
+     "service": {
+      "disabled_reason": null,
+      "host": "worker1",
+      "id": 11
+     },
+     "state": "up",
+     "status": "enabled",
+     "vcpus": 4,
+     "vcpus_used": 1
+    }
+   ]
+  },
+  "http": 200
+ },
+ "images": {
+  "data": {
+   "first": "/v2/images",
+   "images": [
+    {
+     "checksum": "443b7623e27ecf03dc9e01ee93f67afe",
+     "container_format": "bare",
+     "created_at": "2026-10-21T08:07:25Z",
+     "disk_format": "qcow2",
+     "file": "/v2/images/45c3b2b6-6b4b-4fed-915c-bc2441205e85/file",
+     "id": "45c3b2b6-6b4b-4fed-915c-bc2441205e85",
+     "min_disk": 0,
+     "min_ram": 0,
+     "name": "cirros",
+     "os_hash_algo": "sha512",
+     "os_hash_value": "6513f21e44aa3da349f248188a44bc304a3653a04122d8fb4535423c8e1d14cd6a153f735bb0982e2161b5b5186106570c17a9e58b64dd39390617cd5a350f78",
+     "os_hidden": false,
+     "owner": "dfbaf1d9512149bfadaebf3f998267a8",
+     "protected": false,
+     "schema": "/v2/schemas/image",
+     "self": "/v2/images/45c3b2b6-6b4b-4fed-915c-bc2441205e85",
+     "size": 12716032,
+     "status": "active",
+     "tags": [],
+     "updated_at": "2026-10-21T08:07:25Z",
+     "virtual_size": 46137344,
+     "visibility": "public"
+    }
+   ],
+   "schema": "/v2/schemas/images"
+  },
+  "http": 200
+ },
+ "keystone_domains": {
+  "data": {
+   "domains": [
+    {
+     "description": "Domain for TEL141",
+     "enabled": true,
+     "id": "c814fd851c1c4837a0e8ab07c74fe375",
+     "links": {
+      "self": "http://127.0.0.1:55000/v3/domains/c814fd851c1c4837a0e8ab07c74fe375"
+     },
+     "name": "Cloud",
+     "options": {},
+     "tags": []
+    },
+    {
+     "description": "The default domain",
+     "enabled": true,
+     "id": "default",
+     "links": {
+      "self": "http://127.0.0.1:55000/v3/domains/default"
+     },
+     "name": "Default",
+     "options": {},
+     "tags": []
+    }
+   ],
+   "links": {
+    "next": null,
+    "previous": null,
+    "self": "http://127.0.0.1:55000/v3/domains"
+   }
+  },
+  "http": 200
+ },
+ "keystone_projects": {
+  "data": {
+   "links": {
+    "next": null,
+    "previous": null,
+    "self": "http://127.0.0.1:55000/v3/projects"
+   },
+   "projects": [
+    {
+     "description": "Service Project",
+     "domain_id": "default",
+     "enabled": true,
+     "id": "3e43afaacdce4d8a84493e9a2e9e9dfb",
+     "is_domain": false,
+     "links": {
+      "self": "http://127.0.0.1:55000/v3/projects/3e43afaacdce4d8a84493e9a2e9e9dfb"
+     },
+     "name": "service",
+     "options": {},
+     "parent_id": "default",
+     "tags": []
+    },
+    {
+     "description": "Admin project for Cloud domain",
+     "domain_id": "c814fd851c1c4837a0e8ab07c74fe375",
+     "enabled": true,
+     "id": "8f707d377c364977b3ba49f2c90e3b39",
+     "is_domain": false,
+     "links": {
+      "self": "http://127.0.0.1:55000/v3/projects/8f707d377c364977b3ba49f2c90e3b39"
+     },
+     "name": "cloud_admin",
+     "options": {},
+     "parent_id": "c814fd851c1c4837a0e8ab07c74fe375",
+     "tags": []
+    },
+    {
+     "description": "",
+     "domain_id": "c814fd851c1c4837a0e8ab07c74fe375",
+     "enabled": true,
+     "id": "dab7003331e14b6189675014b1dedc4f",
+     "is_domain": false,
+     "links": {
+      "self": "http://127.0.0.1:55000/v3/projects/dab7003331e14b6189675014b1dedc4f"
+     },
+     "name": "lab5",
+     "options": {},
+     "parent_id": "c814fd851c1c4837a0e8ab07c74fe375",
+     "tags": []
+    },
+    {
+     "description": "Bootstrap project for initializing the cloud.",
+     "domain_id": "default",
+     "enabled": true,
+     "id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "is_domain": false,
+     "links": {
+      "self": "http://127.0.0.1:55000/v3/projects/dfbaf1d9512149bfadaebf3f998267a8"
+     },
+     "name": "admin",
+     "options": {},
+     "parent_id": "default",
+     "tags": []
+    }
+   ]
+  },
+  "http": 200
+ },
+ "networks": {
+  "data": {
+   "networks": [
+    {
+     "admin_state_up": true,
+     "availability_zone_hints": [],
+     "availability_zones": [
+      "nova"
+     ],
+     "created_at": "2026-10-23T18:31:48Z",
+     "description": "",
+     "id": "31497432-d685-44bb-b87a-243af104f30c",
+     "ipv4_address_scope": null,
+     "ipv6_address_scope": null,
+     "mtu": 1500,
+     "name": "link_1",
+     "port_security_enabled": false,
+     "project_id": "dab7003331e14b6189675014b1dedc4f",
+     "provider:network_type": "vlan",
+     "provider:physical_network": "physnet1",
+     "provider:segmentation_id": 319,
+     "revision_number": 2,
+     "router:external": false,
+     "shared": false,
+     "status": "ACTIVE",
+     "subnets": [
+      "fed4bc3c-256a-41f1-b7c1-a8640f5fd01a"
+     ],
+     "tags": [],
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated_at": "2026-10-23T18:32:06Z"
+    },
+    {
+     "admin_state_up": true,
+     "availability_zone_hints": [],
+     "availability_zones": [
+      "nova"
+     ],
+     "created_at": "2026-10-22T01:49:24Z",
+     "description": "",
+     "id": "c63a0e9f-8e6c-4540-9e09-5b54ca7ececa",
+     "ipv4_address_scope": null,
+     "ipv6_address_scope": null,
+     "is_default": false,
+     "mtu": 1500,
+     "name": "external",
+     "port_security_enabled": true,
+     "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "provider:network_type": "flat",
+     "provider:physical_network": "physnet0",
+     "provider:segmentation_id": null,
+     "revision_number": 2,
+     "router:external": true,
+     "shared": true,
+     "status": "ACTIVE",
+     "subnets": [
+      "2f828b3b-d95e-40de-9484-18bebe1935d5"
+     ],
+     "tags": [],
+     "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "updated_at": "2026-10-22T01:49:28Z"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "neutron_extensions": {
+  "data": {
+   "extensions": [
+    {
+     "alias": "address-group",
+     "description": "Support address group",
+     "links": [],
+     "name": "Address group",
+     "updated": "2020-07-15T10:00:00-00:00"
+    },
+    {
+     "alias": "address-scope",
+     "description": "Address scopes extension.",
+     "links": [],
+     "name": "Address scope",
+     "updated": "2015-07-26T10:00:00-00:00"
+    },
+    {
+     "alias": "router-admin-state-down-before-update",
+     "description": "Ensure that the admin state of a router is down (admin_state_up=False) before updating the distributed attribute",
+     "links": [],
+     "name": "Enforce Router's Admin State Down Before Update Extension",
+     "updated": "2019-04-08 13:30:00"
+    },
+    {
+     "alias": "agent",
+     "description": "The agent management extension.",
+     "links": [],
+     "name": "agent",
+     "updated": "2013-02-03T10:00:00-00:00"
+    },
+    {
+     "alias": "agent-resources-synced",
+     "description": "Stores success/failure of last sync to Placement",
+     "links": [],
+     "name": "Agent's Resource View Synced to Placement",
+     "updated": "2018-12-19T00:00:00-00:00"
+    },
+    {
+     "alias": "allowed-address-pairs",
+     "description": "Provides allowed address pairs",
+     "links": [],
+     "name": "Allowed Address Pairs",
+     "updated": "2013-07-23T10:00:00-00:00"
+    },
+    {
+     "alias": "auto-allocated-topology",
+     "description": "Auto Allocated Topology Services.",
+     "links": [],
+     "name": "Auto Allocated Topology Services",
+     "updated": "2016-01-01T00:00:00-00:00"
+    },
+    {
+     "alias": "availability_zone",
+     "description": "The availability zone extension.",
+     "links": [],
+     "name": "Availability Zone",
+     "updated": "2015-01-01T10:00:00-00:00"
+    },
+    {
+     "alias": "availability_zone_filter",
+     "description": "Add filter parameters to AvailabilityZone resource",
+     "links": [],
+     "name": "Availability Zone Filter Extension",
+     "updated": "2018-06-22T10:00:00-00:00"
+    },
+    {
+     "alias": "default-subnetpools",
+     "description": "Provides ability to mark and use a subnetpool as the default.",
+     "links": [],
+     "name": "Default Subnetpools",
+     "updated": "2016-02-18T18:00:00-00:00"
+    },
+    {
+     "alias": "dhcp_agent_scheduler",
+     "description": "Schedule networks among dhcp agents",
+     "links": [],
+     "name": "DHCP Agent Scheduler",
+     "updated": "2013-02-07T10:00:00-00:00"
+    },
+    {
+     "alias": "dvr",
+     "description": "Enables configuration of Distributed Virtual Routers.",
+     "links": [],
+     "name": "Distributed Virtual Router",
+     "updated": "2014-06-1T10:00:00-00:00"
+    },
+    {
+     "alias": "empty-string-filtering",
+     "description": "Allow filtering by attributes with empty string value",
+     "links": [],
+     "name": "Empty String Filtering Extension",
+     "updated": "2018-05-01T10:00:00-00:00"
+    },
+    {
+     "alias": "external-net",
+     "description": "Adds external network attribute to network resource.",
+     "links": [],
+     "name": "Neutron external network",
+     "updated": "2013-01-14T10:00:00-00:00"
+    },
+    {
+     "alias": "extra_dhcp_opt",
+     "description": "Extra options configuration for DHCP. For example PXE boot options to DHCP clients can be specified (e.g. tftp-server, server-ip-address, bootfile-name)",
+     "links": [],
+     "name": "Neutron Extra DHCP options",
+     "updated": "2013-03-17T12:00:00-00:00"
+    },
+    {
+     "alias": "extraroute",
+     "description": "Extra routes configuration for L3 router",
+     "links": [],
+     "name": "Neutron Extra Route",
+     "updated": "2013-02-01T10:00:00-00:00"
+    },
+    {
+     "alias": "extraroute-atomic",
+     "description": "Edit extra routes of a router on server side by atomically adding/removing extra routes",
+     "links": [],
+     "name": "Atomically add/remove extra routes",
+     "updated": "2019-07-10T00:00:00+00:00"
+    },
+    {
+     "alias": "filter-validation",
+     "description": "Provides validation on filter parameters.",
+     "links": [],
+     "name": "Filter parameters validation",
+     "updated": "2018-03-21T10:00:00-00:00"
+    },
+    {
+     "alias": "fip-port-details",
+     "description": "Add port_details attribute to Floating IP resource",
+     "links": [],
+     "name": "Floating IP Port Details Extension",
+     "updated": "2018-04-09T10:00:00-00:00"
+    },
+    {
+     "alias": "flavors",
+     "description": "Flavor specification for Neutron advanced services.",
+     "links": [],
+     "name": "Neutron Service Flavors",
+     "updated": "2015-09-17T10:00:00-00:00"
+    },
+    {
+     "alias": "floatingip-pools",
+     "description": "Provides a floating IP pools API.",
+     "links": [],
+     "name": "Floating IP Pools Extension",
+     "updated": "2018-03-21T10:00:00-00:00"
+    },
+    {
+     "alias": "ip-substring-filtering",
+     "description": "Provides IP address substring filtering when listing ports",
+     "links": [],
+     "name": "IP address substring filtering",
+     "updated": "2017-11-28T09:00:00-00:00"
+    },
+    {
+     "alias": "router",
+     "description": "Router abstraction for basic L3 forwarding between L2 Neutron networks and access to external networks via a NAT gateway.",
+     "links": [],
+     "name": "Neutron L3 Router",
+     "updated": "2012-07-20T10:00:00-00:00"
+    },
+    {
+     "alias": "ext-gw-mode",
+     "description": "Extension of the router abstraction for specifying whether SNAT should occur on the external gateway",
+     "links": [],
+     "name": "Neutron L3 Configurable external gateway mode",
+     "updated": "2013-03-28T10:00:00-00:00"
+    },
+    {
+     "alias": "l3-ha",
+     "description": "Adds HA capability to routers.",
+     "links": [],
+     "name": "HA Router extension",
+     "updated": "2014-04-26T00:00:00-00:00"
+    },
+    {
+     "alias": "l3-flavors",
+     "description": "Flavor support for routers.",
+     "links": [],
+     "name": "Router Flavor Extension",
+     "updated": "2016-05-17T00:00:00-00:00"
+    },
+    {
+     "alias": "l3-port-ip-change-not-allowed",
+     "description": "Prevent change of IP address for some L3 router ports",
+     "links": [],
+     "name": "Prevent L3 router ports IP address change extension",
+     "updated": "2018-10-09T10:00:00-00:00"
+    },
+    {
+     "alias": "l3_agent_scheduler",
+     "description": "Schedule routers among l3 agents",
+     "links": [],
+     "name": "L3 Agent Scheduler",
+     "updated": "2013-02-07T10:00:00-00:00"
+    },
+    {
+     "alias": "multi-provider",
+     "description": "Expose mapping of virtual networks to multiple physical networks",
+     "links": [],
+     "name": "Multi Provider Network",
+     "updated": "2013-06-27T10:00:00-00:00"
+    },
+    {
+     "alias": "net-mtu",
+     "description": "Provides MTU attribute for a network resource.",
+     "links": [],
+     "name": "Network MTU",
+     "updated": "2015-03-25T10:00:00-00:00"
+    },
+    {
+     "alias": "net-mtu-writable",
+     "description": "Provides a writable MTU attribute for a network resource.",
+     "links": [],
+     "name": "Network MTU (writable)",
+     "updated": "2017-07-12T00:00:00-00:00"
+    },
+    {
+     "alias": "network_availability_zone",
+     "description": "Availability zone support for network.",
+     "links": [],
+     "name": "Network Availability Zone",
+     "updated": "2015-01-01T10:00:00-00:00"
+    },
+    {
+     "alias": "network-ip-availability",
+     "description": "Provides IP availability data for each network and subnet.",
+     "links": [],
+     "name": "Network IP Availability",
+     "updated": "2015-09-24T00:00:00-00:00"
+    },
+    {
+     "alias": "pagination",
+     "description": "Extension that indicates that pagination is enabled.",
+     "links": [],
+     "name": "Pagination support",
+     "updated": "2016-06-12T00:00:00-00:00"
+    },
+    {
+     "alias": "port-mac-address-regenerate",
+     "description": "Network port MAC address regenerate",
+     "links": [],
+     "name": "Neutron Port MAC address regenerate",
+     "updated": "2018-05-03T10:00:00-00:00"
+    },
+    {
+     "alias": "binding",
+     "description": "Expose port bindings of a virtual port to external application",
+     "links": [],
+     "name": "Port Binding",
+     "updated": "2014-02-03T10:00:00-00:00"
+    },
+    {
+     "alias": "binding-extended",
+     "description": "Expose port bindings of a virtual port to external application",
+     "links": [],
+     "name": "Port Bindings Extended",
+     "updated": "2017-07-17T10:00:00-00:00"
+    },
+    {
+     "alias": "port-security",
+     "description": "Provides port security",
+     "links": [],
+     "name": "Port Security",
+     "updated": "2012-07-23T10:00:00-00:00"
+    },
+    {
+     "alias": "project-id",
+     "description": "Extension that indicates that project_id field is enabled.",
+     "links": [],
+     "name": "project_id field enabled",
+     "updated": "2016-09-09T09:09:09-09:09"
+    },
+    {
+     "alias": "provider",
+     "description": "Expose mapping of virtual networks to physical networks",
+     "links": [],
+     "name": "Provider Network",
+     "updated": "2012-09-07T10:00:00-00:00"
+    },
+    {
+     "alias": "quotas",
+     "description": "Expose functions for quotas management per tenant",
+     "links": [],
+     "name": "Quota management support",
+     "updated": "2012-07-29T10:00:00-00:00"
+    },
+    {
+     "alias": "quota_details",
+     "description": "Expose functions for quotas usage statistics per project",
+     "links": [],
+     "name": "Quota details management support",
+     "updated": "2017-02-10T10:00:00-00:00"
+    },
+    {
+     "alias": "rbac-policies",
+     "description": "Allows creation and modification of policies that control tenant access to resources.",
+     "links": [],
+     "name": "RBAC Policies",
+     "updated": "2015-06-17T12:15:12-00:00"
+    },
+    {
+     "alias": "rbac-address-scope",
+     "description": "Add address_scope type to RBAC",
+     "links": [],
+     "name": "Add address_scope type to RBAC",
+     "updated": "2020-02-12T00:00:00-00:00"
+    },
+    {
+     "alias": "rbac-security-groups",
+     "description": "Add security_group type to network RBAC",
+     "links": [],
+     "name": "Add security_group type to network RBAC",
+     "updated": "2019-02-14T00:00:00-00:00"
+    },
+    {
+     "alias": "rbac-subnetpool",
+     "description": "Add subnetpool type to RBAC",
+     "links": [],
+     "name": "Add subnetpool type to RBAC",
+     "updated": "2020-02-05T00:00:00-00:00"
+    },
+    {
+     "alias": "revision-if-match",
+     "description": "Extension indicating that If-Match based on revision_number is supported.",
+     "links": [],
+     "name": "If-Match constraints based on revision_number",
+     "updated": "2016-12-11T00:00:00-00:00"
+    },
+    {
+     "alias": "standard-attr-revisions",
+     "description": "This extension will display the revision number of neutron resources.",
+     "links": [],
+     "name": "Resource revision numbers",
+     "updated": "2016-04-11T10:00:00-00:00"
+    },
+    {
+     "alias": "router_availability_zone",
+     "description": "Availability zone support for router.",
+     "links": [],
+     "name": "Router Availability Zone",
+     "updated": "2015-01-01T10:00:00-00:00"
+    },
+    {
+     "alias": "port-security-groups-filtering",
+     "description": "Provides security groups filtering when listing ports",
+     "links": [],
+     "name": "Port filtering on security groups",
+     "updated": "2018-01-09T09:00:00-00:00"
+    },
+    {
+     "alias": "security-group",
+     "description": "The security groups extension.",
+     "links": [],
+     "name": "security-group",
+     "updated": "2012-10-05T10:00:00-00:00"
+    },
+    {
+     "alias": "service-type",
+     "description": "API for retrieving service providers for Neutron advanced services",
+     "links": [],
+     "name": "Neutron Service Type Management",
+     "updated": "2013-01-20T00:00:00-00:00"
+    },
+    {
+     "alias": "sorting",
+     "description": "Extension that indicates that sorting is enabled.",
+     "links": [],
+     "name": "Sorting support",
+     "updated": "2016-06-12T00:00:00-00:00"
+    },
+    {
+     "alias": "standard-attr-description",
+     "description": "Extension to add descriptions to standard attributes",
+     "links": [],
+     "name": "standard-attr-description",
+     "updated": "2016-02-10T10:00:00-00:00"
+    },
+    {
+     "alias": "stateful-security-group",
+     "description": "Indicates if the security group is stateful or not",
+     "links": [],
+     "name": "Stateful security group",
+     "updated": "2019-11-26T09:00:00-00:00"
+    },
+    {
+     "alias": "subnet_onboard",
+     "description": "Provides support for onboarding subnets into subnet pools",
+     "links": [],
+     "name": "Subnet Onboard",
+     "updated": "2018-12-18T09:00:00-00:00"
+    },
+    {
+     "alias": "subnet-service-types",
+     "description": "Provides ability to set the subnet service_types field",
+     "links": [],
+     "name": "Subnet service types",
+     "updated": "2016-03-15T18:00:00-00:00"
+    },
+    {
+     "alias": "subnet_allocation",
+     "description": "Enables allocation of subnets from a subnet pool",
+     "links": [],
+     "name": "Subnet Allocation",
+     "updated": "2015-03-30T10:00:00-00:00"
+    },
+    {
+     "alias": "subnetpool-prefix-ops",
+     "description": "Provides support for adjusting the prefix list of subnet pools",
+     "links": [],
+     "name": "Subnet Pool Prefix Operations",
+     "updated": "2019-02-08T10:00:00-00:00"
+    },
+    {
+     "alias": "standard-attr-tag",
+     "description": "Enables to set tag on resources with standard attribute.",
+     "links": [],
+     "name": "Tag support for resources with standard attribute: port, subnet, subnetpool, network, router, floatingip, policy, security_group, trunk, network_segment_range",
+     "updated": "2017-01-01T00:00:00-00:00"
+    },
+    {
+     "alias": "standard-attr-timestamp",
+     "description": "Adds created_at and updated_at fields to all Neutron resources that have Neutron standard attributes.",
+     "links": [],
+     "name": "Resource timestamps",
+     "updated": "2016-09-12T10:00:00-00:00"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "neutron_quota_cloud_admin": {
+  "data": {
+   "quota": {
+    "floatingip": 50,
+    "network": 100,
+    "port": 500,
+    "rbac_policy": 10,
+    "router": 10,
+    "security_group": 10,
+    "security_group_rule": 100,
+    "subnet": 100,
+    "subnetpool": -1
+   }
+  },
+  "http": 200
+ },
+ "nova_quota_cloud_admin": {
+  "data": {
+   "quota_set": {
+    "cores": 20,
+    "fixed_ips": -1,
+    "floating_ips": -1,
+    "id": "8f707d377c364977b3ba49f2c90e3b39",
+    "injected_file_content_bytes": 10240,
+    "injected_file_path_bytes": 255,
+    "injected_files": 5,
+    "instances": 10,
+    "key_pairs": 100,
+    "metadata_items": 128,
+    "ram": 51200,
+    "security_group_rules": -1,
+    "security_groups": -1,
+    "server_group_members": 10,
+    "server_groups": 10
+   }
+  },
+  "http": 200
+ },
+ "nova_versions": {
+  "data": {
+   "versions": [
+    {
+     "id": "v2.0",
+     "status": "SUPPORTED"
+    },
+    {
+     "id": "v2.1",
+     "min_version": "2.1",
+     "status": "CURRENT",
+     "version": "2.87"
+    }
+   ]
+  },
+  "http": 200,
+  "note": "GET http://127.0.0.1:58774/ (consulta separada; la primera con ruta relativa devolvi\u00f3 404)"
+ },
+ "ports": {
+  "data": {
+   "ports": [
+    {
+     "admin_state_up": true,
+     "allowed_address_pairs": [],
+     "binding:host_id": "headnode",
+     "binding:profile": {},
+     "binding:vif_details": {
+      "bridge_name": "br-int",
+      "connectivity": "l2",
+      "datapath_type": "system",
+      "ovs_hybrid_plug": false,
+      "port_filter": true
+     },
+     "binding:vif_type": "ovs",
+     "binding:vnic_type": "normal",
+     "created_at": "2026-10-22T01:49:29Z",
+     "description": "",
+     "device_id": "dhcp6f668d3b-1414-5d86-acad-4120818912b6-c63a0e9f-8e6c-4540-9e09-5b54ca7ececa",
+     "device_owner": "network:dhcp",
+     "extra_dhcp_opts": [],
+     "fixed_ips": [
+      {
+       "ip_address": "172.20.15.2",
+       "subnet_id": "2f828b3b-d95e-40de-9484-18bebe1935d5"
+      }
+     ],
+     "id": "1f2af036-8426-4a48-b029-91c4dbf57db6",
+     "mac_address": "fa:16:3e:04:ab:78",
+     "name": "",
+     "network_id": "c63a0e9f-8e6c-4540-9e09-5b54ca7ececa",
+     "port_security_enabled": false,
+     "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "revision_number": 3,
+     "security_groups": [],
+     "status": "ACTIVE",
+     "tags": [],
+     "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "updated_at": "2026-10-22T01:49:38Z"
+    },
+    {
+     "admin_state_up": true,
+     "allowed_address_pairs": [],
+     "binding:host_id": "worker3",
+     "binding:profile": {},
+     "binding:vif_details": {
+      "bridge_name": "br-int",
+      "connectivity": "l2",
+      "datapath_type": "system",
+      "ovs_hybrid_plug": false,
+      "port_filter": true
+     },
+     "binding:vif_type": "ovs",
+     "binding:vnic_type": "normal",
+     "created_at": "2026-10-23T18:32:37Z",
+     "description": "",
+     "device_id": "cafe6276-a124-4362-ad8c-07cfb9ddcb72",
+     "device_owner": "compute:nova",
+     "extra_dhcp_opts": [],
+     "fixed_ips": [
+      {
+       "ip_address": "10.0.39.98",
+       "subnet_id": "fed4bc3c-256a-41f1-b7c1-a8640f5fd01a"
+      }
+     ],
+     "id": "2d145ba8-3c17-4f54-80db-0cc9b9359c16",
+     "mac_address": "fa:16:3e:48:46:be",
+     "name": "port_2_link_1",
+     "network_id": "31497432-d685-44bb-b87a-243af104f30c",
+     "port_security_enabled": false,
+     "project_id": "dab7003331e14b6189675014b1dedc4f",
+     "revision_number": 4,
+     "security_groups": [],
+     "status": "ACTIVE",
+     "tags": [],
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated_at": "2026-10-24T04:40:52Z"
+    },
+    {
+     "admin_state_up": true,
+     "allowed_address_pairs": [],
+     "binding:host_id": "worker1",
+     "binding:profile": {},
+     "binding:vif_details": {
+      "bridge_name": "br-int",
+      "connectivity": "l2",
+      "datapath_type": "system",
+      "ovs_hybrid_plug": false,
+      "port_filter": true
+     },
+     "binding:vif_type": "ovs",
+     "binding:vnic_type": "normal",
+     "created_at": "2026-10-23T18:32:27Z",
+     "description": "",
+     "device_id": "77482432-1314-46fe-bc23-02d6f253b5ef",
+     "device_owner": "compute:nova",
+     "extra_dhcp_opts": [],
+     "fixed_ips": [
+      {
+       "ip_address": "10.0.39.97",
+       "subnet_id": "fed4bc3c-256a-41f1-b7c1-a8640f5fd01a"
+      }
+     ],
+     "id": "732332a4-c997-45e3-986e-c4b7daa7052d",
+     "mac_address": "fa:16:3e:be:70:56",
+     "name": "port_1_link_1",
+     "network_id": "31497432-d685-44bb-b87a-243af104f30c",
+     "port_security_enabled": false,
+     "project_id": "dab7003331e14b6189675014b1dedc4f",
+     "revision_number": 4,
+     "security_groups": [],
+     "status": "ACTIVE",
+     "tags": [],
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated_at": "2026-10-24T04:39:18Z"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "routers": {
+  "data": {
+   "routers": []
+  },
+  "http": 200
+ },
+ "security_groups": {
+  "data": {
+   "security_groups": [
+    {
+     "created_at": "2026-10-23T18:31:48Z",
+     "description": "Default security group",
+     "id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+     "name": "default",
+     "project_id": "dab7003331e14b6189675014b1dedc4f",
+     "revision_number": 1,
+     "security_group_rules": [
+      {
+       "created_at": "2026-10-23T18:31:48Z",
+       "description": null,
+       "direction": "ingress",
+       "ethertype": "IPv4",
+       "id": "63d2460e-93d3-4053-a1b7-236a32da9c0c",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dab7003331e14b6189675014b1dedc4f",
+       "protocol": null,
+       "remote_group_id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+       "tags": [],
+       "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+       "updated_at": "2026-10-23T18:31:48Z"
+      },
+      {
+       "created_at": "2026-10-23T18:31:48Z",
+       "description": null,
+       "direction": "egress",
+       "ethertype": "IPv4",
+       "id": "ab7e1ee6-de9e-434c-bae1-3d4be660d727",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dab7003331e14b6189675014b1dedc4f",
+       "protocol": null,
+       "remote_group_id": null,
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+       "tags": [],
+       "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+       "updated_at": "2026-10-23T18:31:48Z"
+      },
+      {
+       "created_at": "2026-10-23T18:31:48Z",
+       "description": null,
+       "direction": "egress",
+       "ethertype": "IPv6",
+       "id": "b1d9e686-bb97-409b-bc59-34e4949c5c1e",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dab7003331e14b6189675014b1dedc4f",
+       "protocol": null,
+       "remote_group_id": null,
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+       "tags": [],
+       "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+       "updated_at": "2026-10-23T18:31:48Z"
+      },
+      {
+       "created_at": "2026-10-23T18:31:48Z",
+       "description": null,
+       "direction": "ingress",
+       "ethertype": "IPv6",
+       "id": "feb98880-0b32-4d4c-9c45-06ca1ead6055",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dab7003331e14b6189675014b1dedc4f",
+       "protocol": null,
+       "remote_group_id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "3321c1ca-8aa8-499a-8744-a313c74ceeea",
+       "tags": [],
+       "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+       "updated_at": "2026-10-23T18:31:48Z"
+      }
+     ],
+     "stateful": true,
+     "tags": [],
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated_at": "2026-10-23T18:31:48Z"
+    },
+    {
+     "created_at": "2026-10-22T01:49:24Z",
+     "description": "Default security group",
+     "id": "9bdea582-9111-476c-9400-76dd0d828d18",
+     "name": "default",
+     "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "revision_number": 1,
+     "security_group_rules": [
+      {
+       "created_at": "2026-10-22T01:49:24Z",
+       "description": null,
+       "direction": "egress",
+       "ethertype": "IPv4",
+       "id": "1c8f0a11-b8a2-4ac8-8328-5c6614ae64af",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "protocol": null,
+       "remote_group_id": null,
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "9bdea582-9111-476c-9400-76dd0d828d18",
+       "tags": [],
+       "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "updated_at": "2026-10-22T01:49:24Z"
+      },
+      {
+       "created_at": "2026-10-22T01:49:24Z",
+       "description": null,
+       "direction": "egress",
+       "ethertype": "IPv6",
+       "id": "2691590a-b930-4a95-9bf3-142433d43682",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "protocol": null,
+       "remote_group_id": null,
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "9bdea582-9111-476c-9400-76dd0d828d18",
+       "tags": [],
+       "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "updated_at": "2026-10-22T01:49:24Z"
+      },
+      {
+       "created_at": "2026-10-22T01:49:24Z",
+       "description": null,
+       "direction": "ingress",
+       "ethertype": "IPv4",
+       "id": "be2a7028-bc05-49bc-b409-804c2b2dbe97",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "protocol": null,
+       "remote_group_id": "9bdea582-9111-476c-9400-76dd0d828d18",
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "9bdea582-9111-476c-9400-76dd0d828d18",
+       "tags": [],
+       "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "updated_at": "2026-10-22T01:49:24Z"
+      },
+      {
+       "created_at": "2026-10-22T01:49:24Z",
+       "description": null,
+       "direction": "ingress",
+       "ethertype": "IPv6",
+       "id": "ca664f79-138d-4108-904b-2ec120240e07",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "protocol": null,
+       "remote_group_id": "9bdea582-9111-476c-9400-76dd0d828d18",
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "9bdea582-9111-476c-9400-76dd0d828d18",
+       "tags": [],
+       "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+       "updated_at": "2026-10-22T01:49:24Z"
+      }
+     ],
+     "stateful": true,
+     "tags": [],
+     "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "updated_at": "2026-10-22T01:49:24Z"
+    },
+    {
+     "created_at": "2026-11-03T13:52:40Z",
+     "description": "Default security group",
+     "id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+     "name": "default",
+     "project_id": "8f707d377c364977b3ba49f2c90e3b39",
+     "revision_number": 1,
+     "security_group_rules": [
+      {
+       "created_at": "2026-11-03T13:52:40Z",
+       "description": null,
+       "direction": "ingress",
+       "ethertype": "IPv6",
+       "id": "20d28979-e449-4c0e-848c-3b61dd7c7726",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "protocol": null,
+       "remote_group_id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+       "tags": [],
+       "tenant_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "updated_at": "2026-11-03T13:52:40Z"
+      },
+      {
+       "created_at": "2026-11-03T13:52:40Z",
+       "description": null,
+       "direction": "egress",
+       "ethertype": "IPv4",
+       "id": "5e8d3bcf-31fd-4ebc-a913-b67ca80295a0",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "protocol": null,
+       "remote_group_id": null,
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+       "tags": [],
+       "tenant_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "updated_at": "2026-11-03T13:52:40Z"
+      },
+      {
+       "created_at": "2026-11-03T13:52:40Z",
+       "description": null,
+       "direction": "ingress",
+       "ethertype": "IPv4",
+       "id": "b641e754-c426-4271-80f9-b92f762af11d",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "protocol": null,
+       "remote_group_id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+       "tags": [],
+       "tenant_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "updated_at": "2026-11-03T13:52:40Z"
+      },
+      {
+       "created_at": "2026-11-03T13:52:40Z",
+       "description": null,
+       "direction": "egress",
+       "ethertype": "IPv6",
+       "id": "c7107943-2a8b-43be-84f1-202649db1798",
+       "port_range_max": null,
+       "port_range_min": null,
+       "project_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "protocol": null,
+       "remote_group_id": null,
+       "remote_ip_prefix": null,
+       "revision_number": 0,
+       "security_group_id": "fd65084e-52f9-4b2e-b5ba-fdff6c6b0f98",
+       "tags": [],
+       "tenant_id": "8f707d377c364977b3ba49f2c90e3b39",
+       "updated_at": "2026-11-03T13:52:40Z"
+      }
+     ],
+     "stateful": true,
+     "tags": [],
+     "tenant_id": "8f707d377c364977b3ba49f2c90e3b39",
+     "updated_at": "2026-11-03T13:52:40Z"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "servers_all": {
+  "data": {
+   "servers": [
+    {
+     "OS-DCF:diskConfig": "MANUAL",
+     "OS-EXT-AZ:availability_zone": "nova",
+     "OS-EXT-SRV-ATTR:host": "worker3",
+     "OS-EXT-SRV-ATTR:hypervisor_hostname": "worker3",
+     "OS-EXT-SRV-ATTR:instance_name": "instance-00000002",
+     "OS-EXT-STS:power_state": 1,
+     "OS-EXT-STS:task_state": null,
+     "OS-EXT-STS:vm_state": "active",
+     "OS-SRV-USG:launched_at": "2026-10-24T04:40:52.000000",
+     "OS-SRV-USG:terminated_at": null,
+     "accessIPv4": "",
+     "accessIPv6": "",
+     "addresses": {
+      "link_1": [
+       {
+        "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:48:46:be",
+        "OS-EXT-IPS:type": "fixed",
+        "addr": "10.0.39.98",
+        "version": 4
+       }
+      ]
+     },
+     "config_drive": "",
+     "created": "2026-10-24T04:40:44Z",
+     "flavor": {
+      "id": "97b18566-0513-469d-8bc5-1de0c8b430be",
+      "links": [
+       {
+        "href": "http://127.0.0.1:58774/flavors/97b18566-0513-469d-8bc5-1de0c8b430be",
+        "rel": "bookmark"
+       }
+      ]
+     },
+     "hostId": "95b9b6cb5c12a788199b80c5d25990cfc066d38032de7f4f2e704dff",
+     "id": "cafe6276-a124-4362-ad8c-07cfb9ddcb72",
+     "image": {
+      "id": "45c3b2b6-6b4b-4fed-915c-bc2441205e85",
+      "links": [
+       {
+        "href": "http://127.0.0.1:58774/images/45c3b2b6-6b4b-4fed-915c-bc2441205e85",
+        "rel": "bookmark"
+       }
+      ]
+     },
+     "key_name": null,
+     "links": [
+      {
+       "href": "http://127.0.0.1:58774/v2.1/servers/cafe6276-a124-4362-ad8c-07cfb9ddcb72",
+       "rel": "self"
+      },
+      {
+       "href": "http://127.0.0.1:58774/servers/cafe6276-a124-4362-ad8c-07cfb9ddcb72",
+       "rel": "bookmark"
+      }
+     ],
+     "metadata": {},
+     "name": "instance_2",
+     "os-extended-volumes:volumes_attached": [],
+     "progress": 0,
+     "status": "ACTIVE",
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated": "2026-10-24T04:40:52Z",
+     "user_id": "81eaf00b52354ab88e646f8e9999f372"
+    },
+    {
+     "OS-DCF:diskConfig": "MANUAL",
+     "OS-EXT-AZ:availability_zone": "nova",
+     "OS-EXT-SRV-ATTR:host": "worker1",
+     "OS-EXT-SRV-ATTR:hypervisor_hostname": "worker1",
+     "OS-EXT-SRV-ATTR:instance_name": "instance-00000001",
+     "OS-EXT-STS:power_state": 1,
+     "OS-EXT-STS:task_state": null,
+     "OS-EXT-STS:vm_state": "active",
+     "OS-SRV-USG:launched_at": "2026-10-24T04:39:20.000000",
+     "OS-SRV-USG:terminated_at": null,
+     "accessIPv4": "",
+     "accessIPv6": "",
+     "addresses": {
+      "link_1": [
+       {
+        "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:be:70:56",
+        "OS-EXT-IPS:type": "fixed",
+        "addr": "10.0.39.97",
+        "version": 4
+       }
+      ]
+     },
+     "config_drive": "",
+     "created": "2026-10-24T04:39:09Z",
+     "flavor": {
+      "id": "97b18566-0513-469d-8bc5-1de0c8b430be",
+      "links": [
+       {
+        "href": "http://127.0.0.1:58774/flavors/97b18566-0513-469d-8bc5-1de0c8b430be",
+        "rel": "bookmark"
+       }
+      ]
+     },
+     "hostId": "931a5c3fa6ccf51b5e8fda3164caf53e5729173e1bfa6b0c94a18182",
+     "id": "77482432-1314-46fe-bc23-02d6f253b5ef",
+     "image": {
+      "id": "45c3b2b6-6b4b-4fed-915c-bc2441205e85",
+      "links": [
+       {
+        "href": "http://127.0.0.1:58774/images/45c3b2b6-6b4b-4fed-915c-bc2441205e85",
+        "rel": "bookmark"
+       }
+      ]
+     },
+     "key_name": null,
+     "links": [
+      {
+       "href": "http://127.0.0.1:58774/v2.1/servers/77482432-1314-46fe-bc23-02d6f253b5ef",
+       "rel": "self"
+      },
+      {
+       "href": "http://127.0.0.1:58774/servers/77482432-1314-46fe-bc23-02d6f253b5ef",
+       "rel": "bookmark"
+      }
+     ],
+     "metadata": {},
+     "name": "instance_1",
+     "os-extended-volumes:volumes_attached": [],
+     "progress": 0,
+     "status": "ACTIVE",
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated": "2026-10-24T04:39:20Z",
+     "user_id": "81eaf00b52354ab88e646f8e9999f372"
+    }
+   ]
+  },
+  "http": 200
+ },
+ "source": "app server via SSH tunnels (D-06), read-only GETs",
+ "subnets": {
+  "data": {
+   "subnets": [
+    {
+     "allocation_pools": [
+      {
+       "end": "172.20.15.254",
+       "start": "172.20.15.2"
+      }
+     ],
+     "cidr": "172.20.15.0/24",
+     "created_at": "2026-10-22T01:49:28Z",
+     "description": "",
+     "dns_nameservers": [
+      "8.8.8.8"
+     ],
+     "enable_dhcp": true,
+     "gateway_ip": "172.20.15.1",
+     "host_routes": [],
+     "id": "2f828b3b-d95e-40de-9484-18bebe1935d5",
+     "ip_version": 4,
+     "ipv6_address_mode": null,
+     "ipv6_ra_mode": null,
+     "name": "external_subnet",
+     "network_id": "c63a0e9f-8e6c-4540-9e09-5b54ca7ececa",
+     "project_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "revision_number": 0,
+     "service_types": [],
+     "subnetpool_id": null,
+     "tags": [],
+     "tenant_id": "dfbaf1d9512149bfadaebf3f998267a8",
+     "updated_at": "2026-10-22T01:49:28Z"
+    },
+    {
+     "allocation_pools": [
+      {
+       "end": "10.0.39.110",
+       "start": "10.0.39.97"
+      }
+     ],
+     "cidr": "10.0.39.96/28",
+     "created_at": "2026-10-23T18:32:06Z",
+     "description": "",
+     "dns_nameservers": [],
+     "enable_dhcp": false,
+     "gateway_ip": null,
+     "host_routes": [],
+     "id": "fed4bc3c-256a-41f1-b7c1-a8640f5fd01a",
+     "ip_version": 4,
+     "ipv6_address_mode": null,
+     "ipv6_ra_mode": null,
+     "name": "subnet_link_1",
+     "network_id": "31497432-d685-44bb-b87a-243af104f30c",
+     "project_id": "dab7003331e14b6189675014b1dedc4f",
+     "revision_number": 0,
+     "service_types": [],
+     "subnetpool_id": null,
+     "tags": [],
+     "tenant_id": "dab7003331e14b6189675014b1dedc4f",
+     "updated_at": "2026-10-23T18:32:06Z"
+    }
+   ]
+  },
+  "http": 200
+ }
+}

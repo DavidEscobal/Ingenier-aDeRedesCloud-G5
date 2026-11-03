@@ -10,4 +10,4 @@ __pycache__/
 *.qcow2
 *.img
 *.iso
-evidencias/
+/evidencias/
