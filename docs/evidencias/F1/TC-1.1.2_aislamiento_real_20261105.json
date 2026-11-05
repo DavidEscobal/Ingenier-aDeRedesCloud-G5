@@ -1,0 +1,35 @@
+{
+ "fecha_utc": "2026-11-05T06:12:07Z",
+ "version_codigo": "commit f23b9cb",
+ "identidades": "admin = infra-manager (rol admin), alumno = alumno-demo (rol user); tokens omitidos",
+ "caso": "TC-1.1.2 Aislamiento entre usuarios (clúster real, API G5 en el app server)",
+ "resultado": {
+  "admin_get_slice": {
+   "http": 200,
+   "owner": "infra-manager",
+   "status": "DELETED"
+  },
+  "alumno_get_slice_ajeno": {
+   "http": 404,
+   "respuesta": {
+    "error": "Slice inexistente"
+   }
+  },
+  "alumno_lista_slices": {
+   "http": 200,
+   "slices_visibles": 0
+  },
+  "alumno_delete_slice_ajeno": {
+   "http": 404,
+   "respuesta": {
+    "error": "Slice inexistente"
+   }
+  },
+  "token_invalido": {
+   "http": 401,
+   "respuesta": {
+    "error": "Token invÃ¡lido"
+   }
+  }
+ }
+}

@@ -72,12 +72,13 @@ def steps(text):
 def result_text(text):
     text = clean(text)
     kind = 'PASS [REAL]' if 'PASS [REAL]' in text else 'PASS [AUT]' if 'PASS [AUT]' in text else 'NT' if 'NT' in text else None
-    rest = re.sub(r'\*\*(PASS \[(REAL|AUT)\]|NT)\*\*\s*(—\s*)?', '', text)
+    rest = re.sub(r'^\*\*(PASS \[(REAL|AUT)\]|NT)\*\*\s*(—\s*)?', '', text, count=1)
     rest = re.sub(r'\*\*PASS \[(REAL|AUT)\]\*\*', lambda m: 'PASS (%s)' % ('clúster real' if m.group(1) == 'REAL' else 'automática'), rest)
     rest = rest.replace(' · ', '; ').strip()
     label = {'PASS [REAL]': '**PASS** — ejecutado en el clúster OpenStack real.',
              'PASS [AUT]': '**PASS** — prueba automática (backend simulado, sin infraestructura real).',
              'NT': '**NT** — no realizado: los requisitos aún no se cumplen.'}.get(kind, text)
+    rest = re.sub(r'\*\*', '', rest)
     items = [label] + ([rest[0].upper() + rest[1:]] if rest and rest != 'función pendiente de implementación.' else [])
     return items
 
@@ -93,7 +94,7 @@ def evidence_items(text):
         items.append('Pruebas ejecutadas: ' + ', '.join(tests) + '.')
     rest = re.sub(r'test_[a-z0-9_]+(,\s*)?', '', text).replace('(log de la suite)', '').strip(' ;,.')
     for part in [p.strip(' ,.') for p in re.split(r';\s*', rest) if p.strip(' ,.')]:
-        items.append(part[0].upper() + part[1:] + '.')
+        items.append((part if part.startswith('docs/') else part[0].upper() + part[1:]) + '.')
     return items
 
 

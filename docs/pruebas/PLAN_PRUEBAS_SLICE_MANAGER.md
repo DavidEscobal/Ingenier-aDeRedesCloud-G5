@@ -3,7 +3,7 @@
 **Proyecto:** PUCP Private Cloud Orchestrator — Grupo 5 · TEL141 2026-2
 **Entregable:** LAB6 (guía `GUIA_LAB6_TEL141_2026-2`), Informe Previo, Actividad 2: plan de pruebas del módulo «Slice Manager» considerando los requerimientos de EX1 y EX2. Entrega: jueves 5 de noviembre de 2026.
 **Versión del código evaluada:** rama `fase2`, commit `70966bc` (driver Linux EX1 + driver OpenStack de fase 2).
-**Fecha de corte de resultados:** 2026-11-03.
+**Fecha de corte de resultados:** 2026-11-05.
 
 > Formato de la guía LAB6 (§3.2): casos `X.Y.Z` con 9 campos. `X = 1` es el módulo Slice Manager.
 > Tipos de prueba de la guía (§3.1): Unitaria, Integración, Funcional y Rendimiento.
@@ -11,6 +11,7 @@
 > Solo se marca PASS con salida verificable. Se distingue el entorno de cada resultado:
 > **[AUT]** prueba automática con backend simulado (MemoryBackend / OpenStack falso), Windows + stubs;
 > **[REAL]** ejecución sobre el clúster OpenStack de la topología de fase 2.
+> Un caso con ambas ejecuciones se cuenta como [REAL] en el resumen.
 
 ## 0. Alcance y entorno
 
@@ -52,19 +53,19 @@ cumplieron los requisitos» de la guía): se ejecutarán cuando la fase correspo
 
 | Sección | Casos | PASS [REAL] | PASS [AUT] | NT |
 |---|---:|---:|---:|---:|
-| 1.1 Autenticación y autorización | 5 | 0 | 3 | 2 |
-| 1.2 Validación del body | 5 | 0 | 4 | 1 |
+| 1.1 Autenticación y autorización | 5 | 1 | 2 | 2 |
+| 1.2 Validación del body | 5 | 1 | 3 | 1 |
 | 1.3 Modelado, topologías y borradores | 5 | 1 | 1 | 3 |
 | 1.4 Admisión, reservas, concurrencia y placement | 8 | 0 | 5 | 3 |
 | 1.5 Creación de slices | 5 | 2 | 2 | 1 |
 | 1.6 Consulta, seguimiento y acceso | 5 | 3 | 1 | 1 |
 | 1.7 Eliminación | 5 | 1 | 4 | 0 |
-| 1.8 Fallos, reintentos y compensación | 4 | 0 | 4 | 0 |
+| 1.8 Fallos, reintentos y compensación | 4 | 1 | 3 | 0 |
 | 1.9 Rendimiento | 4 | 2 | 0 | 2 |
 | 1.10 Ciclo de vida (detener/reanudar) | 1 | 0 | 1 | 0 |
 | 1.11 Edición de slices desplegados | 2 | 0 | 0 | 2 |
 | 1.12 Red y seguridad del slice | 2 | 0 | 0 | 2 |
-| **Total** | **51** | **9** | **25** | **17** |
+| **Total** | **51** | **12** | **22** | **17** |
 
 En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 
@@ -94,8 +95,8 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Prerrequisitos | Un slice creado por `profesor` (admin); token de `alumno` (rol user). |
 | Procedimiento | `GET /v1/slices/{id}` con el token del alumno, en un slice Linux y en uno OpenStack. |
 | Resultados esperados | HTTP 404 en ambos proveedores. |
-| Resultado obtenido | **PASS [AUT]** |
-| Evidencias | `test_user_cannot_read_another_slice`, `test_template_lifecycle_over_http`. |
+| Resultado obtenido | **PASS [REAL]** — API G5 en el app server (2026-11-05): el alumno recibe 404 al consultar y al borrar el slice del profesor y ve 0 slices; el admin recibe 200; un token inválido recibe 401. También **PASS [AUT]**. |
+| Evidencias | `docs/evidencias/F1/TC-1.1.2_aislamiento_real_20261105.json`; `test_user_cannot_read_another_slice`, `test_template_lifecycle_over_http`. |
 | Comentarios | EX2-R1B-I-11. |
 
 ### 1.1.3 OPERACIONES ADMINISTRATIVAS SOLO PARA ADMIN
@@ -187,8 +188,8 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Prerrequisitos | Catálogo Linux y Glance (falso) sin la imagen pedida. |
 | Procedimiento | `POST /v1/slices` con imagen inexistente (Linux por SHA-256; OpenStack por nombre). |
 | Resultados esperados | Linux 404 / OpenStack 409; tablas `allocations`, `leases` y `slices` sin filas nuevas. |
-| Resultado obtenido | **PASS [AUT]** |
-| Evidencias | `test_missing_image_and_no_partial_reservations`, `test_unknown_image_is_rejected_before_admission`. |
+| Resultado obtenido | **PASS [REAL]** — con Glance real: imagen `imagen-inexistente-g5` rechazada con HTTP 409 antes de admitir; slices antes = después = 1; nada creado en OpenStack. También **PASS [AUT]** (Linux). |
+| Evidencias | `docs/evidencias/F1/TC-1.2.4_imagen_inexistente_real_20261105.json`; `test_missing_image_and_no_partial_reservations`, `test_unknown_image_is_rejected_before_admission`. |
 | Comentarios | HLD §4.2.5 (referencia de imagen no disponible: rechazo explícito). |
 
 ### 1.2.5 IMPORTACIÓN DE UNA TOPOLOGÍA CON ESQUEMA INVÁLIDO
@@ -599,11 +600,11 @@ En 1.6.4 se cuenta el resultado [REAL] (OpenStack); su parte Linux es [AUT].
 | Número de caso | 1.8.2 |
 | Tipo de prueba | Integración |
 | Objetivos | Si una VM no se puede crear, retirar todo lo creado y liberar reservas. |
-| Prerrequisitos | Fallo permanente inyectado (agente) o instancia en ERROR (Nova). |
-| Procedimiento | Crear el slice con el fallo inyectado. |
+| Prerrequisitos | [AUT] fallo permanente inyectado (agente) o instancia en ERROR (Nova); [REAL] API G5 en el app server, `create_flavors=false` y sin flavor de 1 vCPU / 512 MB / 1 GB en OpenStack. |
+| Procedimiento | 1) Registrar el estado de OpenStack (proyectos, redes, puertos, servidores, flavors). 2) Crear un slice OpenStack de 2 VMs con `disk_gb: 1`. 3) Esperar el estado final de la operación. 4) Comparar OpenStack con el estado inicial. |
 | Resultados esperados | `FAILED_CLEANED`, sin recursos ni reservas; el error muestra la causa. |
-| Resultado obtenido | **PASS [AUT]** |
-| Evidencias | `test_permanent_create_failure_compensates`, `test_nova_error_is_compensated`, `test_missing_flavor_without_permission_fails_cleanly`. |
+| Resultado obtenido | **PASS [REAL]** — clúster OpenStack: faltaba el flavor de 1 GB (`create_flavors=false`); se crearon proyecto, red, subred y 2 puertos, falló y compensó en 5,7 s: slice `FAILED_CLEANED`, proyectos, redes, puertos, servidores y flavors idénticos al estado previo. También **PASS [AUT]**. |
+| Evidencias | `docs/evidencias/F1/TC-1.8.2_compensacion_real_20261105.json`; `test_permanent_create_failure_compensates`, `test_nova_error_is_compensated`, `test_missing_flavor_without_permission_fails_cleanly`. |
 | Comentarios | HLD F3 pasos 31c–31d. |
 
 ### 1.8.3 LIMPIEZA INCIERTA CONSERVA RESERVAS

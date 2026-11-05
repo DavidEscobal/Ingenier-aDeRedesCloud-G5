@@ -1,0 +1,40 @@
+{
+ "fecha_utc": "2026-11-05T06:12:07Z",
+ "version_codigo": "commit f23b9cb",
+ "identidades": "admin = infra-manager (rol admin), alumno = alumno-demo (rol user); tokens omitidos",
+ "caso": "TC-1.2.4 Imagen inexistente rechazada antes de admitir (Glance real)",
+ "resultado": {
+  "solicitud": {
+   "name": "tc124-imagen",
+   "provider": "openstack",
+   "networks": [
+    {
+     "name": "link1",
+     "cidr": "192.168.21.0/28"
+    }
+   ],
+   "vms": [
+    {
+     "name": "vm1",
+     "image": "imagen-inexistente-g5",
+     "vcpus": 1,
+     "memory_mb": 512,
+     "disk_gb": 4,
+     "nics": [
+      {
+       "network": "link1"
+      }
+     ]
+    }
+   ]
+  },
+  "respuesta": {
+   "http": 409,
+   "cuerpo": {
+    "error": "Imagen Glance inexistente o ambigua: imagen-inexistente-g5"
+   }
+  },
+  "slices_antes": 1,
+  "slices_despues": 1
+ }
+}

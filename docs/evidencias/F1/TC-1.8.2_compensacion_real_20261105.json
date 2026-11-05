@@ -1,0 +1,148 @@
+{
+ "caso": "TC-1.8.2 Fallo permanente compensado sin residuos (clúster real)",
+ "fecha_utc": "2026-11-05T06:12:33Z",
+ "version_codigo": "commit f23b9cb",
+ "causa_del_fallo": "flavor 1 vCPU / 512 MB / 1 GB inexistente y create_flavors=false (no se crea flavor)",
+ "openstack_antes": {
+  "proyectos": [
+   "admin",
+   "cloud_admin",
+   "lab5",
+   "service"
+  ],
+  "redes": [
+   "external",
+   "link_1"
+  ],
+  "puertos_total": 3,
+  "servidores": [
+   "instance_1",
+   "instance_2"
+  ],
+  "flavors": [
+   "512MBRAM_1VCPUs_4GBRoot"
+  ]
+ },
+ "solicitud": {
+  "name": "tc182-compensa",
+  "provider": "openstack",
+  "networks": [
+   {
+    "name": "link1",
+    "cidr": "192.168.22.0/28"
+   }
+  ],
+  "vms": [
+   {
+    "name": "vm1",
+    "image": "cirros",
+    "vcpus": 1,
+    "memory_mb": 512,
+    "disk_gb": 1,
+    "nics": [
+     {
+      "network": "link1"
+     }
+    ]
+   },
+   {
+    "name": "vm2",
+    "image": "cirros",
+    "vcpus": 1,
+    "memory_mb": 512,
+    "disk_gb": 1,
+    "nics": [
+     {
+      "network": "link1"
+     }
+    ]
+   }
+  ]
+ },
+ "respuesta_creacion": {
+  "http": 202,
+  "operacion": "5d8d486df8d746199f9db0f51c9b76b4",
+  "slice_id": "3addf6da493f4dd0b669aea363df3723"
+ },
+ "operacion_final": {
+  "status": "FAILED",
+  "error": "No existe flavor g5-1c-512m-1g y create_flavors está deshabilitado; No existe flavor g5-1c-512m-1g y create_flavors está deshabilitado",
+  "attempts": 1,
+  "duracion_s": 5.7
+ },
+ "slice_final": {
+  "status": "FAILED_CLEANED",
+  "reserved": 0,
+  "provider": "openstack"
+ },
+ "eventos": [
+  [
+   "ACCEPTED",
+   "infra-manager"
+  ],
+  [
+   "START",
+   "create"
+  ],
+  [
+   "OS_CREATED",
+   "project g5-3addf6da493f4dd0b669aea363df3723"
+  ],
+  [
+   "OS_PROJECT",
+   "g5-3addf6da493f4dd0b669aea363df3723"
+  ],
+  [
+   "OS_CREATED",
+   "network link1"
+  ],
+  [
+   "OS_CREATED",
+   "subnet link1"
+  ],
+  [
+   "OS_NETWORKS",
+   "link1"
+  ],
+  [
+   "OS_CREATED",
+   "port vm1.link1"
+  ],
+  [
+   "OS_CREATED",
+   "port vm2.link1"
+  ],
+  [
+   "OS_DELETED",
+   "g5-3addf6da493f4dd0b669aea363df3723"
+  ],
+  [
+   "FAILED_CLEANED",
+   "Eliminación confirmada en todos los destinos; reservas liberadas"
+  ],
+  [
+   "FAILED",
+   "No existe flavor g5-1c-512m-1g y create_flavors está deshabilitado; No existe flavor g5-1c-512m-1g y create_flavors está deshabilitado"
+  ]
+ ],
+ "openstack_despues": {
+  "proyectos": [
+   "admin",
+   "cloud_admin",
+   "lab5",
+   "service"
+  ],
+  "redes": [
+   "external",
+   "link_1"
+  ],
+  "puertos_total": 3,
+  "servidores": [
+   "instance_1",
+   "instance_2"
+  ],
+  "flavors": [
+   "512MBRAM_1VCPUs_4GBRoot"
+  ]
+ }
+}
