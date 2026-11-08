@@ -275,6 +275,19 @@ class Handler(BaseHTTPRequestHandler):
     do_PUT = handle_request
 
 
+LOOPBACK = ('127.0.0.1', '::1', 'localhost')
+
+
+def bind_allowed(host, cert=None, key=None, internal_network=False):
+    """HTTP plano solo en loopback; fuera de él, TLS o una red interna declarada.
+
+    `internal_network` es para el contenedor platform-manager: escucha en 0.0.0.0
+    dentro de la red Docker `control`, sin puerto publicado en el host. La
+    autenticación Bearer sigue siendo obligatoria.
+    """
+    return host in LOOPBACK or bool(cert and key) or bool(internal_network)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--config', default='config/cluster.json')
@@ -285,8 +298,11 @@ def main():
     p.add_argument('--cert'); p.add_argument('--key')
     p.add_argument('--simulate', action='store_true')
     p.add_argument('--openstack-env', default='~/.g5/openstack.env', help='openrc con OS_* (permisos 600)')
+    p.add_argument('--internal-network', action='store_true',
+                   help='permite HTTP sin TLS fuera de loopback: solo dentro de una red Docker interna sin puertos publicados')
     args = p.parse_args()
-    require(args.host in ('127.0.0.1', '::1', 'localhost') or (args.cert and args.key), 'Para escuchar en red se exige certificado y clave TLS')
+    require(bind_allowed(args.host, args.cert, args.key, args.internal_network),
+            'Para escuchar en red se exige certificado y clave TLS (o --internal-network dentro de Docker)')
     os.umask(0o077)
     Path(args.state).mkdir(parents=True, exist_ok=True)
     lock = (Path(args.state) / 'api.lock').open('a')

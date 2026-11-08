@@ -36,6 +36,31 @@ services:
       retries: 3
       start_period: 10s
 
+  platform-manager:
+    # Núcleo de ejecución (g5/): cola de jobs, Engine y drivers Linux/OpenStack.
+    # Sin puertos publicados: solo lo alcanzan servicios de la red `control`.
+    build:
+      context: ..
+      dockerfile: services/platform-manager/Dockerfile
+      args:
+        APP_UID: ${G5_UID:-1000}
+        APP_GID: ${G5_GID:-1000}
+    volumes:
+      - platform-data:/app/state
+      # Configuración y secretos del host, solo lectura (nunca en la imagen ni en Git).
+      - ${G5_PLATFORM_CONFIG:?definir G5_PLATFORM_CONFIG}/cluster.json:/run/g5/cluster.json:ro
+      - ${G5_PLATFORM_CONFIG}/keys.json:/run/g5/keys.json:ro
+      - ${G5_PLATFORM_CONFIG}/openstack.env:/run/g5/openstack.env:ro
+      - ${G5_PLATFORM_CONFIG}/ssh:/home/appuser/.ssh:ro
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   gateway:
     build:
       context: ../services/gateway
@@ -65,3 +90,4 @@ networks:
 
 volumes:
   iam-data:
+  platform-data:

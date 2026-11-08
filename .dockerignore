@@ -1,0 +1,8 @@
+# Solo usado por builds con contexto en la raíz (platform-manager).
+# Lista blanca: nada entra a la imagen salvo el núcleo g5 y sus recursos.
+*
+!g5/
+!api/
+!templates/
+**/__pycache__
+**/*.pyc
