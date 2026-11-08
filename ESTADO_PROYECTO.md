@@ -36,8 +36,15 @@ Manager / Placement / IAM con login.
   Credenciales OpenStack en `~/.g5/openstack.env` (600, no leer ni imprimir).
 - **Docker 28.1.1 + Compose v2.35.1** instalados (2026-11-08); `ubuntu` en el grupo `docker`; linger activado.
   Código de microservicios en `~/g5-app` (copia de `fase2`, revisión en `~/g5-app/REVISION`); imágenes
-  `g5-app-{gateway,iam,slice-manager,platform-manager}` construidas. Ningún contenedor levantado aún
-  (falta `g5_iam.cli init`, interactivo, lo ejecuta el usuario).
+  `g5-app-{gateway,iam,slice-manager,platform-manager}` construidas. Ningún contenedor levantado aún.
+- **Punto exacto donde quedamos (2026-11-08):** el `init` de IAM **no quedó registrado en el app server** (no había
+  volumen ni contenedor de IAM). El volumen `g5-app_iam-data` existe pero **vacío**: lo creó por accidente una
+  revisión de Claude a las 22:38 UTC; IAM puede escribir en él (Compose avisa que no lo creó él; opcional
+  `docker volume rm g5-app_iam-data` antes del init). Siguiente acción, del usuario, en el app server:
+  `cd ~/g5-app && docker compose -f deploy/compose.yaml run --rm --no-deps iam python -m g5_iam.cli init`
+  y pegar la salida sin la contraseña. Luego Claude: verificar el volumen, `docker compose -f deploy/compose.yaml up -d`
+  (solo iam, slice-manager, gateway), healthchecks y pruebas 401/login/capacidades/revocación.
+- `fase2` local va **7 commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
   `~/.ssh/authorized_keys.bak-20261103`. No se tocó iptables.
