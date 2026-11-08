@@ -1,0 +1,150 @@
+"""Gateway: own process, HTTP-only communication with Slice Manager."""
+import logging
+import math
+import os
+from contextlib import asynccontextmanager
+from typing import Literal
+from urllib.parse import urlsplit
+
+import httpx
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from .auth import router, platform_access, iam_call
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+logger = logging.getLogger("g5.gateway")
+
+
+class Health(BaseModel):
+    service: Literal["gateway"] = "gateway"
+    status: Literal["ok"] = "ok"
+
+
+class UpstreamHealth(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    service: Literal["slice-manager"]
+    status: Literal["ok"]
+
+
+class Readiness(Health):
+    dependencies: dict[str, Literal["ok"]]
+
+
+# Local representation of the HTTP contract; no imports from Slice Manager.
+class Features(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    slice_lifecycle: bool
+    persistence: bool
+    iam: bool
+    queue: bool
+    linux_r2: bool
+    openstack: bool
+    placement: bool
+
+
+class Capabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    service: Literal["slice-manager"]
+    api_version: Literal["v1"]
+    phase: Literal["bootstrap"]
+    features: Features
+
+
+ERROR_RESPONSES = {
+    502: {"description": "Respuesta inválida o error del Slice Manager"},
+    503: {"description": "Slice Manager no disponible"},
+    504: {"description": "Slice Manager excedió el tiempo límite"},
+}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    url = os.getenv("SLICE_MANAGER_URL", "http://127.0.0.1:8001").rstrip("/")
+    parts = urlsplit(url)
+    if (parts.scheme not in {"http", "https"} or not parts.hostname
+            or parts.username or parts.password or parts.query or parts.fragment
+            or parts.path not in {"", "/"}):
+        raise ValueError("SLICE_MANAGER_URL debe ser un origen HTTP(S) sin credenciales ni ruta")
+    timeout = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "3"))
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("UPSTREAM_TIMEOUT_SECONDS debe ser positivo y finito")
+    iam_url = os.getenv("IAM_URL", "http://127.0.0.1:8002").rstrip("/")
+    iam_parts = urlsplit(iam_url)
+    if (iam_parts.scheme not in {"http", "https"} or not iam_parts.hostname
+            or iam_parts.username or iam_parts.password or iam_parts.query or iam_parts.fragment
+            or iam_parts.path not in {"", "/"}):
+        raise ValueError("IAM_URL must be an HTTP(S) origin")
+    async with httpx.AsyncClient(
+        base_url=url, timeout=httpx.Timeout(timeout), trust_env=False,
+        follow_redirects=False,
+    ) as client:
+        app.state.slice_manager = client
+        async with httpx.AsyncClient(base_url=iam_url, timeout=timeout, trust_env=False,
+                                     follow_redirects=False) as iam:
+            app.state.iam = iam
+            yield
+
+
+app = FastAPI(
+    title="G5 API Gateway", version="0.2.0", lifespan=lifespan,
+    description="Gateway con autenticación y autorización delegadas a IAM.",
+)
+
+
+async def fetch(request: Request, path: str, model: type[BaseModel], access_token=None) -> BaseModel:
+    try:
+        response = await request.app.state.slice_manager.get(path, headers={"Authorization": "Bearer " + access_token} if access_token else {})
+        if response.status_code in (401, 403):
+            raise HTTPException(response.status_code, "not_authorized",
+                                headers={"WWW-Authenticate": "Bearer"} if response.status_code == 401 else {})
+        if response.status_code == 503:
+            raise HTTPException(503, "slice_manager_unavailable")
+        if response.status_code != 200:
+            logger.warning("slice_manager returned status=%s", response.status_code)
+            raise HTTPException(502, "slice_manager_bad_response")
+        return model.model_validate(response.json())
+    except httpx.TimeoutException:
+        raise HTTPException(504, "slice_manager_timeout") from None
+    except httpx.RequestError:
+        raise HTTPException(503, "slice_manager_unavailable") from None
+    except (ValueError, ValidationError):
+        raise HTTPException(502, "slice_manager_bad_response") from None
+
+
+@app.get("/healthz", response_model=Health, tags=["health"])
+def health() -> Health:
+    # Process liveness does not claim dependency readiness.
+    return Health()
+
+
+@app.get("/readyz", response_model=Readiness, tags=["health"], responses=ERROR_RESPONSES)
+async def ready(request: Request) -> Readiness:
+    await fetch(request, "/readyz", UpstreamHealth)
+    iam_health = await iam_call(request, "GET", "/readyz")
+    if iam_health != {"service": "iam", "status": "ok"}:
+        raise HTTPException(502, "iam_bad_response")
+    return Readiness(dependencies={"slice-manager": "ok", "iam": "ok"})
+
+
+@app.get("/v1/platform/capabilities", response_model=Capabilities,
+         tags=["platform"], responses=ERROR_RESPONSES)
+async def capabilities(request: Request, access_token=Depends(platform_access)) -> BaseModel:
+    return await fetch(request, "/v1/capabilities", Capabilities, access_token)
+
+
+app.include_router(router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, exc):
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(e["loc"]), "type": e["type"], "msg": e["msg"]} for e in exc.errors()
+    ]})
+
+
+@app.middleware("http")
+async def no_cache(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response

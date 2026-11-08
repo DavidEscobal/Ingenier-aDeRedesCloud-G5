@@ -11,3 +11,13 @@ __pycache__/
 *.img
 *.iso
 evidencias/
+
+# APP local development
+.venv/
+.env
+.env.*
+!.env.example
+*.egg-info/
+build/
+dist/
+.pytest_cache/

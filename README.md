@@ -1,3 +1,6 @@
+> **APP de microservicios (rama app):** guía de ejecución y alcance en
+> [deploy/README.md](deploy/README.md). El contenido siguiente documenta R2.
+
 # EX1 — Demo de soporte Linux Cluster R2
 
 

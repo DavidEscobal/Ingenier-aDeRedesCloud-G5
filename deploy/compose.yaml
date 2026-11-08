@@ -1,0 +1,67 @@
+name: g5-app
+
+services:
+  iam:
+    build:
+      context: ../services/iam-service
+    environment:
+      IAM_DB_PATH: /app/state/iam/iam.db
+      IAM_SECRET_FILE: /app/state/iam/jwt.key
+      IAM_TOKEN_TTL_SECONDS: "900"
+    volumes:
+      - iam-data:/app/state/iam
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  slice-manager:
+    build:
+      context: ../services/slice-manager
+    environment:
+      IAM_URL: http://iam:8000
+    depends_on:
+      iam:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  gateway:
+    build:
+      context: ../services/gateway
+    environment:
+      IAM_URL: http://iam:8000
+      SLICE_MANAGER_URL: http://slice-manager:8000
+      UPSTREAM_TIMEOUT_SECONDS: "3"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      iam:
+        condition: service_healthy
+      slice-manager:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=8)"]
+      interval: 10s
+      timeout: 9s
+      retries: 3
+      start_period: 10s
+
+networks:
+  control:
+    driver: bridge
+
+volumes:
+  iam-data:
