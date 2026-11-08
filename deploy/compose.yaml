@@ -39,6 +39,9 @@ services:
   platform-manager:
     # Núcleo de ejecución (g5/): cola de jobs, Engine y drivers Linux/OpenStack.
     # Sin puertos publicados: solo lo alcanzan servicios de la red `control`.
+    # Perfil propio: no arranca con `up` hasta preparar su configuración
+    # (docker compose --profile platform up -d).
+    profiles: [platform]
     build:
       context: ..
       dockerfile: services/platform-manager/Dockerfile
@@ -48,10 +51,10 @@ services:
     volumes:
       - platform-data:/app/state
       # Configuración y secretos del host, solo lectura (nunca en la imagen ni en Git).
-      - ${G5_PLATFORM_CONFIG:?definir G5_PLATFORM_CONFIG}/cluster.json:/run/g5/cluster.json:ro
-      - ${G5_PLATFORM_CONFIG}/keys.json:/run/g5/keys.json:ro
-      - ${G5_PLATFORM_CONFIG}/openstack.env:/run/g5/openstack.env:ro
-      - ${G5_PLATFORM_CONFIG}/ssh:/home/appuser/.ssh:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/cluster.json:/run/g5/cluster.json:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/keys.json:/run/g5/keys.json:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/openstack.env:/run/g5/openstack.env:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/ssh:/home/appuser/.ssh:ro
     restart: unless-stopped
     networks: [control]
     healthcheck:

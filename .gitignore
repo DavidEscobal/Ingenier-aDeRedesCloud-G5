@@ -22,3 +22,6 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
+
+# Configuración y secretos del platform-manager (montados en el contenedor)
+deploy/platform-config/

@@ -22,6 +22,10 @@ y plantillas (slice-manager / topology-manager), ni de la decisión de placement
 
 ## Montajes (solo lectura) — directorio `$G5_PLATFORM_CONFIG` del host
 
+Por defecto `deploy/platform-config/` (ignorado por Git, permisos 700). El servicio
+está en el perfil `platform`: `docker compose up -d` no lo arranca;
+se levanta con `docker compose --profile platform up -d` cuando la carpeta está lista.
+
 | Archivo en el host | En el contenedor | Nota |
 |---|---|---|
 | `cluster.json` | `/run/g5/cluster.json` | `ssh_key` como `~/.ssh/<clave>` → `/home/appuser/.ssh/<clave>` |
