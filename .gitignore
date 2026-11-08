@@ -10,4 +10,15 @@ __pycache__/
 *.qcow2
 *.img
 *.iso
+# Salida de g5.demo en la raíz (puede contener credenciales de invitados); docs/evidencias/ sí se versiona
 /evidencias/
+
+# APP local development
+.venv/
+.env
+.env.*
+!.env.example
+*.egg-info/
+build/
+dist/
+.pytest_cache/
