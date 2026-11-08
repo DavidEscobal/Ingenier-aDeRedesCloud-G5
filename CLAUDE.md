@@ -32,8 +32,8 @@ de slices sobre Linux Cluster y OpenStack.
 
 ## Objetivo actual
 Ver ESTADO_PROYECTO.md (sección «Próxima sesión»).
-F0 y F1 terminadas; siguiente: F2 (Topology Manager,
-borradores, edición y roles — R1B), en la rama `fase2`.
+F0 y F1 terminadas; arquitectura de microservicios en Docker
+(D-08) e interfaz web (D-10), en la rama `fase2`.
 
 ## Cómo trabajar en este repo
 - Tests: `PYTHONPATH=tools/winshim python -m unittest discover -s tests`

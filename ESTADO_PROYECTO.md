@@ -1,14 +1,16 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
-> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-03 (cierre de la sesión F0 + F1 + LAB6).
+> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-08 (integración `app`, Docker en el app server, D-10).
 
 ## Estado general
 - **F0 (auditoría) y F1 (núcleo de Slice Manager agnóstico + driver OpenStack) terminadas.**
   Crear, consultar y borrar un slice en OpenStack desde la API G5 funciona y está probado en el clúster real.
-- Código en `github.com/DavidEscobal/Ingenier-aDeRedesCloud-G5`, rama **`fase2`** (sincronizada; `main` = EX1 sin tocar).
+- Código en `github.com/DavidEscobal/Ingenier-aDeRedesCloud-G5`, rama **`fase2`** (integra la rama `app`: gateway, IAM, slice-manager; `main` = EX1 sin tocar).
   El repositorio es **público**; el enunciado pide privado (lo decide el dueño, David Escobal).
-- Suite automática: **83 pruebas OK** (`PYTHONPATH=tools/winshim python -m unittest discover -s tests`).
-- **Slice Manager NO está completo**: faltan roles académicos, Topology Manager, borradores, edición, VM Placement
+- Suite automática: **89 pruebas OK** del núcleo (`PYTHONPATH=tools/winshim python -m unittest discover -s tests`)
+  y **14 OK** de los servicios `app` (`tests/app`, requiere las dependencias de `services/*/requirements.lock`).
+- **Arquitectura: microservicios en Docker Compose (D-08) + interfaz web (D-10).** Slice Manager NO está completo:
+  falta conectarlo al platform-manager, Topology Manager, borradores, edición, VM Placement
   y red/seguridad en OpenStack (ver "Próxima sesión").
 
 ## Implementación actual (rama `fase2`)
@@ -29,13 +31,18 @@ plantillas escritas a mano, secuencia Linux fija (resuelto con `LinuxDriver`), w
 Manager / Placement / IAM con login.
 
 ## Estado de la infraestructura (para no romper nada)
-- **App server** (`ssh g5-app`, 10.20.11.248): código desplegado en `~/g5-orchestrator` (commit f23b9cb),
-  credenciales locales de la API en `config/` (600), base de la prueba en `state-f1/`. **API detenida.**
+- **App server** (`ssh g5-app`, 10.20.11.248): EX1/F1 en `~/g5-orchestrator` (commit f23b9cb),
+  credenciales locales de la API en `config/` (600), base de la prueba en `state-f1/`. **API temporal detenida (2026-11-08).**
   Credenciales OpenStack en `~/.g5/openstack.env` (600, no leer ni imprimir).
+- **Docker 28.1.1 + Compose v2.35.1** instalados (2026-11-08); `ubuntu` en el grupo `docker`; linger activado.
+  Código de microservicios en `~/g5-app` (copia de `fase2`, revisión en `~/g5-app/REVISION`); imágenes
+  `g5-app-{gateway,iam,slice-manager,platform-manager}` construidas. Ningún contenedor levantado aún
+  (falta `g5_iam.cli init`, interactivo, lo ejecuta el usuario).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
   `~/.ssh/authorized_keys.bak-20261103`. No se tocó iptables.
-- **OpenStack**: igual que el inventario inicial (solo `lab5` con 2 VMs y la red `external`). Ningún recurso `g5-*`.
+- **OpenStack** (2026-11-08): ningún recurso `g5-*`. Existen proyectos de laboratorio `lab5` (2 VMs) y `topo1_lab6`
+  (3 VMs, 3 redes) que no son del orquestador: no tocarlos; ocupan capacidad de los workers.
 - Acceso desde la PC del usuario: alias `g5-app` y `g5-gw` en `~/.ssh/config` con la llave `id_ed25519_g5`.
 
 ## Inventario de fase 2 verificado (2026-11-03, solo lectura)
@@ -99,7 +106,6 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
 |---|---|---|
 | Informe previo LAB6 (Actividad 1 en el headnode + pasar el plan al template PAIDEIA) | Grupo | **Jueves 5 nov** |
 | Explicación del plan de pruebas (evaluación continua) | Grupo | Domingo 8 nov 23:59 |
-| `sudo loginctl enable-linger ubuntu` en el app server | Usuario | Para que `g5-tunnels` arranque tras reiniciar |
 | Agregar `permitopen="192.168.202.1:8778"` (Placement) a la llave del gateway | Usuario | Necesario en F3 |
 | Aclarar autoría de las reglas `LAB5_DIRECT` (origen 10.8.0.168) en el gateway | Grupo | D-05 en pausa hasta entonces |
 | Repositorio privado + coach `fernandoguzmann` como colaborador (triage) | David Escobal | Requisito del enunciado |
@@ -107,19 +113,22 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
 | Decidir qué nodo Linux hace de gateway de slices en fase 2 | Grupo | Necesario para el `cluster.json` Linux |
 | Carpeta `requerimientos_md/Imagenes/` sin commitear (captura de un portal externo) | Usuario | Decidir si se versiona |
 
-## Próxima sesión: F2 — Topology Manager, borradores, edición y roles (R1B)
-Abrir **una sesión nueva** (contexto liviano). Leer `CLAUDE.md`, este archivo y `docs/pruebas/PLAN_PRUEBAS_SLICE_MANAGER.md`.
-Pasos propuestos (cada uno con tests y commit propio, sin tocar infraestructura):
-1. **Generadores de topologías** (`g5/topology/`): lineal, anillo, malla, árbol, bus para N nodos, independientes del
-   proveedor; esquema JSON versionado (`schema_version`). Casos 1.3.2–1.3.3.
-2. **Borradores persistentes**: tabla `drafts` (dueño, versión, contenido); API `POST/GET/PUT /v1/drafts`, combinar
-   topologías y agregar nodos/enlaces; desplegar un borrador como slice. Casos 1.3.4–1.3.5.
-3. **Exportar/importar** plantillas con validación de esquema (sin credenciales ni IDs de ejecución). Casos 1.2.5.
-4. **IAM mínimo**: login con expiración y roles admin/profesor/alumno; filtrar por dueño/curso. Casos 1.1.4–1.1.5.
-5. **Edición de slices desplegados** con control de versión (409 si la versión es obsoleta). Casos 1.11.1–1.11.2.
-6. **Interfaz web** sobre esos endpoints (listar, crear desde plantilla o borrador eligiendo Linux/OpenStack, estado,
-   diagnóstico, consola, borrar). La web EX1 (`g5/web.py`) sirve de base.
-Luego: F3 (VM Placement, R4) → configuración Linux de fase 2 → F4 (red y seguridad, R5).
+## Próxima sesión: microservicios en el app server y servicio web (D-08, D-10)
+Pasos (cada uno con tests y commit propio; autorización antes de cambios remotos):
+1. **Levantar `iam`, `slice-manager`, `gateway`** en `~/g5-app` (tras `g5_iam.cli init`) y probar salud, login,
+   capacidades, 401 y revocación por el gateway (`127.0.0.1:8000`).
+2. **Platform-manager en compose** (perfil `platform`): carpeta `deploy/platform-config/` (600) y acceso a OpenStack
+   desde el contenedor (decidir: sidecar de túneles —recomendado— o túneles del host).
+3. **Paso 5: slice-manager → platform-manager** con token de servicio y autorización IAM: login → crear → estado →
+   borrar slice por el gateway, contra el clúster real.
+4. **Web, parte 1** (D-10): login, menú por rol y "Mis slices" (listar, desplegar Linux/OpenStack, estado, borrar, consola).
+5. **Topology-manager + web, parte 2**: generadores lineal, malla, árbol, anillo, bus (esquema versionado); borradores
+   (combinar predefinidas, agregar nodos/enlaces, capacidad por VM); exportar/importar; lienzo con React Flow.
+   Casos 1.3.2–1.3.5 y 1.2.5.
+6. **Edición de slices desplegados** con control de versión (409 si la versión es obsoleta). Casos 1.11.1–1.11.2.
+7. **Web, parte 3**: cursos/usuarios (IAM), importar imágenes (image-catalog, solo metadatos), consumo de recursos.
+Luego: placement (D-07, cuando se decida la heurística) y monitoreo → `cluster.json` Linux de fase 2 → R5 con
+`SwitchController` (D-09).
 
 ## Decisiones aprobadas (2026-11-03)
 | ID | Decisión | Motivo | Pendiente de verificar |
@@ -132,6 +141,7 @@ Luego: F3 (VM Placement, R4) → configuración Linux de fase 2 → F4 (red y se
 | D-07 | **Pendiente:** heurística de VM Placement **aún no definida**; el módulo no se implementa todavía. | El grupo presentó WFD en una reunión previa; el HLD §4.7 describe BFD y el contexto de Codex (8-nov) propone BFD. Insumo para decidir: `jupyter notebooks-20261106/07_heuristicas_placement.ipynb` (FFD/BFD/WFD vs CP-SAT, misma instancia). | Definir objetivo (balancear vs consolidar), puntuación multidimensional y admisión por slice completo; luego alinear HLD §4.7 (§4.7.1, §4.7.4, §4.7.9, §4.7.10). |
 | D-08 | **Microservicios con Docker Compose en el app server.** Implementación inicial: `gateway`, `iam`, `slice-manager` (de la rama `app`), `platform-manager` (núcleo de `fase2`: API, Engine, drivers) y `console`. Después: `topology-manager`, `image-catalog` (solo metadatos), `placement` y `monitoring`. Sin AWS ni NoSQL; cola en base de datos. | El diseño define ~16 módulos lógicos; se implementan los que tienen datos o ciclo de vida propios. Dueños de datos: IAM (usuarios, roles, cursos, asignaciones), slice-manager (borradores y plantillas), platform-manager (slices desplegados, operaciones, reservas, recursos del proveedor). Networking queda dentro de los drivers (como G2). | Verificar CPU/RAM/disco y Docker en el app server; acceso de contenedores a los túneles; credenciales montadas como secretos. |
 | D-09 | **Control dinámico de ovs1/ovs2 (R5-I-06) por SSH desde el driver** detrás de una interfaz `SwitchController`; migrar a un servicio `network-controller` por la Control Network solo si el jefe de práctica confirma ese uso. | Funciona con la red de gestión actual (ovs1 192.168.201.5, ovs2 192.168.202.5) y reutiliza el agente de EX1 (candado y registro por slice). | Hoy la S-VLAN es por slice (filtra por slice, no por enlace): evaluar una S-VLAN por enlace. ovs2 lo comparte OpenStack: tocar solo VLANs de slices G5. Inspección de solo lectura y autorización antes de cambiar switches. |
+| D-10 | **Interfaz web como microservicio `web`** en el mismo compose: React + Vite compilado a estáticos y servido por un contenedor ligero (nginx); lienzo de topologías con React Flow. Solo habla con el gateway. Diseño propio de G5 (G2 es referencia de funcionalidad, no de apariencia). | R1B (12 pts) es la UI: predefinidas, edición, borradores, exportar/importar, capacidad por VM, mis slices, consumo, consola. La demo final debe mostrar el flujo visual ejecutado de verdad sobre el clúster. No toca la lógica probada del núcleo. | Node.js para desarrollo local; el gateway debe exponer las rutas de slices, borradores y consola; TLS en el punto de entrada antes de exponerlo. |
 | D-04 | Primera fase de implementación: F0 (auditoría) y luego F1 (núcleo de Slice Manager agnóstico + driver OpenStack mínimo: crear, consultar y eliminar un slice lineal). | Cubre la experiencia del LAB6, R3-I y R1B-I-01, y fija el modelo del que dependen R1B, R4 y R5. | — |
 
 ## Restricciones
