@@ -149,6 +149,10 @@ class Registry:
         with self.lock:
             self.db.execute("UPDATE slices SET iam_registered=1 WHERE id=?", (sid,))
 
+    def mark_retired(self, sid):
+        with self.lock:
+            self.db.execute("UPDATE slices SET iam_registered=0 WHERE id=?", (sid,))
+
     def get(self, sid):
         with self.lock:
             row = self.db.execute("SELECT * FROM slices WHERE id=?", (sid,)).fetchone()
@@ -354,6 +358,21 @@ async def register_in_iam(request, row, user, spec):
     return True
 
 
+async def retire_if_deleted(request, row, status):
+    """Cuando el motor confirma DELETED, se retira el slice de IAM (recurso, VMs y asignaciones). Idempotente."""
+    token = request.app.state.iam_service_token
+    if status != "DELETED" or not row["iam_registered"] or not token:
+        return
+    try:
+        response = await request.app.state.iam.delete("/v1/iam/internal/slices/" + row["id"],
+                                                      headers={"Authorization": "Bearer " + token})
+    except httpx.RequestError:
+        return  # se reintenta en la próxima consulta
+    if response.status_code == 200:
+        request.app.state.registry.mark_retired(row["id"])
+        row["iam_registered"] = 0
+
+
 async def iam_passthrough(request, method, path, token, body=None):
     """Llamada a IAM con el token del usuario conservando 403/404/409 (asignaciones)."""
     try:
@@ -435,6 +454,8 @@ async def list_slices(request: Request, token=Depends(credentials_token),
     if not rows:
         return []
     states = {s["id"]: s["status"] for s in await platform_call(request, "GET", "/v1/slices")}
+    for r in rows:
+        await retire_if_deleted(request, r, states.get(r["id"]))
     return [view(r, states.get(r["id"], "UNKNOWN")) for r in rows]
 
 
@@ -451,6 +472,7 @@ async def get_slice(slice_id: SliceId, request: Request, token=Depends(credentia
     vms = [VmView(name=v["name"], image=v.get("image"), vcpus=v.get("vcpus"), memory_mb=v.get("memory_mb"),
                   disk_gb=v.get("disk_gb"), networks=[n.get("network") for n in v.get("nics", []) if n.get("network")])
            for v in spec.get("vms", []) if isinstance(v, dict) and v.get("name")]
+    await retire_if_deleted(request, row, state.get("status"))
     manage = user.role == "admin" or row["owner_id"] == user.id
     return SliceDetail(**view(row, state.get("status", "UNKNOWN")).model_dump(), vms=vms, events=recent,
                        assignable=bool(row["iam_registered"]) and manage, can_manage=manage)

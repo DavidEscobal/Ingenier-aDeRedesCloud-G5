@@ -243,6 +243,28 @@ class SliceFlowTests(unittest.TestCase):
         self.assertEqual(request(base, token=self.student)[0], 404)
         self.assertEqual(request(base + "/vms/vm1/console", "POST", self.student)[0], 404)
 
+    def test_deleted_slice_is_retired_from_iam_with_its_assignments(self):
+        status, accepted = self.create(self.prof)
+        sid = accepted["slice_id"]
+        base = self.gw + "/v1/slices/" + sid
+        self.assertEqual(request(base + "/assignments", "POST", self.prof, {"user_id": self.student_id})[0], 200)
+        iam_ids = lambda: [r["id"] for r in request(self.iam + "/v1/iam/resources", token=self.admin)[1]]
+        self.assertIn(sid, iam_ids())
+        self.assertEqual(request(base, "DELETE", self.prof, headers={"Idempotency-Key": uuid.uuid4().hex})[0], 202)
+        # Mientras el motor no confirma, el registro se conserva (si el borrado fallara, sigue asignable).
+        request(self.gw + "/v1/slices", token=self.prof)
+        self.assertIn(sid, iam_ids())
+        self.platform.slices[sid]["status"] = "DELETED"
+        rows = request(self.gw + "/v1/slices", token=self.prof)[1]
+        self.assertEqual(next(r for r in rows if r["id"] == sid)["status"], "DELETED")
+        self.assertNotIn(sid, iam_ids(), "slice y VMs retirados de IAM")
+        self.assertFalse(any(i.startswith(sid + "-") for i in iam_ids()))
+        self.assertNotIn(sid, [r["id"] for r in request(self.gw + "/v1/slices", token=self.student)[1]])
+        self.assertEqual(request(base, token=self.student)[0], 404)
+        self.assertFalse(request(base, token=self.prof)[1]["assignable"])
+        # Idempotente: volver a consultar no falla.
+        self.assertEqual(request(base, token=self.prof)[0], 200)
+
     def test_internal_registration_requires_the_service_token(self):
         body = {"id": "x" * 32, "course_id": "TEL141", "professor_id": self.prof_id, "vms": []}
         url = self.iam + "/v1/iam/internal/slices/" + "x" * 32

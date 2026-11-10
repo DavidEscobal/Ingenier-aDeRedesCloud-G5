@@ -338,6 +338,23 @@ def register_slice(slice_id: Identifier, body: SliceRegistration, db=Depends(ser
     return {"status": "registered"}
 
 
+
+@app.delete("/v1/iam/internal/slices/{slice_id}", response_model=Message)
+def retire_slice(slice_id: Identifier, db=Depends(service, scope="function")):
+    """Retira (idempotente) un slice ya eliminado: sus VMs, el slice y todas sus asignaciones."""
+    resource = db.execute("SELECT kind FROM resources WHERE id=?", (slice_id,)).fetchone()
+    if resource is None:
+        return {"status": "absent"}
+    if resource["kind"] != "slice":
+        raise HTTPException(409, "conflict")
+    children = [r["id"] for r in db.execute("SELECT id FROM resources WHERE parent_slice_id=?", (slice_id,))]
+    for rid in children + [slice_id]:
+        db.execute("DELETE FROM assignments WHERE resource_id=?", (rid,))
+    db.execute("DELETE FROM resources WHERE parent_slice_id=?", (slice_id,))
+    db.execute("DELETE FROM resources WHERE id=?", (slice_id,))
+    audit(db, "service:slice-manager", "resource.retire_slice", slice_id, "allowed")
+    return {"status": "retired"}
+
 @app.get("/v1/iam/courses/{course_id}/students", response_model=list[Person])
 def course_students(course_id: Identifier, ctx=Depends(context, scope="function")):
     """Alumnos activos del curso: para que el profesor elija a quién asignar un slice."""
