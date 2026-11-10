@@ -242,6 +242,29 @@ VmName = Annotated[str, PathParam(pattern=r"^[a-z][a-z0-9-]{0,31}$")]
 async def vm_console(slice_id: SliceId, vm: VmName, request: Request, access_token=Depends(token)):
     return await slice_call(request, "POST", "/v1/slices/%s/vms/%s/console" % (slice_id, vm), access_token)
 
+
+UserId = Annotated[str, PathParam(pattern=r"^[a-zA-Z0-9_-]{1,64}$")]
+
+
+class AssignmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+
+
+@app.get("/v1/slices/{slice_id}/assignments", tags=["slices"], responses=ERROR_RESPONSES)
+async def slice_assignments(slice_id: SliceId, request: Request, access_token=Depends(token)):
+    return await slice_call(request, "GET", f"/v1/slices/{slice_id}/assignments", access_token)
+
+
+@app.post("/v1/slices/{slice_id}/assignments", tags=["slices"], responses=ERROR_RESPONSES)
+async def assign_slice(slice_id: SliceId, body: AssignmentBody, request: Request, access_token=Depends(token)):
+    return await slice_call(request, "POST", f"/v1/slices/{slice_id}/assignments", access_token, body.model_dump())
+
+
+@app.delete("/v1/slices/{slice_id}/assignments/{user_id}", tags=["slices"], responses=ERROR_RESPONSES)
+async def unassign_slice(slice_id: SliceId, user_id: UserId, request: Request, access_token=Depends(token)):
+    return await slice_call(request, "DELETE", f"/v1/slices/{slice_id}/assignments/{user_id}", access_token)
+
 # --- Topologías y borradores (paso 6): rutas explícitas hacia el Topology Manager, dueño del documento.
 DraftId = Annotated[str, PathParam(pattern=r"^[0-9a-f]{32}$")]
 JsonBody = Annotated[dict[str, Any], Body()]

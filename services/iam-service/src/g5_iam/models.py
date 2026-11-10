@@ -108,3 +108,25 @@ class TokenResponse(Model):
 
 class Message(Model):
     status: str
+
+
+class SliceRegistration(Model):
+    """Registro interno (solo token de servicio): un slice y sus VMs como recursos autorizables."""
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    course_id: str = Field(min_length=1, max_length=64)
+    professor_id: str = Field(min_length=1, max_length=64)
+    vms: list[str] = Field(default_factory=list, max_length=64)
+
+    @field_validator("vms")
+    @classmethod
+    def vm_names(cls, value):
+        import re
+        if any(not re.fullmatch(r"[a-z][a-z0-9-]{0,31}", v) for v in value) or len(set(value)) != len(value):
+            raise ValueError("Invalid or repeated VM names")
+        return value
+
+
+class Person(BaseModel):
+    id: str
+    username: str
+    display_name: str

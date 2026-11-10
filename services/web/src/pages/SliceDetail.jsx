@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Api } from '../api.js'
 import { ConfirmDialog, FINAL, formatDate, ProviderLabel, StatusBadge, usePolling } from '../components.jsx'
+import Assignments from './Assignments.jsx'
 
 const EVENT_LABEL = {
   ACCEPTED: 'Solicitud aceptada', STARTED: 'Inicio', OS_CREATED: 'Recurso creado', OS_PLACED: 'Ubicación de VMs',
@@ -85,7 +86,7 @@ export default function SliceDetail({ user }) {
   }
   if (!slice) return <p className="muted">Cargando…</p>
 
-  const deletable = ['READY', 'FAILED_CLEANED', 'FAILED', 'ERROR'].includes(slice.status)
+  const deletable = slice.can_manage && ['READY', 'FAILED_CLEANED', 'FAILED', 'ERROR'].includes(slice.status)
   return (
     <section>
       <Link to="/slices" className="back">← {user.role === 'admin' ? 'Todos los slices' : 'Mis slices'}</Link>
@@ -127,6 +128,11 @@ export default function SliceDetail({ user }) {
           </table>
           {slice.status === 'READY' && <p className="hint">La consola se abre en otra pestaña. El enlace de Nova caduca en pocos minutos: si expira, vuelve a pulsar Consola.</p>}
         </>
+      )}
+
+      {slice.assignable && slice.status !== 'DELETED' && <Assignments slice={slice} />}
+      {!slice.can_manage && (
+        <p className="notice">Slice asignado por {slice.owner}. Puedes ver su estado y abrir la consola de sus VMs.</p>
       )}
 
       {!FINAL.has(slice.status) && (

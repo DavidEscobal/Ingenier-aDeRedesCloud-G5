@@ -82,7 +82,7 @@ export default function Slices({ user }) {
                 <td>{formatDate(r.created_at)}</td>
                 <td className="actions">
                   <Link to={'/slices/' + r.id}>Ver</Link>
-                  {['READY', 'FAILED_CLEANED', 'FAILED', 'ERROR'].includes(r.status) && (
+                  {(admin || r.owner_id === user.id) && ['READY', 'FAILED_CLEANED', 'FAILED', 'ERROR'].includes(r.status) && (
                     <button className="link danger-text" onClick={() => setToDelete(r)}>Borrar</button>
                   )}
                 </td>

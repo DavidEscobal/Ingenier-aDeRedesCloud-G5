@@ -103,6 +103,9 @@ class SliceFlowTests(unittest.TestCase):
         cls.addClassCleanup(cls.stack.close)
         directory = Path(cls.stack.enter_context(tempfile.TemporaryDirectory()))
         settings, password, _ = initialize(directory)
+        iam_token = directory / "iam-service.token"
+        iam_token.write_text(secrets.token_urlsafe(40), encoding="utf-8")
+        settings["IAM_SERVICE_TOKEN_FILE"] = str(iam_token)
         cls.stack.enter_context(patch.dict(os.environ, settings))
         cls.iam, _ = cls.stack.enter_context(service("g5_iam.main", **settings))
         cls.platform = FakePlatform()
@@ -111,14 +114,15 @@ class SliceFlowTests(unittest.TestCase):
         token_file.write_text(SERVICE_TOKEN + "\n", encoding="utf-8")
         cls.sm, _ = cls.stack.enter_context(service(
             "g5_slice_manager.main", IAM_URL=cls.iam, PLATFORM_MANAGER_URL=platform_url,
-            PLATFORM_TOKEN_FILE=str(token_file), SLICE_DB_PATH=str(directory / "slices.db")))
+            PLATFORM_TOKEN_FILE=str(token_file), SLICE_DB_PATH=str(directory / "slices.db"),
+            IAM_SERVICE_TOKEN_FILE=str(iam_token)))
         cls.gw, _ = cls.stack.enter_context(service("g5_gateway.main", IAM_URL=cls.iam, SLICE_MANAGER_URL=cls.sm))
         cls.admin = cls.login("admin", password)
         status, _ = request(cls.iam + "/v1/iam/courses", "POST", cls.admin, {"id": "TEL141", "name": "Cloud"})
         assert status == 201, status
         cls.prof, cls.prof_id = cls.user("prof1", "professor")
         cls.other, cls.other_id = cls.user("prof2", "professor")
-        cls.student, _ = cls.user("alumno1", "student")
+        cls.student, cls.student_id = cls.user("alumno1", "student")
 
     @classmethod
     def login(cls, username, password):
@@ -205,6 +209,55 @@ class SliceFlowTests(unittest.TestCase):
         self.assertEqual(request(self.gw + path, "POST", self.admin)[0], 200)
         self.assertEqual(request(self.gw + "/v1/slices/%s/vms/nada/console" % sid, "POST", self.prof)[0], 404)
         self.assertEqual(request(self.gw + path, "POST")[0], 401)
+
+    def test_professor_assigns_slice_and_student_sees_it_and_its_consoles(self):
+        status, accepted = self.create(self.prof)
+        sid = accepted["slice_id"]
+        base = self.gw + "/v1/slices/" + sid
+        self.assertTrue(request(base, token=self.prof)[1]["assignable"], "slice de profesor registrado en IAM")
+        # El profesor ve a los alumnos de su curso; el alumno no.
+        status, students = request(self.gw + "/v1/iam/courses/TEL141/students", token=self.prof)
+        self.assertEqual(status, 200)
+        self.assertIn("alumno1", [s["username"] for s in students])
+        self.assertEqual(request(self.gw + "/v1/iam/courses/TEL141/students", token=self.student)[0], 403)
+        # Antes de asignar: el alumno no ve nada.
+        self.assertNotIn(sid, [r["id"] for r in request(self.gw + "/v1/slices", token=self.student)[1]])
+        self.assertEqual(request(base, token=self.student)[0], 404)
+        self.assertEqual(request(base + "/vms/vm1/console", "POST", self.student)[0], 404)
+        # Otro profesor no puede asignar; el dueño sí.
+        self.assertEqual(request(base + "/assignments", "POST", self.other, {"user_id": self.student_id})[0], 404)
+        status, assigned = request(base + "/assignments", "POST", self.prof, {"user_id": self.student_id})
+        self.assertEqual((status, [a["username"] for a in assigned]), (200, ["alumno1"]))
+        self.assertEqual(request(base + "/assignments", "POST", self.prof, {"user_id": self.other_id})[0], 409,
+                         "solo se asigna a alumnos")
+        # Después: el alumno lo ve, lo consulta y abre consolas, pero no lo gestiona.
+        self.assertIn(sid, [r["id"] for r in request(self.gw + "/v1/slices", token=self.student)[1]])
+        status, detail = request(base, token=self.student)
+        self.assertEqual((status, detail["can_manage"], detail["assignable"]), (200, False, False))
+        self.assertEqual(request(base + "/vms/vm1/console", "POST", self.student)[0], 200)
+        self.assertEqual(request(base, "DELETE", self.student, headers={"Idempotency-Key": uuid.uuid4().hex})[0], 404)
+        self.assertEqual(request(base + "/assignments", token=self.student)[0], 404)
+        # Quitar la asignación revoca de inmediato.
+        status, assigned = request(base + "/assignments/" + self.student_id, "DELETE", self.prof)
+        self.assertEqual((status, assigned), (200, []))
+        self.assertEqual(request(base, token=self.student)[0], 404)
+        self.assertEqual(request(base + "/vms/vm1/console", "POST", self.student)[0], 404)
+
+    def test_internal_registration_requires_the_service_token(self):
+        body = {"id": "x" * 32, "course_id": "TEL141", "professor_id": self.prof_id, "vms": []}
+        url = self.iam + "/v1/iam/internal/slices/" + "x" * 32
+        for token in (None, self.admin, self.prof, "otro-token-cualquiera-de-servicio-xxxxxxxx"):
+            self.assertEqual(request(url, "PUT", token, body)[0], 401)
+        # Y el gateway no la expone.
+        self.assertEqual(request(self.gw + "/v1/iam/internal/slices/" + "x" * 32, "PUT", self.admin, body)[0], 404)
+
+    def test_admin_slices_are_not_assignable(self):
+        status, accepted = self.create(self.admin)
+        base = self.gw + "/v1/slices/" + accepted["slice_id"]
+        self.assertFalse(request(base, token=self.admin)[1]["assignable"])
+        status, body = request(base + "/assignments", "POST", self.admin, {"user_id": self.student_id})
+        self.assertEqual(status, 409)
+        self.assertIn("no admite asignaciones", body["detail"])
 
     def test_capabilities_report_lifecycle_when_platform_is_configured(self):
         status, caps = request(self.gw + "/v1/platform/capabilities", token=self.prof)

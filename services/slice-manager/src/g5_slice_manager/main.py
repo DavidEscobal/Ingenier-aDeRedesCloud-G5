@@ -87,6 +87,19 @@ class VmView(BaseModel):
 class SliceDetail(SliceView):
     vms: list[VmView] = []
     events: list[SliceEvent]
+    assignable: bool = False
+    can_manage: bool = False
+
+
+class Assignment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+
+
+class Person(BaseModel):
+    id: str
+    username: str
+    display_name: str
 
 
 class Console(BaseModel):
@@ -122,24 +135,35 @@ class Registry:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("""CREATE TABLE IF NOT EXISTS slices(id TEXT PRIMARY KEY, owner_id TEXT NOT NULL,
             owner TEXT NOT NULL, course_id TEXT NOT NULL, name TEXT, provider TEXT NOT NULL, created_at REAL NOT NULL)""")
+        columns = {r[1] for r in self.db.execute("PRAGMA table_info(slices)")}
+        if "iam_registered" not in columns:
+            self.db.execute("ALTER TABLE slices ADD COLUMN iam_registered INTEGER NOT NULL DEFAULT 0")
 
     def add(self, sid, user, course_id, spec):
         with self.lock:
-            self.db.execute("INSERT OR IGNORE INTO slices VALUES(?,?,?,?,?,?,?)",
-                            (sid, user.id, user.username, course_id, spec.get("name"),
-                             spec.get("provider", "linux"), time.time()))
+            self.db.execute("INSERT OR IGNORE INTO slices(id, owner_id, owner, course_id, name, provider, created_at) "
+                            "VALUES(?,?,?,?,?,?,?)", (sid, user.id, user.username, course_id, spec.get("name"),
+                                                      spec.get("provider", "linux"), time.time()))
+
+    def mark_registered(self, sid):
+        with self.lock:
+            self.db.execute("UPDATE slices SET iam_registered=1 WHERE id=?", (sid,))
 
     def get(self, sid):
         with self.lock:
             row = self.db.execute("SELECT * FROM slices WHERE id=?", (sid,)).fetchone()
         return dict(row) if row else None
 
-    def visible(self, user):
+    def visible(self, user, assigned=()):
+        assigned = list(assigned)
         with self.lock:
             if user.role == "admin":
                 rows = self.db.execute("SELECT * FROM slices ORDER BY created_at").fetchall()
             else:
-                rows = self.db.execute("SELECT * FROM slices WHERE owner_id=? ORDER BY created_at", (user.id,)).fetchall()
+                marks = ",".join("?" * len(assigned))
+                extra = f" OR id IN ({marks})" if assigned else ""
+                rows = self.db.execute(f"SELECT * FROM slices WHERE owner_id=?{extra} ORDER BY created_at",
+                                       (user.id, *assigned)).fetchall()
         return [dict(r) for r in rows]
 
     def close(self):
@@ -159,6 +183,11 @@ async def lifespan(app):
         if len(app.state.platform_token) < 32:
             raise ValueError("PLATFORM_TOKEN_FILE debe contener un token de servicio")
         app.state.registry = Registry(os.getenv("SLICE_DB_PATH", "state/slice/slices.db"))
+    app.state.iam_service_token = None
+    if os.getenv("IAM_SERVICE_TOKEN_FILE"):
+        app.state.iam_service_token = Path(os.environ["IAM_SERVICE_TOKEN_FILE"]).read_text(encoding="utf-8").strip()
+        if len(app.state.iam_service_token) < 32:
+            raise ValueError("IAM_SERVICE_TOKEN_FILE debe contener un token de servicio")
     timeout = float(os.getenv("PLATFORM_TIMEOUT_SECONDS", "20"))
     async with httpx.AsyncClient(base_url=iam_url, timeout=3, trust_env=False, follow_redirects=False) as iam, \
             httpx.AsyncClient(base_url=platform_url or "http://platform.invalid", timeout=timeout,
@@ -287,6 +316,66 @@ def owned(registry, sid, user):
     return row
 
 
+async def readable(request, registry, sid, user, token, action="slice.read", resource=None):
+    """Dueño o admin; si no, IAM decide sobre el recurso registrado (alumno asignado). Si no, 404."""
+    row = registry.get(sid)
+    if not row:
+        raise HTTPException(404, "not_found")
+    if user.role == "admin" or row["owner_id"] == user.id:
+        return row
+    if row["iam_registered"] and await allowed(request, token, action, resource_id=resource or sid):
+        return row
+    raise HTTPException(404, "not_found")
+
+
+async def manageable(request, registry, sid, user, token, action):
+    """Borrar o asignar: admin; o el profesor dueño, respetando la política del curso en IAM si está registrado."""
+    row = owned(registry, sid, user)
+    if user.role != "admin" and row["iam_registered"] and not await allowed(request, token, action, resource_id=sid):
+        raise HTTPException(403, "not_authorized")
+    return row
+
+
+async def register_in_iam(request, row, user, spec):
+    """Registro (idempotente) del slice y sus VMs en IAM. Solo slices de profesores: IAM exige profesor del curso."""
+    token = request.app.state.iam_service_token
+    if not token or user.role != "professor":
+        return False
+    vms = [v["name"] for v in spec.get("vms", []) if isinstance(v, dict) and isinstance(v.get("name"), str)]
+    try:
+        response = await request.app.state.iam.put(
+            "/v1/iam/internal/slices/" + row, headers={"Authorization": "Bearer " + token},
+            json={"id": row, "course_id": spec["__course"], "professor_id": user.id, "vms": vms})
+    except httpx.RequestError:
+        return False
+    if response.status_code != 200:
+        return False
+    request.app.state.registry.mark_registered(row)
+    return True
+
+
+async def iam_passthrough(request, method, path, token, body=None):
+    """Llamada a IAM con el token del usuario conservando 403/404/409 (asignaciones)."""
+    try:
+        response = await request.app.state.iam.request(method, path, headers={"Authorization": "Bearer " + token}, json=body)
+    except httpx.RequestError:
+        raise HTTPException(503, "iam_unavailable") from None
+    if response.status_code == 401:
+        raise HTTPException(401, "invalid_credentials", headers={"WWW-Authenticate": "Bearer"})
+    if response.status_code in (403, 404, 409):
+        detail = None
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            pass
+        messages = {"student_not_in_course": "El alumno no está matriculado en el curso del slice",
+                    "slice_assignment_required": "Primero hay que asignar el slice"}
+        raise HTTPException(response.status_code, messages.get(detail, detail if isinstance(detail, str) else "not_authorized"))
+    if response.status_code != 200:
+        raise HTTPException(503, "iam_unavailable")
+    return response.json()
+
+
 def view(row, status):
     return SliceView(id=row["id"], name=row["name"], provider=row["provider"], status=status,
                      course_id=row["course_id"], owner_id=row["owner_id"], owner=row["owner"],
@@ -330,13 +419,19 @@ async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey,
     except (KeyError, TypeError, ValidationError):
         raise HTTPException(502, "platform_bad_response") from None
     request.app.state.registry.add(accepted.slice_id, user, body.course_id, body.spec)
+    await register_in_iam(request, accepted.slice_id, user, dict(body.spec, __course=body.course_id))
     return accepted
 
 
 @app.get("/v1/slices", response_model=list[SliceView], tags=["slices"])
-async def list_slices(request: Request, user: UserView = Depends(current_user)) -> list[SliceView]:
+async def list_slices(request: Request, token=Depends(credentials_token),
+                      user: UserView = Depends(current_user)) -> list[SliceView]:
     _, registry = platform_ready(request)
-    rows = registry.visible(user)
+    assigned = []
+    if user.role != "admin":
+        resources = await iam_request(request, "GET", "/v1/iam/resources", token)
+        assigned = [r["id"] for r in resources or [] if isinstance(r, dict) and r.get("kind") == "slice"]
+    rows = registry.visible(user, assigned)
     if not rows:
         return []
     states = {s["id"]: s["status"] for s in await platform_call(request, "GET", "/v1/slices")}
@@ -344,9 +439,10 @@ async def list_slices(request: Request, user: UserView = Depends(current_user)) 
 
 
 @app.get("/v1/slices/{slice_id}", response_model=SliceDetail, tags=["slices"])
-async def get_slice(slice_id: SliceId, request: Request, user: UserView = Depends(current_user)) -> SliceDetail:
+async def get_slice(slice_id: SliceId, request: Request, token=Depends(credentials_token),
+                    user: UserView = Depends(current_user)) -> SliceDetail:
     _, registry = platform_ready(request)
-    row = owned(registry, slice_id, user)
+    row = await readable(request, registry, slice_id, user, token)
     state = await platform_call(request, "GET", "/v1/slices/" + slice_id)
     events = await platform_call(request, "GET", "/v1/slices/%s/events" % slice_id)
     recent = [SliceEvent(**{k: e.get(k) for k in ("seq", "event", "detail", "timestamp")})
@@ -355,14 +451,16 @@ async def get_slice(slice_id: SliceId, request: Request, user: UserView = Depend
     vms = [VmView(name=v["name"], image=v.get("image"), vcpus=v.get("vcpus"), memory_mb=v.get("memory_mb"),
                   disk_gb=v.get("disk_gb"), networks=[n.get("network") for n in v.get("nics", []) if n.get("network")])
            for v in spec.get("vms", []) if isinstance(v, dict) and v.get("name")]
-    return SliceDetail(**view(row, state.get("status", "UNKNOWN")).model_dump(), vms=vms, events=recent)
+    manage = user.role == "admin" or row["owner_id"] == user.id
+    return SliceDetail(**view(row, state.get("status", "UNKNOWN")).model_dump(), vms=vms, events=recent,
+                       assignable=bool(row["iam_registered"]) and manage, can_manage=manage)
 
 
 @app.delete("/v1/slices/{slice_id}", response_model=Accepted, status_code=202, tags=["slices"])
-async def delete_slice(slice_id: SliceId, request: Request, key: IdempotencyKey,
+async def delete_slice(slice_id: SliceId, request: Request, key: IdempotencyKey, token=Depends(credentials_token),
                        user: UserView = Depends(current_user)) -> Accepted:
     _, registry = platform_ready(request)
-    owned(registry, slice_id, user)
+    await manageable(request, registry, slice_id, user, token, "slice.delete")
     job = await platform_call(request, "DELETE", "/v1/slices/" + slice_id, key=platform_key(user, key))
     try:
         return Accepted(slice_id=slice_id, operation_id=job["id"], status=job["status"])
@@ -371,12 +469,52 @@ async def delete_slice(slice_id: SliceId, request: Request, key: IdempotencyKey,
 
 
 @app.post("/v1/slices/{slice_id}/vms/{vm}/console", response_model=Console, tags=["slices"])
-async def vm_console(slice_id: SliceId, vm: VmName, request: Request, user: UserView = Depends(current_user)) -> Console:
-    """URL de consola (noVNC con token de Nova, de vida corta). Solo dueño o admin, como el resto del slice."""
+async def vm_console(slice_id: SliceId, vm: VmName, request: Request, token=Depends(credentials_token),
+                     user: UserView = Depends(current_user)) -> Console:
+    """URL de consola (noVNC con token de Nova, de vida corta): dueño, admin o alumno asignado a la VM (IAM)."""
     _, registry = platform_ready(request)
-    owned(registry, slice_id, user)
+    await readable(request, registry, slice_id, user, token, "vm.console", f"{slice_id}-{vm}")
     data = await platform_call(request, "POST", "/v1/slices/%s/vms/%s/console" % (slice_id, vm), {})
     url = data.get("url") if isinstance(data, dict) else None
     if not isinstance(url, str) or not url:
         raise HTTPException(502, "platform_bad_response")
     return Console(url=url, provider=data.get("provider", "unknown"), vm=vm)
+
+
+
+@app.get("/v1/slices/{slice_id}/assignments", response_model=list[Person], tags=["assignments"])
+async def list_assignments(slice_id: SliceId, request: Request, token=Depends(credentials_token),
+                           user: UserView = Depends(current_user)) -> list[Person]:
+    _, registry = platform_ready(request)
+    row = owned(registry, slice_id, user)
+    if not row["iam_registered"]:
+        return []
+    return await iam_passthrough(request, "GET", f"/v1/iam/resources/{slice_id}/assignments", token)
+
+
+@app.post("/v1/slices/{slice_id}/assignments", response_model=list[Person], tags=["assignments"])
+async def assign(slice_id: SliceId, body: Assignment, request: Request, token=Depends(credentials_token),
+                 user: UserView = Depends(current_user)) -> list[Person]:
+    """Asigna el slice y todas sus VMs a un alumno del curso (IAM valida rol, curso y permiso slice.assign)."""
+    _, registry = platform_ready(request)
+    row = owned(registry, slice_id, user)
+    if not row["iam_registered"]:
+        raise HTTPException(409, "Este slice no admite asignaciones (lo creó un admin o es anterior a esta función)")
+    state = await platform_call(request, "GET", "/v1/slices/" + slice_id)
+    vms = [v["name"] for v in (state.get("spec") or {}).get("vms", []) if isinstance(v, dict) and v.get("name")]
+    await iam_passthrough(request, "PUT", f"/v1/iam/resources/{slice_id}/assignments/{body.user_id}", token)
+    for vm in vms:
+        await iam_passthrough(request, "PUT", f"/v1/iam/resources/{slice_id}-{vm}/assignments/{body.user_id}", token)
+    return await iam_passthrough(request, "GET", f"/v1/iam/resources/{slice_id}/assignments", token)
+
+
+@app.delete("/v1/slices/{slice_id}/assignments/{user_id}", response_model=list[Person], tags=["assignments"])
+async def unassign(slice_id: SliceId, user_id: Annotated[str, PathParam(pattern=r"^[a-zA-Z0-9_-]{1,64}$")],
+                   request: Request, token=Depends(credentials_token), user: UserView = Depends(current_user)) -> list[Person]:
+    _, registry = platform_ready(request)
+    row = owned(registry, slice_id, user)
+    if not row["iam_registered"]:
+        raise HTTPException(409, "Este slice no admite asignaciones")
+    # IAM retira también las asignaciones de las VMs hijas.
+    await iam_passthrough(request, "DELETE", f"/v1/iam/resources/{slice_id}/assignments/{user_id}", token)
+    return await iam_passthrough(request, "GET", f"/v1/iam/resources/{slice_id}/assignments", token)

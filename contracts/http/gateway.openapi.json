@@ -752,6 +752,54 @@
         }
       }
     },
+    "/v1/iam/courses/{course_id}/students": {
+      "get": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "Course Students",
+        "operationId": "course_students_v1_iam_courses__course_id__students_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/iam/resources": {
       "get": {
         "tags": [
@@ -1278,6 +1326,189 @@
         }
       }
     },
+    "/v1/slices/{slice_id}/assignments": {
+      "get": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Slice Assignments",
+        "operationId": "slice_assignments_v1_slices__slice_id__assignments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Assign Slice",
+        "operationId": "assign_slice_v1_slices__slice_id__assignments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}/assignments/{user_id}": {
+      "delete": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Unassign Slice",
+        "operationId": "unassign_slice_v1_slices__slice_id__assignments__user_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/topologies/catalog": {
       "get": {
         "tags": [
@@ -1645,6 +1876,23 @@
   },
   "components": {
     "schemas": {
+      "AssignmentBody": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "User Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "AssignmentBody"
+      },
       "AuthorizationRequest": {
         "properties": {
           "action": {

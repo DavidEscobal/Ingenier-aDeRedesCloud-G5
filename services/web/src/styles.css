@@ -152,3 +152,10 @@ input:focus, select:focus { outline: 2px solid #9cc3e4; border-color: var(--bran
 .react-flow__edge-path { stroke: #6f8ea8; stroke-width: 2; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--danger); }
 @media (max-width: 900px) { .editor-grid { grid-template-columns: 1fr; } .canvas { height: 520px; } }
+
+/* --- Asignaciones --- */
+.assignments { margin-top: 24px; }
+.assignments h2 { margin-top: 0; }
+.people { list-style: none; margin: 0 0 14px; padding: 0; }
+.people li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.assign-row select { flex: 1; min-width: 0; }

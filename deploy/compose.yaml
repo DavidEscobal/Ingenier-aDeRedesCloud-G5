@@ -8,8 +8,11 @@ services:
       IAM_DB_PATH: /app/state/iam/iam.db
       IAM_SECRET_FILE: /app/state/iam/jwt.key
       IAM_TOKEN_TTL_SECONDS: "900"
+      # D-14: token de servicio del slice-manager (solo para registrar slices/VMs como recursos).
+      IAM_SERVICE_TOKEN_FILE: /run/g5/iam-service.token
     volumes:
       - iam-data:/app/state/iam
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/iam-service.token:/run/g5/iam-service.token:ro
     restart: unless-stopped
     networks: [control]
     healthcheck:
@@ -28,8 +31,10 @@ services:
       PLATFORM_MANAGER_URL: http://platform-manager:8000
       PLATFORM_TOKEN_FILE: /run/g5/platform.token
       SLICE_DB_PATH: /app/state/slice/slices.db
+      IAM_SERVICE_TOKEN_FILE: /run/g5/iam-service.token
     volumes:
       - slice-data:/app/state/slice
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/iam-service.token:/run/g5/iam-service.token:ro
       - ${G5_PLATFORM_CONFIG:-./platform-config}/slice-manager.token:/run/g5/platform.token:ro
     depends_on:
       iam:

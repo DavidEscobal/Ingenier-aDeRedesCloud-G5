@@ -274,7 +274,7 @@
           "slices"
         ],
         "summary": "Vm Console",
-        "description": "URL de consola (noVNC con token de Nova, de vida corta). Solo dueño o admin, como el resto del slice.",
+        "description": "URL de consola (noVNC con token de Nova, de vida corta): dueño, admin o alumno asignado a la VM (IAM).",
         "operationId": "vm_console_v1_slices__slice_id__vms__vm__console_post",
         "security": [
           {
@@ -326,6 +326,181 @@
           }
         }
       }
+    },
+    "/v1/slices/{slice_id}/assignments": {
+      "get": {
+        "tags": [
+          "assignments"
+        ],
+        "summary": "List Assignments",
+        "operationId": "list_assignments_v1_slices__slice_id__assignments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  "title": "Response List Assignments V1 Slices  Slice Id  Assignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "assignments"
+        ],
+        "summary": "Assign",
+        "description": "Asigna el slice y todas sus VMs a un alumno del curso (IAM valida rol, curso y permiso slice.assign).",
+        "operationId": "assign_v1_slices__slice_id__assignments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Assignment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  "title": "Response Assign V1 Slices  Slice Id  Assignments Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}/assignments/{user_id}": {
+      "delete": {
+        "tags": [
+          "assignments"
+        ],
+        "summary": "Unassign",
+        "operationId": "unassign_v1_slices__slice_id__assignments__user_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  "title": "Response Unassign V1 Slices  Slice Id  Assignments  User Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -352,6 +527,23 @@
           "status"
         ],
         "title": "Accepted"
+      },
+      "Assignment": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "User Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "Assignment"
       },
       "Capabilities": {
         "properties": {
@@ -480,6 +672,29 @@
         "type": "object",
         "title": "Health"
       },
+      "Person": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name"
+        ],
+        "title": "Person"
+      },
       "SliceCreate": {
         "properties": {
           "course_id": {
@@ -559,6 +774,16 @@
             },
             "type": "array",
             "title": "Events"
+          },
+          "assignable": {
+            "type": "boolean",
+            "title": "Assignable",
+            "default": false
+          },
+          "can_manage": {
+            "type": "boolean",
+            "title": "Can Manage",
+            "default": false
           }
         },
         "type": "object",

@@ -895,6 +895,168 @@
           }
         }
       }
+    },
+    "/v1/iam/internal/slices/{slice_id}": {
+      "put": {
+        "summary": "Register Slice",
+        "description": "Registra (idempotente) un slice y sus VMs para que IAM decida asignaciones, lectura y consola.",
+        "operationId": "register_slice_v1_iam_internal_slices__slice_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Slice Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SliceRegistration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/iam/courses/{course_id}/students": {
+      "get": {
+        "summary": "Course Students",
+        "description": "Alumnos activos del curso: para que el profesor elija a quién asignar un slice.",
+        "operationId": "course_students_v1_iam_courses__course_id__students_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  "title": "Response Course Students V1 Iam Courses  Course Id  Students Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/iam/resources/{resource_id}/assignments": {
+      "get": {
+        "summary": "Resource Assignments",
+        "description": "A quién está asignado un slice; mismo permiso que asignar (profesor del slice o admin).",
+        "operationId": "resource_assignments_v1_iam_resources__resource_id__assignments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  "title": "Response Resource Assignments V1 Iam Resources  Resource Id  Assignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1130,6 +1292,29 @@
         ],
         "title": "PasswordReset"
       },
+      "Person": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name"
+        ],
+        "title": "Person"
+      },
       "Quotas": {
         "properties": {
           "max_slices": {
@@ -1216,6 +1401,46 @@
           "professor_id"
         ],
         "title": "ResourceCreate"
+      },
+      "SliceRegistration": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Id"
+          },
+          "course_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Course Id"
+          },
+          "professor_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Professor Id"
+          },
+          "vms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Vms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "course_id",
+          "professor_id"
+        ],
+        "title": "SliceRegistration",
+        "description": "Registro interno (solo token de servicio): un slice y sus VMs como recursos autorizables."
       },
       "TokenResponse": {
         "properties": {

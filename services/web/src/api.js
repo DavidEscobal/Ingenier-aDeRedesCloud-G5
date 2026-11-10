@@ -69,6 +69,10 @@ export const Api = {
   createSlice: (courseId, spec) => api('/v1/slices', { method: 'POST', body: { course_id: courseId, spec }, idempotent: true }),
   deleteSlice: (id) => api('/v1/slices/' + id, { method: 'DELETE', idempotent: true }),
   console: (id, vm) => api(`/v1/slices/${id}/vms/${vm}/console`, { method: 'POST' }),
+  assignments: (id) => api(`/v1/slices/${id}/assignments`),
+  assign: (id, userId) => api(`/v1/slices/${id}/assignments`, { method: 'POST', body: { user_id: userId } }),
+  unassign: (id, userId) => api(`/v1/slices/${id}/assignments/${userId}`, { method: 'DELETE' }),
+  students: (courseId) => api(`/v1/iam/courses/${courseId}/students`),
   // Topology Manager (paso 6)
   catalog: () => api('/v1/topologies/catalog'),
   generate: (kind, n, extra = {}) => api('/v1/topologies/generate', { method: 'POST', body: { kind, n, ...extra } }),

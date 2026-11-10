@@ -1,5 +1,7 @@
 from typing import Annotated
 from fastapi import Path as PathParam
+import hashlib
+import hmac
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
@@ -10,7 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .models import (AuthorizationRequest, CourseCreate, Decision, Login, Membership,
-                     Message, PasswordChange, PasswordReset, ResourceCreate,
+                     Message, PasswordChange, PasswordReset, Person, ResourceCreate, SliceRegistration,
                      TokenResponse, UserCreate, UserUpdate, UserView)
 from .policy import decide
 from .security import PASSWORDS, authenticate, login as perform_login, unauthorized
@@ -27,6 +29,7 @@ async def lifespan(app):
     app.state.secret = app.state.settings.read_secret()
     app.state.store = Store(app.state.settings.database)
     app.state.store.check_schema()
+    app.state.service_hash = app.state.settings.service_token_hash()
     yield
 
 
@@ -76,6 +79,17 @@ def context(request: Request, credentials: HTTPAuthorizationCredentials | None =
             route = request.scope.get("route")
             store.record(actor, request.method + " " + (route.path if route else "request"), None, "denied")
         raise
+
+
+def service(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
+    """Identidad de servicio del Slice Manager (D-14): solo para el registro interno de recursos."""
+    expected = request.app.state.service_hash
+    if not expected or not credentials or credentials.scheme.lower() != "bearer":
+        raise unauthorized()
+    if not hmac.compare_digest(hashlib.sha256(credentials.credentials.encode()).hexdigest(), expected):
+        raise unauthorized()
+    with request.app.state.store.transaction() as db:
+        yield db
 
 
 def admin(ctx=Depends(context, scope="function")):
@@ -299,3 +313,53 @@ def list_audit(limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=
     db, user, _ = ctx
     audit(db, user["id"], "audit.read", None, "allowed")
     return [dict(r) for r in db.execute("SELECT * FROM audit ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))]
+
+
+
+@app.put("/v1/iam/internal/slices/{slice_id}", response_model=Message)
+def register_slice(slice_id: Identifier, body: SliceRegistration, db=Depends(service, scope="function")):
+    """Registra (idempotente) un slice y sus VMs para que IAM decida asignaciones, lectura y consola."""
+    if body.id != slice_id:
+        raise HTTPException(422, "id_mismatch")
+    require_row(db, "courses", body.course_id)
+    professor = require_row(db, "users", body.professor_id)
+    member = db.execute("SELECT 1 FROM memberships WHERE course_id=? AND user_id=?",
+                        (body.course_id, body.professor_id)).fetchone()
+    if professor["role"] != "professor" or not professor["active"] or not member:
+        raise HTTPException(409, "professor_not_in_course")
+    existing = db.execute("SELECT * FROM resources WHERE id=?", (slice_id,)).fetchone()
+    if existing and (existing["kind"], existing["course_id"], existing["professor_id"]) != ("slice", body.course_id, body.professor_id):
+        raise HTTPException(409, "conflict")
+    db.execute("INSERT OR IGNORE INTO resources VALUES(?,?,?,?,?)", (slice_id, "slice", body.course_id, body.professor_id, None))
+    for vm in body.vms:
+        db.execute("INSERT OR IGNORE INTO resources VALUES(?,?,?,?,?)",
+                   (f"{slice_id}-{vm}", "vm", body.course_id, body.professor_id, slice_id))
+    audit(db, "service:slice-manager", "resource.register_slice", slice_id, "allowed")
+    return {"status": "registered"}
+
+
+@app.get("/v1/iam/courses/{course_id}/students", response_model=list[Person])
+def course_students(course_id: Identifier, ctx=Depends(context, scope="function")):
+    """Alumnos activos del curso: para que el profesor elija a quién asignar un slice."""
+    db, user, _ = ctx
+    require_row(db, "courses", course_id)
+    member = db.execute("SELECT 1 FROM memberships WHERE course_id=? AND user_id=?", (course_id, user["id"])).fetchone()
+    if not (user["role"] == "admin" or (user["role"] == "professor" and member)):
+        raise HTTPException(403, "not_authorized")
+    rows = db.execute("SELECT u.id, u.username, u.display_name FROM users u JOIN memberships m ON m.user_id=u.id "
+                      "WHERE m.course_id=? AND u.role='student' AND u.active=1 ORDER BY u.username", (course_id,)).fetchall()
+    audit(db, user["id"], "course.students", course_id, "allowed")
+    return [dict(r) for r in rows]
+
+
+@app.get("/v1/iam/resources/{resource_id}/assignments", response_model=list[Person])
+def resource_assignments(resource_id: Identifier, ctx=Depends(context, scope="function")):
+    """A quién está asignado un slice; mismo permiso que asignar (profesor del slice o admin)."""
+    db, user, _ = ctx
+    resource = require_row(db, "resources", resource_id)
+    slice_id = resource["parent_slice_id"] if resource["kind"] == "vm" else resource_id
+    if not decide(db, user, AuthorizationRequest(action="slice.assign", resource_id=slice_id)).allowed:
+        raise HTTPException(403, "not_authorized")
+    rows = db.execute("SELECT u.id, u.username, u.display_name FROM users u JOIN assignments a ON a.user_id=u.id "
+                      "WHERE a.resource_id=? ORDER BY u.username", (resource_id,)).fetchall()
+    return [dict(r) for r in rows]

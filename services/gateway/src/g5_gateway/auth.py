@@ -162,6 +162,11 @@ async def get_membership(course_id: Identifier, user_id: Identifier, request: Re
     return await iam_call(request, "GET", f"/v1/iam/courses/{course_id}/members/{user_id}", access_token)
 
 
+@router.get("/v1/iam/courses/{course_id}/students", tags=["courses"])
+async def course_students(course_id: Identifier, request: Request, access_token=Depends(token)):
+    return await iam_call(request, "GET", f"/v1/iam/courses/{course_id}/students", access_token)
+
+
 @router.post("/v1/iam/resources", status_code=201, tags=["authorization metadata"])
 async def register_resource(body: ResourceCreate, request: Request, access_token=Depends(token)):
     return await iam_call(request, "POST", "/v1/iam/resources", access_token, body)
