@@ -58,5 +58,5 @@ red `control`, con los puertos originales de cada API. En el `cluster.json` mont
   proceso; el futuro servicio `console` (websockify) debe compartir su espacio de
   red (`network_mode: service:platform-manager`) o se rediseña el reenvío.
 - **Llamada desde slice-manager** con token de servicio y autorización IAM (paso 5).
-- No se ha construido ni ejecutado la imagen: el app server aún no tiene Docker
-  verificado y esta PC no tiene Docker.
+- **Driver Linux desde el contenedor:** requiere el `cluster.json` de fase 2 y la clave hacia los nodos
+  Linux en `platform-config/ssh/` (hoy vacío en el app server).
