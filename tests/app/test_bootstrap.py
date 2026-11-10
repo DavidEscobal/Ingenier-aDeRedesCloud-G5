@@ -137,8 +137,12 @@ class BootstrapTests(unittest.TestCase):
                 self.assertEqual(forwarded[1]["phase"], "bootstrap")
                 self.assertTrue(forwarded[1]["features"]["iam"])
                 self.assertFalse(any(v for k, v in forwarded[1]["features"].items() if k != "iam"))
+                # D-12: las rutas de slices existen; sin token 401 y, sin platform-manager configurado,
+                # el Slice Manager responde 503 en vez de simular slices.
                 for base in (manager, gateway):
-                    self.assertEqual(request(base + "/v1/slices", "POST")[0], 404)
+                    self.assertEqual(request(base + "/v1/slices", "POST")[0], 401)
+                    self.assertEqual(request(base + "/v1/slices", token=self.token),
+                                     (503, {"detail": "platform_unavailable"}))
                 # Kill actual dependency after successful communication, same gateway process.
                 manager_process.terminate()
                 manager_process.wait(timeout=5)

@@ -24,6 +24,13 @@ services:
       context: ../services/slice-manager
     environment:
       IAM_URL: http://iam:8000
+      # D-12: delega la ejecución en el platform-manager (perfil `platform`) con un token de servicio.
+      PLATFORM_MANAGER_URL: http://platform-manager:8000
+      PLATFORM_TOKEN_FILE: /run/g5/platform.token
+      SLICE_DB_PATH: /app/state/slice/slices.db
+    volumes:
+      - slice-data:/app/state/slice
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/slice-manager.token:/run/g5/platform.token:ro
     depends_on:
       iam:
         condition: service_healthy
@@ -99,6 +106,7 @@ services:
       IAM_URL: http://iam:8000
       SLICE_MANAGER_URL: http://slice-manager:8000
       UPSTREAM_TIMEOUT_SECONDS: "3"
+      SLICE_TIMEOUT_SECONDS: "30"
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -122,3 +130,4 @@ networks:
 volumes:
   iam-data:
   platform-data:
+  slice-data:

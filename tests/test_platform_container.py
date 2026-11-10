@@ -70,6 +70,13 @@ class ContainerArtifactTests(unittest.TestCase):
         self.assertIn(b'StrictHostKeyChecking=yes', script)
         self.assertIn(b'ExitOnForwardFailure=yes', script)
 
+    def test_slice_manager_reaches_platform_with_read_only_service_token(self):
+        block = compose_service('slice-manager')
+        self.assertIn('PLATFORM_MANAGER_URL: http://platform-manager:8000', block)
+        self.assertRegex(block, r'slice-manager\.token:/run/g5/platform\.token:ro\b')
+        self.assertIn('slice-data:/app/state/slice', block)
+        self.assertNotIn('ports:', block)
+
     def test_only_gateway_publishes_ports(self):
         text = (ROOT / 'deploy' / 'compose.yaml').read_text(encoding='utf-8')
         section = re.search(r'^services:\n(.*?)(?=^\S)', text, re.S | re.M).group(1)

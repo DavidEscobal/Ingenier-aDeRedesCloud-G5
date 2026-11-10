@@ -3,15 +3,16 @@ import logging
 import math
 import os
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from .auth import router, platform_access, iam_call
-from pydantic import BaseModel, ConfigDict, ValidationError
+from .auth import router, platform_access, iam_call, token
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 logger = logging.getLogger("g5.gateway")
 
@@ -134,6 +135,66 @@ async def capabilities(request: Request, access_token=Depends(platform_access)) 
 
 
 app.include_router(router)
+
+
+# --- Slices (D-12): rutas explícitas hacia el Slice Manager; la autorización la decide él con IAM.
+SliceId = Annotated[str, PathParam(pattern=r"^[0-9a-f]{32}$")]
+IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=64,
+                                       pattern=r"^[A-Za-z0-9_-]+$")]
+SLICE_STATUSES = {200, 202, 401, 403, 404, 409, 413, 422, 502, 503, 504}
+
+
+class SliceCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    course_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    spec: dict[str, Any]
+
+
+async def slice_call(request: Request, method: str, path: str, access_token: str, body=None, key=None):
+    headers = {"Authorization": "Bearer " + access_token}
+    if key:
+        headers["Idempotency-Key"] = key
+    timeout = float(os.getenv("SLICE_TIMEOUT_SECONDS", "30"))
+    try:
+        response = await request.app.state.slice_manager.request(
+            method, path, headers=headers, json=body, timeout=timeout)
+    except httpx.TimeoutException:
+        raise HTTPException(504, "slice_manager_timeout") from None
+    except httpx.RequestError:
+        raise HTTPException(503, "slice_manager_unavailable") from None
+    if response.status_code not in SLICE_STATUSES:
+        logger.warning("slice_manager returned status=%s", response.status_code)
+        raise HTTPException(502, "slice_manager_bad_response")
+    try:
+        data = response.json()
+    except ValueError:
+        raise HTTPException(502, "slice_manager_bad_response") from None
+    if response.status_code >= 400:
+        detail = data.get("detail") if isinstance(data, dict) else None
+        headers = {"WWW-Authenticate": "Bearer"} if response.status_code == 401 else {}
+        raise HTTPException(response.status_code, detail if isinstance(detail, str) else "slice_manager_error",
+                            headers=headers)
+    return JSONResponse(status_code=response.status_code, content=data)
+
+
+@app.post("/v1/slices", status_code=202, tags=["slices"], responses=ERROR_RESPONSES)
+async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey, access_token=Depends(token)):
+    return await slice_call(request, "POST", "/v1/slices", access_token, body.model_dump(), key)
+
+
+@app.get("/v1/slices", tags=["slices"], responses=ERROR_RESPONSES)
+async def list_slices(request: Request, access_token=Depends(token)):
+    return await slice_call(request, "GET", "/v1/slices", access_token)
+
+
+@app.get("/v1/slices/{slice_id}", tags=["slices"], responses=ERROR_RESPONSES)
+async def get_slice(slice_id: SliceId, request: Request, access_token=Depends(token)):
+    return await slice_call(request, "GET", "/v1/slices/" + slice_id, access_token)
+
+
+@app.delete("/v1/slices/{slice_id}", status_code=202, tags=["slices"], responses=ERROR_RESPONSES)
+async def delete_slice(slice_id: SliceId, request: Request, key: IdempotencyKey, access_token=Depends(token)):
+    return await slice_call(request, "DELETE", "/v1/slices/" + slice_id, access_token, key=key)
 
 
 @app.exception_handler(RequestValidationError)

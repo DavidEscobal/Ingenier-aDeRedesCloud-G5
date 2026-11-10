@@ -994,6 +994,224 @@
           }
         }
       }
+    },
+    "/v1/slices": {
+      "post": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Create Slice",
+        "operationId": "create_slice_v1_slices_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SliceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "List Slices",
+        "operationId": "list_slices_v1_slices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          }
+        }
+      }
+    },
+    "/v1/slices/{slice_id}": {
+      "get": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Get Slice",
+        "operationId": "get_slice_v1_slices__slice_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Delete Slice",
+        "operationId": "delete_slice_v1_slices__slice_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1423,6 +1641,29 @@
           "professor_id"
         ],
         "title": "ResourceCreate"
+      },
+      "SliceCreate": {
+        "properties": {
+          "course_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Course Id"
+          },
+          "spec": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Spec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_id",
+          "spec"
+        ],
+        "title": "SliceCreate"
       },
       "TokenResponse": {
         "properties": {
