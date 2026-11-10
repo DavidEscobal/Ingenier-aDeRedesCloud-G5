@@ -123,6 +123,24 @@ services:
       retries: 3
       start_period: 10s
 
+  web:
+    # D-10: interfaz web. Publica solo en loopback (acceso por túnel SSH); habla únicamente con el gateway.
+    build:
+      context: ../services/web
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
 networks:
   control:
     driver: bridge

@@ -1,0 +1,21 @@
+{
+  "name": "g5-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interfaz web del orquestador G5 (D-10). Solo habla con el gateway vía /api.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.28.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.3",
+    "vite": "5.4.10"
+  }
+}

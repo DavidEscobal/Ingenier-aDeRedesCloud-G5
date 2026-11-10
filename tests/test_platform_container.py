@@ -77,13 +77,27 @@ class ContainerArtifactTests(unittest.TestCase):
         self.assertIn('slice-data:/app/state/slice', block)
         self.assertNotIn('ports:', block)
 
-    def test_only_gateway_publishes_ports(self):
+    def test_only_gateway_and_web_publish_ports_and_only_on_loopback(self):
         text = (ROOT / 'deploy' / 'compose.yaml').read_text(encoding='utf-8')
         section = re.search(r'^services:\n(.*?)(?=^\S)', text, re.S | re.M).group(1)
         services = re.findall(r'^  ([a-z][a-z-]*):\n', section, re.M)
         self.assertIn('platform-manager', services)
         published = [s for s in services if 'ports:' in compose_service(s)]
-        self.assertEqual(published, ['gateway'])
+        self.assertEqual(published, ['gateway', 'web'])
+        for name in published:
+            mappings = re.findall(r'^\s+- "([^"]+)"', compose_service(name).split('ports:')[1], re.M)
+            self.assertTrue(mappings, name)
+            for mapping in mappings:
+                self.assertTrue(mapping.startswith('127.0.0.1:'), '%s publica %s fuera de loopback' % (name, mapping))
+
+    def test_web_talks_only_to_gateway_and_runs_unprivileged(self):
+        folder = ROOT / 'services' / 'web'
+        nginx = (folder / 'nginx.conf').read_text(encoding='utf-8')
+        self.assertEqual(re.findall(r'proxy_pass\s+(\S+);', nginx), ['http://gateway:8000/'])
+        self.assertIn("frame-ancestors 'none'", nginx)
+        self.assertIn('nginx-unprivileged', (folder / 'Dockerfile').read_text(encoding='utf-8'))
+        api = (folder / 'src' / 'api.js').read_text(encoding='utf-8')
+        self.assertIn("fetch('/api' + path", api, 'la web llama solo a /api (mismo origen)')
 
 
 if __name__ == '__main__':
