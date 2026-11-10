@@ -52,6 +52,9 @@ Manager / Placement / IAM con login.
 - **Paso 5 hecho (MS-05, 2026-11-10):** login → crear `os-lineal-1g` **por el gateway** → READY en 20 s → listado con
   dueño/curso → borrado DELETED en 15 s, 8/8 OK; OpenStack limpio. Curso `TEL141` creado en IAM. Identidad de servicio
   `slice-manager` en `platform-config/keys.json` (token 644 en carpeta 700).
+- **Roles en real (MS-06, 2026-11-10):** prof1 crea y borra un slice real; prof2 y alumno1 aislados (404), alumno y
+  curso ajeno rechazados (403), admin ve todo: 13/13. IAM tiene `prof1`, `prof2`, `alumno1` en TEL141 (contraseñas
+  aleatorias desconocidas; el admin las restablece si se necesitan para la demo).
 - **Siguiente:** web parte 1 (D-10): login, menú por rol y "Mis slices" sobre estas rutas del gateway.
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
