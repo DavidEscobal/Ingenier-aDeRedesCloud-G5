@@ -62,7 +62,10 @@ Manager / Placement / IAM con login.
 - **Paso 6 implementado (2026-11-10):** servicio `topology-manager` (FastAPI + SQLite, volumen `topology-data`):
   generadores lineal/anillo/malla/árbol/bus/estrella, combinación, borradores versionados, import/export y
   compilación a spec (10.60.k.0/24). Web parte 2: Topologías + editor React Flow + desplegar como slice. 8 servicios
-  healthy en el app server. Pendiente: prueba real con login (evidencia MS-08).
+  healthy en el app server. **MS-08:** el usuario combinó anillo + árbol, guardó v1/v2, exportó/importó, desplegó
+  6 VMs (READY en worker1-3) y borró; OpenStack limpio.
+- **Siguiente:** pendientes de R1B — consola por VM en la web, edición de slices desplegados, consumo de recursos
+  (D-13), importar imágenes; asignación de slices a alumnos (IAM).
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
