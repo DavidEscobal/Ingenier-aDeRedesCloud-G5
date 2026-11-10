@@ -49,7 +49,10 @@ Manager / Placement / IAM con login.
   correcta). Con autorización se creó el flavor público **`g5-1c-512m-1g`** (1 GB raíz) y `templates/os-lineal-1g.json`:
   **MS-04 READY en 20 s** (3 VMs ACTIVE, VLAN 215/574, IP fijas) y borrado limpio en 20 s.
   Capacidad de los computes: 9 GB de disco c/u; las VMs de `lab5` y `topo1_lab6` ocupan casi todo worker1 y worker2.
-- **Siguiente:** paso 5 (slice-manager → platform-manager con token de servicio y autorización IAM, por el gateway).
+- **Paso 5 hecho (MS-05, 2026-11-10):** login → crear `os-lineal-1g` **por el gateway** → READY en 20 s → listado con
+  dueño/curso → borrado DELETED en 15 s, 8/8 OK; OpenStack limpio. Curso `TEL141` creado en IAM. Identidad de servicio
+  `slice-manager` en `platform-config/keys.json` (token 644 en carpeta 700).
+- **Siguiente:** web parte 1 (D-10): login, menú por rol y "Mis slices" sobre estas rutas del gateway.
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
@@ -130,8 +133,7 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
 Pasos (cada uno con tests y commit propio; autorización antes de cambios remotos):
 1. ~~Levantar `iam`, `slice-manager`, `gateway`~~ **Hecho 2026-11-10** (MS-01, 7/7 OK).
 2. ~~Platform-manager en compose + acceso a OpenStack~~ **Hecho 2026-11-10** (sidecar `os-tunnel`, MS-02).
-3. **Paso 5: slice-manager → platform-manager** con token de servicio y autorización IAM: login → crear → estado →
-   borrar slice por el gateway, contra el clúster real.
+3. ~~Paso 5: slice-manager → platform-manager~~ **Hecho 2026-11-10** (D-12, MS-05, 8/8 OK).
 4. **Web, parte 1** (D-10): login, menú por rol y "Mis slices" (listar, desplegar Linux/OpenStack, estado, borrar, consola).
 5. **Topology-manager + web, parte 2**: generadores lineal, malla, árbol, anillo, bus (esquema versionado); borradores
    (combinar predefinidas, agregar nodos/enlaces, capacidad por VM); exportar/importar; lienzo con React Flow.
