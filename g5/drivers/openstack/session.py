@@ -167,3 +167,23 @@ class Session:
             if attempt + 1 < attempts:
                 self.sleep(min(2 ** attempt, 8) * self.retry_delay)
         raise error
+
+
+    def upload(self, service, path, stream, size, content_type='application/octet-stream', timeout=900):
+        """PUT de un cuerpo binario de `size` bytes leído de `stream` por bloques. Sin reintentos (no es reproducible)."""
+        entry = self._auth()
+        if service not in entry['catalog']:
+            raise OpenStackError('Servicio ausente del catálogo: ' + service)
+        url = entry['catalog'][service] + path
+        headers = {'X-Auth-Token': entry['token'], 'Content-Type': content_type, 'Content-Length': str(size),
+                   'Accept': 'application/json'}
+        request = urllib.request.Request(url, data=stream, headers=headers, method='PUT')
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                response.read()
+                return response.status
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode(errors='replace')[:300]
+            raise OpenStackError('PUT %s -> HTTP %s: %s' % (urllib.parse.urlsplit(url).path, exc.code, detail), exc.code)
+        except (urllib.error.URLError, socket.timeout, ConnectionError) as exc:
+            raise OpenStackError('PUT %s -> sin respuesta: %s' % (urllib.parse.urlsplit(url).path, getattr(exc, 'reason', exc)))

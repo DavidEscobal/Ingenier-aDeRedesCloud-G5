@@ -13,7 +13,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from .agent import inspect_image
 from .backend import SSHBackend, MemoryBackend, RemoteError
 from .console import Consoles
@@ -81,6 +81,9 @@ class Application:
             with s.tx() as db:
                 db.execute('UPDATE nodes SET enabled=? WHERE id=?', (int(body['enabled']), name))
             return 200, {'node': name, 'enabled': body['enabled']}
+        if path == '/v1/provider-images/openstack' and method == 'GET':
+            require('openstack' in s.drivers and 'openstack' in self.config, 'OpenStack no configurado', 409)
+            return 200, s.drivers['openstack'].list_images()
         if path == '/v1/images' and method == 'GET':
             return 200, s.rows('SELECT * FROM images ORDER BY created')
         match = re.fullmatch(r'/v1/images/([0-9a-f]{64})', path)
@@ -239,6 +242,14 @@ class Handler(BaseHTTPRequestHandler):
             require(not self.headers.get('Transfer-Encoding'), 'Use Content-Length, no chunked')
             length = int(self.headers.get('Content-Length', '0'))
             require(length >= 0, 'Content-Length inválido')
+            provider_image = re.fullmatch(r'/v1/provider-images/openstack/([a-z0-9][a-z0-9._-]{0,62})', path)
+            if self.command == 'PUT' and provider_image:
+                require(admin, 'Requiere rol admin/service', 403)
+                require(not self.headers.get('Transfer-Encoding'), 'Use Content-Length, no chunked')
+                require(0 < length <= app.config.get('max_image_gb', 4) * 1024**3, 'Tamaño de imagen fuera del límite', 413)
+                require('openstack' in app.store.drivers and 'openstack' in app.config, 'OpenStack no configurado', 409)
+                fmt = (parse_qs(urlsplit(self.path).query).get('disk_format') or ['qcow2'])[0]
+                return self.reply(201, app.store.drivers['openstack'].import_image(provider_image.group(1), fmt, length, self.rfile))
             upload = re.fullmatch(r'/v1/images/([0-9a-f]{64})', path)
             if self.command == 'PUT' and upload:
                 require(admin, 'Requiere rol admin/service', 403)

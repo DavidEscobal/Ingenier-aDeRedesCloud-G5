@@ -30,7 +30,9 @@ class FakeOpenStack:
 
             def handle_any(self):
                 length = int(self.headers.get('Content-Length', '0'))
-                body = json.loads(self.rfile.read(length)) if length else None
+                raw = self.rfile.read(length) if length else b''
+                binary = self.headers.get('Content-Type') == 'application/octet-stream'
+                body = raw if binary else (json.loads(raw) if raw else None)
                 path = self.path.split('?')[0]
                 status, payload, headers = fake.dispatch(self.command, path, self.path, body, self.headers)
                 data = json.dumps(payload).encode() if payload is not None else b''
@@ -143,7 +145,26 @@ class FakeCloud:
         if root == 'v2.1':
             return self.nova(method, rest, query, body, project)
         if root == 'v2' and rest == ['images']:
-            return 200, {'images': [i for i in self.images if query.get('name') in (None, i['name'])]}
+            if method == 'POST':
+                image = dict(body, id=self.new('img'), status='queued', size=None)
+                self.images.append(image)
+                return 201, image
+            return 200, {'images': [{k: v for k, v in i.items() if k != 'data'} for i in self.images
+                                    if query.get('name') in (None, i['name'])]}
+        if root == 'v2' and len(rest) >= 2 and rest[0] == 'images':
+            image = next((i for i in self.images if i['id'] == rest[1]), None)
+            if image is None:
+                return 404, {'error': 'imagen'}
+            if method == 'PUT' and rest[2:] == ['file']:
+                if image['name'] in self.error_names:
+                    return 500, {'error': 'falla inyectada en Glance'}
+                image.update(status='active', size=len(body), data=body)
+                return 204, None
+            if method == 'GET':
+                return 200, {k: v for k, v in image.items() if k != 'data'}
+            if method == 'DELETE':
+                self.images.remove(image)
+                return 204, None
         return 404, {'error': 'ruta'}
 
     @staticmethod

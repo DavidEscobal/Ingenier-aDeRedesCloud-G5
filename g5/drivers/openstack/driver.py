@@ -7,6 +7,8 @@ La segmentación la asigna Neutron (tenant_network_types vlan sobre physnet1): s
 """
 import concurrent.futures
 import copy
+import hashlib
+import re
 import ipaddress
 import time
 import urllib.parse
@@ -17,6 +19,30 @@ from .session import OpenStackError, Session
 PRIVATE = [ipaddress.ip_network(x) for x in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')]
 NOVA_CONSOLE = {'OpenStack-API-Version': 'compute 2.6', 'X-OpenStack-Nova-API-Version': '2.6'}
 DELETE_ORDER = ('server', 'port', 'subnet', 'network', 'project')
+IMAGE_NAME = re.compile(r'[a-z0-9][a-z0-9._-]{0,62}')
+DISK_FORMATS = {'qcow2': b'QFI\xfb', 'raw': None}
+
+
+class CountingReader:
+    """Envuelve el cuerpo de la petición: limita a `size` bytes, calcula SHA-256 y guarda la cabecera."""
+
+    def __init__(self, stream, size):
+        self.stream, self.remaining, self.sha = stream, size, hashlib.sha256()
+        self.head, self.total = b'', 0
+
+    def read(self, n=-1):
+        if self.remaining <= 0:
+            return b''
+        n = self.remaining if n is None or n < 0 else min(n, self.remaining)
+        data = self.stream.read(min(n, 1024 * 1024))
+        if not data:
+            raise Fault('Subida incompleta: el cliente cortó la transferencia', 400)
+        self.remaining -= len(data)
+        self.total += len(data)
+        self.sha.update(data)
+        if len(self.head) < 16:
+            self.head += data[:16 - len(self.head)]
+        return data
 
 
 def validate_spec(spec, config):
@@ -325,3 +351,36 @@ class OpenStackDriver(ProviderDriver):
             if url.startswith(prefix):
                 url = target.rstrip('/') + url[len(prefix):]
         return {'url': url, 'provider': 'openstack'}
+
+
+    # --- Imágenes (D-15): el catálogo de G5 las importa aquí; Glance las guarda.
+    def list_images(self):
+        images = self.call('GET', 'image', '/v2/images?limit=200')['images']
+        return [{k: i.get(k) for k in ('id', 'name', 'status', 'size', 'disk_format', 'visibility', 'created_at')}
+                for i in images]
+
+    def import_image(self, name, disk_format, size, stream):
+        require(isinstance(name, str) and IMAGE_NAME.fullmatch(name), 'Nombre de imagen inválido (minúsculas, números, . _ -)')
+        require(disk_format in DISK_FORMATS, 'Formato no soportado: use qcow2 o raw', 400)
+        require(size > 0, 'Archivo vacío', 400)
+        existing = self.call('GET', 'image', '/v2/images?' + urllib.parse.urlencode({'name': name}))['images']
+        require(not existing, 'Ya existe una imagen con ese nombre en Glance', 409)
+        image = self.call('POST', 'image', '/v2/images', {'name': name, 'disk_format': disk_format,
+                                                         'container_format': 'bare', 'visibility': 'public'})
+        reader = CountingReader(stream, size)
+        try:
+            self.session.upload('image', '/v2/images/%s/file' % image['id'], reader, size)
+            require(reader.total == size, 'Subida incompleta', 400)
+            magic = DISK_FORMATS[disk_format]
+            require(magic is None or reader.head.startswith(magic), 'El archivo no es un %s válido' % disk_format, 400)
+            final = self.call('GET', 'image', '/v2/images/' + image['id'])
+            require(final.get('status') == 'active', 'Glance no activó la imagen (estado %s)' % final.get('status'), 502)
+        except BaseException:
+            # Compensación: no dejar imágenes a medias en Glance.
+            try:
+                self.call('DELETE', 'image', '/v2/images/' + image['id'])
+            except OpenStackError:
+                pass
+            raise
+        return {'id': image['id'], 'name': name, 'disk_format': disk_format, 'size': size,
+                'sha256': reader.sha.hexdigest(), 'status': 'active', 'provider': 'openstack'}
