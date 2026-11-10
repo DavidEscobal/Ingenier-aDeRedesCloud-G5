@@ -59,7 +59,10 @@ Manager / Placement / IAM con login.
   del app server; `/api` → gateway. Login, menú por rol, Mis slices (estado en vivo, borrar), detalle con eventos y
   Nuevo slice (plantilla os-lineal-1g). Acceso: `ssh -N -L 8080:127.0.0.1:8080 g5-app`. **MS-07:** el usuario creó y borró `os-lineal-grupo5`
   desde el navegador (READY y borrado limpio).
-- **Siguiente:** paso 6, topology-manager + web parte 2 (topologías predefinidas, borradores, importar/exportar, lienzo).
+- **Paso 6 implementado (2026-11-10):** servicio `topology-manager` (FastAPI + SQLite, volumen `topology-data`):
+  generadores lineal/anillo/malla/árbol/bus/estrella, combinación, borradores versionados, import/export y
+  compilación a spec (10.60.k.0/24). Web parte 2: Topologías + editor React Flow + desplegar como slice. 8 servicios
+  healthy en el app server. Pendiente: prueba real con login (evidencia MS-08).
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en

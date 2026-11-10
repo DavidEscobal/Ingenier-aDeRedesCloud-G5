@@ -68,4 +68,15 @@ export const Api = {
   slice: (id) => api('/v1/slices/' + id),
   createSlice: (courseId, spec) => api('/v1/slices', { method: 'POST', body: { course_id: courseId, spec }, idempotent: true }),
   deleteSlice: (id) => api('/v1/slices/' + id, { method: 'DELETE', idempotent: true }),
+  // Topology Manager (paso 6)
+  catalog: () => api('/v1/topologies/catalog'),
+  generate: (kind, n, extra = {}) => api('/v1/topologies/generate', { method: 'POST', body: { kind, n, ...extra } }),
+  combine: (base, add, connect) => api('/v1/topologies/combine', { method: 'POST', body: connect ? { base, add, connect } : { base, add } }),
+  validateTopology: (topology) => api('/v1/topologies/validate', { method: 'POST', body: { topology } }),
+  compile: (topology, provider, name) => api('/v1/topologies/compile', { method: 'POST', body: { topology, provider, name } }),
+  drafts: () => api('/v1/drafts'),
+  draft: (id) => api('/v1/drafts/' + id),
+  createDraft: (topology) => api('/v1/drafts', { method: 'POST', body: { topology } }),
+  updateDraft: (id, topology, version) => api('/v1/drafts/' + id, { method: 'PUT', body: { topology, version } }),
+  deleteDraft: (id) => api('/v1/drafts/' + id, { method: 'DELETE' }),
 }

@@ -6,6 +6,8 @@ import Login from './pages/Login.jsx'
 import Slices from './pages/Slices.jsx'
 import SliceDetail from './pages/SliceDetail.jsx'
 import NewSlice from './pages/NewSlice.jsx'
+import Topologies from './pages/Topologies.jsx'
+import TopologyEditor from './pages/TopologyEditor.jsx'
 import { canCreate } from './components.jsx'
 
 const ROLE_LABEL = { admin: 'Administrador', professor: 'Profesor', student: 'Alumno' }
@@ -34,6 +36,7 @@ function Shell({ user, children }) {
         <nav>
           <NavLink to="/slices">{user.role === 'admin' ? 'Todos los slices' : 'Mis slices'}</NavLink>
           {canCreate(user) && <NavLink to="/slices/nuevo">Nuevo slice</NavLink>}
+          {canCreate(user) && <NavLink to="/topologias">Topologías</NavLink>}
         </nav>
         <div className="who">
           <span className={'role role-' + user.role}>{ROLE_LABEL[user.role]}</span>
@@ -72,6 +75,9 @@ export default function App() {
         <Route path="/slices" element={<Slices user={user} />} />
         <Route path="/slices/nuevo" element={canCreate(user) ? <NewSlice /> : <Navigate to="/slices" replace />} />
         <Route path="/slices/:id" element={<SliceDetail user={user} />} />
+        <Route path="/topologias" element={canCreate(user) ? <Topologies /> : <Navigate to="/slices" replace />} />
+        <Route path="/topologias/nueva" element={canCreate(user) ? <TopologyEditor key="nueva" /> : <Navigate to="/slices" replace />} />
+        <Route path="/topologias/:id" element={canCreate(user) ? <TopologyEditor /> : <Navigate to="/slices" replace />} />
         <Route path="*" element={<Navigate to="/slices" replace />} />
       </Routes>
     </Shell>

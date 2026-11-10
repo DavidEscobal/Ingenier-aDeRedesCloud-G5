@@ -52,7 +52,7 @@ export default function NewSlice() {
       <div className="page-head">
         <div>
           <h1>Nuevo slice</h1>
-          <p className="sub">Elige una plantilla y el curso. El despliegue se ejecuta en segundo plano.</p>
+          <p className="sub">Elige una plantilla y el curso. Para dibujar tu propia topología usa <Link to="/topologias/nueva">el editor</Link>.</p>
         </div>
       </div>
 
