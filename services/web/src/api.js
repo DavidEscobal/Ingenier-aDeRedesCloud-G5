@@ -68,6 +68,7 @@ export const Api = {
   slice: (id) => api('/v1/slices/' + id),
   createSlice: (courseId, spec) => api('/v1/slices', { method: 'POST', body: { course_id: courseId, spec }, idempotent: true }),
   deleteSlice: (id) => api('/v1/slices/' + id, { method: 'DELETE', idempotent: true }),
+  console: (id, vm) => api(`/v1/slices/${id}/vms/${vm}/console`, { method: 'POST' }),
   // Topology Manager (paso 6)
   catalog: () => api('/v1/topologies/catalog'),
   generate: (kind, n, extra = {}) => api('/v1/topologies/generate', { method: 'POST', body: { kind, n, ...extra } }),

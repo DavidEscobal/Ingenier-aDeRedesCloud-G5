@@ -234,6 +234,14 @@ async def no_cache(request, call_next):
     return response
 
 
+
+VmName = Annotated[str, PathParam(pattern=r"^[a-z][a-z0-9-]{0,31}$")]
+
+
+@app.post("/v1/slices/{slice_id}/vms/{vm}/console", tags=["slices"], responses=ERROR_RESPONSES)
+async def vm_console(slice_id: SliceId, vm: VmName, request: Request, access_token=Depends(token)):
+    return await slice_call(request, "POST", "/v1/slices/%s/vms/%s/console" % (slice_id, vm), access_token)
+
 # --- Topologías y borradores (paso 6): rutas explícitas hacia el Topology Manager, dueño del documento.
 DraftId = Annotated[str, PathParam(pattern=r"^[0-9a-f]{32}$")]
 JsonBody = Annotated[dict[str, Any], Body()]

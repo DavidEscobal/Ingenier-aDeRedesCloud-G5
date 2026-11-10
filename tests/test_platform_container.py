@@ -90,10 +90,13 @@ class ContainerArtifactTests(unittest.TestCase):
             for mapping in mappings:
                 self.assertTrue(mapping.startswith('127.0.0.1:'), '%s publica %s fuera de loopback' % (name, mapping))
 
-    def test_web_talks_only_to_gateway_and_runs_unprivileged(self):
+    def test_web_talks_only_to_gateway_and_novnc_and_runs_unprivileged(self):
         folder = ROOT / 'services' / 'web'
         nginx = (folder / 'nginx.conf').read_text(encoding='utf-8')
-        self.assertEqual(re.findall(r'proxy_pass\s+(\S+);', nginx), ['http://gateway:8000/'])
+        # Solo dos destinos: la API (gateway) y la consola noVNC de Nova a través de os-tunnel.
+        self.assertEqual(re.findall(r'proxy_pass\s+(\S+);', nginx), ['http://gateway:8000/', 'http://os-tunnel:6080/'])
+        console = nginx.split('location /console/')[1].split('location ')[0]
+        self.assertIn('Upgrade $http_upgrade', console, 'la consola necesita WebSocket')
         self.assertIn("frame-ancestors 'none'", nginx)
         self.assertIn('nginx-unprivileged', (folder / 'Dockerfile').read_text(encoding='utf-8'))
         api = (folder / 'src' / 'api.js').read_text(encoding='utf-8')

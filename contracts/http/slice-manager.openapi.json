@@ -267,6 +267,65 @@
           }
         }
       }
+    },
+    "/v1/slices/{slice_id}/vms/{vm}/console": {
+      "post": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Vm Console",
+        "description": "URL de consola (noVNC con token de Nova, de vida corta). Solo dueño o admin, como el resto del slice.",
+        "operationId": "vm_console_v1_slices__slice_id__vms__vm__console_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          },
+          {
+            "name": "vm",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,31}$",
+              "title": "Vm"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Console"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -324,6 +383,29 @@
           "features"
         ],
         "title": "Capabilities"
+      },
+      "Console": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "vm": {
+            "type": "string",
+            "title": "Vm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "provider",
+          "vm"
+        ],
+        "title": "Console"
       },
       "Features": {
         "properties": {
@@ -462,6 +544,14 @@
           "created_at": {
             "type": "number",
             "title": "Created At"
+          },
+          "vms": {
+            "items": {
+              "$ref": "#/components/schemas/VmView"
+            },
+            "type": "array",
+            "title": "Vms",
+            "default": []
           },
           "events": {
             "items": {
@@ -625,6 +715,71 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VmView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "vcpus": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vcpus"
+          },
+          "memory_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Mb"
+          },
+          "disk_gb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Gb"
+          },
+          "networks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Networks",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "VmView"
       }
     },
     "securitySchemes": {

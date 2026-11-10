@@ -75,8 +75,24 @@ class SliceEvent(BaseModel):
     timestamp: float | None = None
 
 
+class VmView(BaseModel):
+    name: str
+    image: str | None = None
+    vcpus: int | None = None
+    memory_mb: int | None = None
+    disk_gb: int | None = None
+    networks: list[str] = []
+
+
 class SliceDetail(SliceView):
+    vms: list[VmView] = []
     events: list[SliceEvent]
+
+
+class Console(BaseModel):
+    url: str
+    provider: str
+    vm: str
 
 
 class UserView(BaseModel):
@@ -237,7 +253,7 @@ async def platform_call(request, method, path, body=None, key=None):
         data = response.json()
     except ValueError:
         raise HTTPException(502, "platform_bad_response") from None
-    if response.status_code in (200, 202):
+    if response.status_code in (200, 201, 202):
         return data
     message = data.get("error") if isinstance(data, dict) else None
     if response.status_code == 400:
@@ -260,6 +276,7 @@ def platform_key(user, key):
 IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=64,
                                        pattern=r"^[A-Za-z0-9_-]+$")]
 SliceId = Annotated[str, PathParam(pattern=r"^[0-9a-f]{32}$")]
+VmName = Annotated[str, PathParam(pattern=r"^[a-z][a-z0-9-]{0,31}$")]
 
 
 def owned(registry, sid, user):
@@ -334,7 +351,11 @@ async def get_slice(slice_id: SliceId, request: Request, user: UserView = Depend
     events = await platform_call(request, "GET", "/v1/slices/%s/events" % slice_id)
     recent = [SliceEvent(**{k: e.get(k) for k in ("seq", "event", "detail", "timestamp")})
               for e in reversed(events[:50])] if isinstance(events, list) else []
-    return SliceDetail(**view(row, state.get("status", "UNKNOWN")).model_dump(), events=recent)
+    spec = state.get("spec") if isinstance(state.get("spec"), dict) else {}
+    vms = [VmView(name=v["name"], image=v.get("image"), vcpus=v.get("vcpus"), memory_mb=v.get("memory_mb"),
+                  disk_gb=v.get("disk_gb"), networks=[n.get("network") for n in v.get("nics", []) if n.get("network")])
+           for v in spec.get("vms", []) if isinstance(v, dict) and v.get("name")]
+    return SliceDetail(**view(row, state.get("status", "UNKNOWN")).model_dump(), vms=vms, events=recent)
 
 
 @app.delete("/v1/slices/{slice_id}", response_model=Accepted, status_code=202, tags=["slices"])
@@ -347,3 +368,15 @@ async def delete_slice(slice_id: SliceId, request: Request, key: IdempotencyKey,
         return Accepted(slice_id=slice_id, operation_id=job["id"], status=job["status"])
     except (KeyError, TypeError, ValidationError):
         raise HTTPException(502, "platform_bad_response") from None
+
+
+@app.post("/v1/slices/{slice_id}/vms/{vm}/console", response_model=Console, tags=["slices"])
+async def vm_console(slice_id: SliceId, vm: VmName, request: Request, user: UserView = Depends(current_user)) -> Console:
+    """URL de consola (noVNC con token de Nova, de vida corta). Solo dueño o admin, como el resto del slice."""
+    _, registry = platform_ready(request)
+    owned(registry, slice_id, user)
+    data = await platform_call(request, "POST", "/v1/slices/%s/vms/%s/console" % (slice_id, vm), {})
+    url = data.get("url") if isinstance(data, dict) else None
+    if not isinstance(url, str) or not url:
+        raise HTTPException(502, "platform_bad_response")
+    return Console(url=url, provider=data.get("provider", "unknown"), vm=vm)

@@ -19,7 +19,8 @@ from iam_support import initialize
 from test_bootstrap import request, service
 
 SERVICE_TOKEN = secrets.token_urlsafe(32)
-SPEC = {"name": "os-lineal-1g", "provider": "openstack", "networks": [], "vms": []}
+SPEC = {"name": "os-lineal-1g", "provider": "openstack", "networks": [{"name": "l1", "cidr": "10.60.1.0/24"}],
+        "vms": [{"name": "vm1", "image": "cirros", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "nics": [{"network": "l1"}]}]}
 
 
 class FakePlatform:
@@ -54,10 +55,17 @@ class FakePlatform:
                         if s["key"] == self.headers.get("Idempotency-Key"):
                             return self.reply(202, {"id": s["job"], "slice_id": sid, "status": "PENDING"})
                     sid, job = uuid.uuid4().hex, uuid.uuid4().hex
-                    fake.slices[sid] = {"key": self.headers.get("Idempotency-Key"), "job": job, "status": "QUEUED", "name": body.get("name")}
+                    fake.slices[sid] = {"key": self.headers.get("Idempotency-Key"), "job": job, "status": "QUEUED",
+                                        "name": body.get("name"), "spec": body}
                     return self.reply(202, {"id": job, "slice_id": sid, "status": "PENDING"})
                 if self.command == "GET" and self.path == "/v1/slices":
                     return self.reply(200, [{"id": k, "status": v["status"], "owner": "slice-manager"} for k, v in fake.slices.items()])
+                console = re.fullmatch(r"/v1/slices/([0-9a-f]{32})/vms/([a-z][a-z0-9-]*)/console", self.path)
+                if console and self.command == "POST" and console.group(1) in fake.slices:
+                    vms = [v["name"] for v in fake.slices[console.group(1)]["spec"].get("vms", [])]
+                    if console.group(2) not in vms:
+                        return self.reply(404, {"error": "VM inexistente"})
+                    return self.reply(201, {"url": "/console/vnc_auto.html?path=%3Ftoken%3Dabc123", "provider": "openstack"})
                 match = re.fullmatch(r"/v1/slices/([0-9a-f]{32})(/events)?", self.path)
                 if match and match.group(1) in fake.slices:
                     sid = match.group(1)
@@ -65,7 +73,8 @@ class FakePlatform:
                         return self.reply(200, [{"seq": 2, "event": "READY", "detail": "ok", "timestamp": 2.0, "job": "x"},
                                                 {"seq": 1, "event": "ACCEPTED", "detail": "slice-manager", "timestamp": 1.0, "job": "x"}])
                     if self.command == "GET":
-                        return self.reply(200, {"id": sid, "status": fake.slices[sid]["status"], "plan": {}, "spec": {}})
+                        return self.reply(200, {"id": sid, "status": fake.slices[sid]["status"], "plan": {},
+                                                "spec": fake.slices[sid]["spec"]})
                     if self.command == "DELETE":
                         fake.slices[sid]["status"] = "DELETING"
                         return self.reply(202, {"id": uuid.uuid4().hex, "slice_id": sid, "status": "PENDING"})
@@ -181,6 +190,21 @@ class SliceFlowTests(unittest.TestCase):
         self.assertIn("se requiere al menos una VM", error["detail"])
         self.assertEqual(request(self.gw + "/v1/slices", "POST", self.prof, {"course_id": "TEL141", "spec": SPEC})[0], 422,
                          "Idempotency-Key obligatoria")
+
+    def test_console_and_vm_list_only_for_owner_or_admin(self):
+        status, accepted = self.create(self.prof)
+        sid = accepted["slice_id"]
+        status, detail = request(self.gw + "/v1/slices/" + sid, token=self.prof)
+        self.assertEqual([(v["name"], v["networks"]) for v in detail["vms"]], [("vm1", ["l1"])])
+        path = "/v1/slices/%s/vms/vm1/console" % sid
+        status, console = request(self.gw + path, "POST", self.prof)
+        self.assertEqual(status, 200, console)
+        self.assertEqual((console["vm"], console["provider"]), ("vm1", "openstack"))
+        self.assertTrue(console["url"].startswith("/console/"))
+        self.assertEqual(request(self.gw + path, "POST", self.other)[0], 404, "otro profesor no obtiene la consola")
+        self.assertEqual(request(self.gw + path, "POST", self.admin)[0], 200)
+        self.assertEqual(request(self.gw + "/v1/slices/%s/vms/nada/console" % sid, "POST", self.prof)[0], 404)
+        self.assertEqual(request(self.gw + path, "POST")[0], 401)
 
     def test_capabilities_report_lifecycle_when_platform_is_configured(self):
         status, caps = request(self.gw + "/v1/platform/capabilities", token=self.prof)

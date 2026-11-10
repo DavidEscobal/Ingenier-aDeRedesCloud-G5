@@ -1213,6 +1213,71 @@
         }
       }
     },
+    "/v1/slices/{slice_id}/vms/{vm}/console": {
+      "post": {
+        "tags": [
+          "slices"
+        ],
+        "summary": "Vm Console",
+        "operationId": "vm_console_v1_slices__slice_id__vms__vm__console_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Slice Id"
+            }
+          },
+          {
+            "name": "vm",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,31}$",
+              "title": "Vm"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/topologies/catalog": {
       "get": {
         "tags": [
