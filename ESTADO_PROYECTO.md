@@ -67,7 +67,9 @@ Manager / Placement / IAM con login.
 - **Consola por VM desde la web (MS-09, 2026-11-10):** botón Consola en el detalle; noVNC vía `/console/` de la web.
 - **Asignación profesor → alumno (MS-10, 2026-11-10, D-14):** prof1 creó y asignó un slice real; alumno1 lo vio y abrió la
   consola; IAM auditó cada acceso. `prof1`/`alumno1` tienen contraseñas que conoce el usuario (demo).
-- **Siguiente:** importar imágenes (R1B). **Pendiente por decisión del usuario (2026-11-10):** edición de slices ya
+- **Importar imágenes (MS-11, 2026-11-10, D-15):** el admin importó `cirros-062` desde la web a Glance (20 MB, SHA-256
+  registrado) y desplegó 2 VMs con ella (ACTIVE). 9 servicios healthy.
+- **Siguiente:** consumo de recursos (espera D-13). **Pendiente por decisión del usuario (2026-11-10):** edición de slices ya
   desplegados (requiere aplicar diferencias en OpenStack con compensación). Consumo de recursos: espera D-13.
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
