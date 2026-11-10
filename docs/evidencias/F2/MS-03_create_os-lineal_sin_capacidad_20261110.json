@@ -1,0 +1,98 @@
+{
+  "action": "create",
+  "http": 202,
+  "job": {
+    "id": "384438f26cb84571ab951c14714dda1c",
+    "slice_id": "be6ed2a3f4bc48d2b60a85edd84ba27d",
+    "action": "create",
+    "status": "PENDING"
+  },
+  "slice_id": "be6ed2a3f4bc48d2b60a85edd84ba27d",
+  "final": "FAILED_CLEANED",
+  "seconds": 30.0,
+  "slice": {
+    "id": "be6ed2a3f4bc48d2b60a85edd84ba27d",
+    "name": "os-lineal",
+    "provider": "openstack",
+    "status": "FAILED_CLEANED",
+    "owner": "infra-manager"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "detail": "infra-manager"
+    },
+    {
+      "seq": 2,
+      "detail": "create"
+    },
+    {
+      "seq": 3,
+      "detail": "project g5-be6ed2a3f4bc48d2b60a85edd84ba27d"
+    },
+    {
+      "seq": 4,
+      "detail": "g5-be6ed2a3f4bc48d2b60a85edd84ba27d"
+    },
+    {
+      "seq": 5,
+      "detail": "network link12"
+    },
+    {
+      "seq": 6,
+      "detail": "subnet link12"
+    },
+    {
+      "seq": 7,
+      "detail": "network link23"
+    },
+    {
+      "seq": 8,
+      "detail": "subnet link23"
+    },
+    {
+      "seq": 9,
+      "detail": "link12, link23"
+    },
+    {
+      "seq": 10,
+      "detail": "port vm3.link23"
+    },
+    {
+      "seq": 11,
+      "detail": "port vm1.link12"
+    },
+    {
+      "seq": 12,
+      "detail": "port vm2.link12"
+    },
+    {
+      "seq": 13,
+      "detail": "port vm2.link23"
+    },
+    {
+      "seq": 14,
+      "detail": "server vm1"
+    },
+    {
+      "seq": 15,
+      "detail": "server vm3"
+    },
+    {
+      "seq": 16,
+      "detail": "server vm2"
+    },
+    {
+      "seq": 17,
+      "detail": "g5-be6ed2a3f4bc48d2b60a85edd84ba27d"
+    },
+    {
+      "seq": 18,
+      "detail": "Eliminación confirmada en todos los destinos; reservas liberadas"
+    },
+    {
+      "seq": 19,
+      "detail": "Nova marcó ERROR en g5-be6ed2a3-vm2: No valid host was found. There are not enough hosts available.; Nova marcó ERROR en g5-be6ed2a3-vm3: No valid host was found. There are not enough hosts available."
+    }
+  ]
+}

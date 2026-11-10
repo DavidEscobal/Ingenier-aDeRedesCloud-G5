@@ -45,8 +45,10 @@ Manager / Placement / IAM con login.
   usuario) reenvía 5000/8774/9696/9292/6080 vía gateway dentro de la red `control`; `g5-tunnels` del host intacto.
   Config en `~/g5-app/deploy/platform-config/` (700/600). API autenticada y Keystone/Nova/Neutron/Glance
   verificados desde el contenedor, solo lectura: `docs/evidencias/F2/MS-02_*.md`.
-- **Siguiente:** prueba de despliegue real desde el contenedor (crear y borrar `os-lineal`, requiere autorización) y
-  luego el paso 5 (slice-manager → platform-manager con token de servicio).
+- **Despliegue desde el contenedor (MS-03, 2026-11-10):** `os-lineal` llegó hasta Nova y terminó en `FAILED_CLEANED`
+  por **falta de disco en los computes** (flavor de 4 GB raíz, computes de 9 GB, 5 VMs de laboratorio ocupando
+  5 de 6 plazas). Compensación correcta; OpenStack quedó sin recursos `g5-*`. Pendiente: liberar capacidad
+  (grupo), flavor con menos disco o slice más pequeño, y repetir hasta READY. Luego el paso 5.
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
