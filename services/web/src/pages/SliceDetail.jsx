@@ -5,7 +5,8 @@ import { ConfirmDialog, FINAL, formatDate, ProviderLabel, StatusBadge, usePollin
 
 const EVENT_LABEL = {
   ACCEPTED: 'Solicitud aceptada', STARTED: 'Inicio', OS_CREATED: 'Recurso creado', OS_PLACED: 'Ubicación de VMs',
-  READY: 'Listo', DELETED: 'Borrado', FAILED: 'Falló', CLEANED: 'Limpieza',
+  OS_DELETED: 'Recurso borrado', READY: 'Listo', DELETED: 'Borrado', FAILED: 'Falló', FAILED_CLEANED: 'Falló (limpiado)',
+  CLEANED: 'Limpieza',
 }
 
 export default function SliceDetail({ user }) {

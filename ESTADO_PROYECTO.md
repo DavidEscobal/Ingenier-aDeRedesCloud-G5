@@ -57,7 +57,9 @@ Manager / Placement / IAM con login.
   aleatorias desconocidas; el admin las restablece si se necesitan para la demo).
 - **Web parte 1 desplegada (2026-11-10):** servicio `web` (React + Vite, nginx sin privilegios) en `127.0.0.1:8080`
   del app server; `/api` → gateway. Login, menú por rol, Mis slices (estado en vivo, borrar), detalle con eventos y
-  Nuevo slice (plantilla os-lineal-1g). Acceso: `ssh -N -L 8080:127.0.0.1:8080 g5-app`. Pendiente: prueba con login real.
+  Nuevo slice (plantilla os-lineal-1g). Acceso: `ssh -N -L 8080:127.0.0.1:8080 g5-app`. **MS-07:** el usuario creó y borró `os-lineal-grupo5`
+  desde el navegador (READY y borrado limpio).
+- **Siguiente:** paso 6, topology-manager + web parte 2 (topologías predefinidas, borradores, importar/exportar, lienzo).
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
