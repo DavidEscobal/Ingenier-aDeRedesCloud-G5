@@ -69,7 +69,19 @@ Manager / Placement / IAM con login.
   consola; IAM auditó cada acceso. `prof1`/`alumno1` tienen contraseñas que conoce el usuario (demo).
 - **Importar imágenes (MS-11, 2026-11-10, D-15):** el admin importó `cirros-062` desde la web a Glance (20 MB, SHA-256
   registrado) y desplegó 2 VMs con ella (ACTIVE). 9 servicios healthy.
-- **Siguiente:** consumo de recursos (espera D-13). **Pendiente por decisión del usuario (2026-11-10):** edición de slices ya
+- **Punto de reanudación (2026-11-10, cierre de sesión):** R1B casi completo (pausados: editar slices desplegados por
+  decisión del usuario; consumo de recursos espera D-13). R3 completo. R4 y R5 sin implementar; el grupo aún no define
+  la heurística (D-07). En el clúster sigue activo el slice `lineal-2` (2 VMs `cirros-062` en worker3): borrarlo.
+- **Plan acordado para la próxima sesión (sin depender de la heurística):**
+  1. Probar que Nova acepta un host forzado (`availability_zone` `nova:<worker>`) con 1 VM temporal — **pedir
+     autorización** (crea recursos).
+  2. Inventario de recursos de ambas plataformas (OpenStack `os-hypervisors`; Linux vía agente) + marco de placement con
+     contrato (slice completo → asignación o rechazo con motivo, límite de tiempo) y algoritmo **provisional** (WFD)
+     intercambiable. Base también de D-13 y del consumo en la web.
+  3. R5 en OpenStack: reglas de seguridad por slice, salida a Internet y SSH desde fuera (revisar qué permite el lab).
+  4. R0: actualizar HLD y reporte de pruebas con MS-01..MS-11.
+  Opcional: propuesta escrita de heurística para que el grupo decida D-07. Linux de fase 2 requiere que el grupo
+  elija el nodo gateway de slices y autorizar SSH gateway→nodos e instalar el agente. **Pendiente por decisión del usuario (2026-11-10):** edición de slices ya
   desplegados (requiere aplicar diferencias en OpenStack con compensación). Consumo de recursos: espera D-13.
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
