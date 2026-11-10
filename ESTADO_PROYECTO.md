@@ -41,9 +41,13 @@ Manager / Placement / IAM con login.
   gateway publica `127.0.0.1:8000`. IAM inicializado (admin `admin123`; contraseña solo la conoce el usuario).
   Salud, 401 sin credenciales, login, rol admin y revocación verificados: `docs/evidencias/F2/MS-01_*.md` (7/7 OK).
   El volumen `g5-app_iam-data` lo creó una revisión manual (aviso inofensivo de Compose); contiene `iam.db` y `jwt.key`.
-- **Siguiente:** platform-manager en compose (carpeta `deploy/platform-config/` y acceso a OpenStack desde el
-  contenedor: sidecar de túneles recomendado, pendiente de decisión del usuario) y luego el paso 5.
-- `fase2` local va **7 commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
+- **Platform-manager + os-tunnel corriendo (2026-11-10):** perfil `platform`; `os-tunnel` (sidecar elegido por el
+  usuario) reenvía 5000/8774/9696/9292/6080 vía gateway dentro de la red `control`; `g5-tunnels` del host intacto.
+  Config en `~/g5-app/deploy/platform-config/` (700/600). API autenticada y Keystone/Nova/Neutron/Glance
+  verificados desde el contenedor, solo lectura: `docs/evidencias/F2/MS-02_*.md`.
+- **Siguiente:** prueba de despliegue real desde el contenedor (crear y borrar `os-lineal`, requiere autorización) y
+  luego el paso 5 (slice-manager → platform-manager con token de servicio).
+- `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
   `~/.ssh/authorized_keys.bak-20261103`. No se tocó iptables.
@@ -122,8 +126,7 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
 ## Próxima sesión: microservicios en el app server y servicio web (D-08, D-10)
 Pasos (cada uno con tests y commit propio; autorización antes de cambios remotos):
 1. ~~Levantar `iam`, `slice-manager`, `gateway`~~ **Hecho 2026-11-10** (MS-01, 7/7 OK).
-2. **Platform-manager en compose** (perfil `platform`): carpeta `deploy/platform-config/` (600) y acceso a OpenStack
-   desde el contenedor (decidir: sidecar de túneles —recomendado— o túneles del host).
+2. ~~Platform-manager en compose + acceso a OpenStack~~ **Hecho 2026-11-10** (sidecar `os-tunnel`, MS-02).
 3. **Paso 5: slice-manager → platform-manager** con token de servicio y autorización IAM: login → crear → estado →
    borrar slice por el gateway, contra el clúster real.
 4. **Web, parte 1** (D-10): login, menú por rol y "Mis slices" (listar, desplegar Linux/OpenStack, estado, borrar, consola).
