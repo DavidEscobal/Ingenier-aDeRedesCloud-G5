@@ -36,6 +36,31 @@ services:
       retries: 3
       start_period: 10s
 
+  os-tunnel:
+    # Túneles SSH hacia las APIs de OpenStack, visibles solo en la red `control`
+    # (http://os-tunnel:5000, :8774, :9696, :9292, :6080). No toca g5-tunnels del host.
+    profiles: [platform]
+    build:
+      context: ../services/os-tunnel
+      args:
+        APP_UID: ${G5_UID:-1000}
+        APP_GID: ${G5_GID:-1000}
+    environment:
+      OS_TUNNEL_GATEWAY: ${OS_TUNNEL_GATEWAY:-ubuntu@10.20.11.245}
+      OS_TUNNEL_CONTROLLER: ${OS_TUNNEL_CONTROLLER:-192.168.202.1}
+      OS_TUNNEL_PORTS: "5000 8774 9696 9292 6080"
+    volumes:
+      # Clave del app server hacia el gateway (restringida con permitopen) y known_hosts.
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/tunnel-ssh:/home/tunnel/.ssh:ro
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD-SHELL", "for p in 5000 8774 9696 9292 6080; do nc -z 127.0.0.1 $$p || exit 1; done"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   platform-manager:
     # Núcleo de ejecución (g5/): cola de jobs, Engine y drivers Linux/OpenStack.
     # Sin puertos publicados: solo lo alcanzan servicios de la red `control`.
@@ -55,6 +80,9 @@ services:
       - ${G5_PLATFORM_CONFIG:-./platform-config}/keys.json:/run/g5/keys.json:ro
       - ${G5_PLATFORM_CONFIG:-./platform-config}/openstack.env:/run/g5/openstack.env:ro
       - ${G5_PLATFORM_CONFIG:-./platform-config}/ssh:/home/appuser/.ssh:ro
+    depends_on:
+      os-tunnel:
+        condition: service_healthy
     restart: unless-stopped
     networks: [control]
     healthcheck:

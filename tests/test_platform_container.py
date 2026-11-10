@@ -51,6 +51,25 @@ class ContainerArtifactTests(unittest.TestCase):
         for target in ('/run/g5/cluster.json', '/run/g5/keys.json', '/run/g5/openstack.env', '/home/appuser/.ssh'):
             self.assertRegex(block, re.escape(target) + r':ro\b', target + ' debe montarse solo lectura')
 
+    def test_os_tunnel_is_private_and_platform_manager_waits_for_it(self):
+        block = compose_service('os-tunnel')
+        self.assertNotIn('ports:', block, 'los túneles no deben publicarse en el host')
+        self.assertIn('networks: [control]', block)
+        self.assertRegex(block, r'/home/tunnel/\.ssh:ro\b', 'la clave SSH debe montarse solo lectura')
+        self.assertIn('profiles: [platform]', block)
+        self.assertRegex(compose_service('platform-manager'),
+                         r'depends_on:\s*\n\s*os-tunnel:\s*\n\s*condition: service_healthy')
+
+    def test_os_tunnel_image_has_no_secrets_and_runs_unprivileged(self):
+        folder = ROOT / 'services' / 'os-tunnel'
+        docker = (folder / 'Dockerfile').read_text(encoding='utf-8')
+        self.assertEqual(re.findall(r'^COPY\s+(?:--\S+\s+)*(\S+)', docker, re.M), ['entrypoint.sh'])
+        self.assertRegex(docker, r'(?m)^USER tunnel$')
+        script = (folder / 'entrypoint.sh').read_bytes()
+        self.assertNotIn(b'\r\n', script, 'el entrypoint debe tener finales de línea LF')
+        self.assertIn(b'StrictHostKeyChecking=yes', script)
+        self.assertIn(b'ExitOnForwardFailure=yes', script)
+
     def test_only_gateway_publishes_ports(self):
         text = (ROOT / 'deploy' / 'compose.yaml').read_text(encoding='utf-8')
         section = re.search(r'^services:\n(.*?)(?=^\S)', text, re.S | re.M).group(1)

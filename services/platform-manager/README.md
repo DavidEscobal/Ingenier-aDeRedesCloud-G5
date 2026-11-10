@@ -33,13 +33,27 @@ se levanta con `docker compose --profile platform up -d` cuando la carpeta está
 | `openstack.env` | `/run/g5/openstack.env` | `OS_*`, permisos 600. **Debe existir** (vacío si solo se usa Linux); si falta, Docker crea un directorio |
 | `ssh/` | `/home/appuser/.ssh` | clave privada (600) y `known_hosts` con las huellas de los nodos (`StrictHostKeyChecking=yes`) |
 
+## Acceso a OpenStack: servicio `os-tunnel`
+
+Los túneles del host (`g5-tunnels`) escuchan en `127.0.0.1` del app server, que el contenedor no ve.
+El servicio `os-tunnel` (perfil `platform`) abre los mismos reenvíos SSH a través del gateway, pero en la
+red `control`, con los puertos originales de cada API. En el `cluster.json` montado:
+
+```json
+"endpoint_map": {
+  "http://controller:5000": "http://os-tunnel:5000",
+  "http://controller:8774": "http://os-tunnel:8774",
+  "http://controller:9696": "http://os-tunnel:9696",
+  "http://controller:9292": "http://os-tunnel:9292"
+}
+```
+
+`console_map` no cambia: son URL para el navegador del usuario, no para el contenedor.
+`os-tunnel` monta `platform-config/tunnel-ssh/` (clave del app server hacia el gateway, restringida con
+`permitopen`, y `known_hosts`). No publica puertos; `g5-tunnels` del host sigue igual.
+
 ## Pendiente (no implementado)
 
-- **Acceso a las API de OpenStack desde el contenedor.** Hoy los túneles
-  (`g5-tunnels`) escuchan en `127.0.0.1` del host, inalcanzable desde la red
-  Docker. Opciones: (a) un servicio *sidecar* de túneles en la red `control`
-  (`endpoint_map` → `http://os-tunnel:55000`, …), sin tocar el host; (b) atar los
-  túneles del host a la IP del puente Docker y usar `host-gateway`. Requiere decisión.
 - **Consola noVNC del driver Linux.** Los reenvíos SSH escuchan en `127.0.0.1` del
   proceso; el futuro servicio `console` (websockify) debe compartir su espacio de
   red (`network_mode: service:platform-manager`) o se rediseña el reenvío.
