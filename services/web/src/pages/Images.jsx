@@ -42,7 +42,13 @@ export default function Images({ user }) {
     if (!f) return
     setFile(f)
     setName(suggestName(f))
-    setFormat(/\.(img|raw)$/i.test(f.name) ? 'raw' : 'qcow2')
+    // El formato se detecta por contenido (cabecera qcow2 "QFI\xfb"), no por la extensión: CirrOS publica qcow2 como .img.
+    f.slice(0, 4).arrayBuffer()
+      .then((buf) => {
+        const b = new Uint8Array(buf)
+        setFormat(b[0] === 0x51 && b[1] === 0x46 && b[2] === 0x49 && b[3] === 0xfb ? 'qcow2' : 'raw')
+      })
+      .catch(() => setFormat('qcow2'))
   }
 
   async function submit(event) {
@@ -88,7 +94,7 @@ export default function Images({ user }) {
               <input ref={fileInput} type="file" accept=".qcow2,.img,.raw,application/octet-stream" onChange={pick} disabled={progress !== null} />
             </label>
             <label>Nombre<input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} disabled={progress !== null} /></label>
-            <label>Formato
+            <label>Formato (detectado)
               <select value={format} onChange={(e) => setFormat(e.target.value)} disabled={progress !== null}>
                 <option value="qcow2">qcow2</option><option value="raw">raw</option>
               </select>
