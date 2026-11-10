@@ -1,0 +1,94 @@
+{
+  "action": "create",
+  "http": 202,
+  "job": {
+    "id": "7b3edd7ac37e47de89ff0d3d8d56e1f8",
+    "slice_id": "69dd110e3bc94713abca89803a436824",
+    "action": "create",
+    "status": "PENDING"
+  },
+  "slice_id": "69dd110e3bc94713abca89803a436824",
+  "final": "READY",
+  "seconds": 20.0,
+  "slice": {
+    "id": "69dd110e3bc94713abca89803a436824",
+    "name": "os-lineal-1g",
+    "provider": "openstack",
+    "status": "READY",
+    "owner": "infra-manager"
+  },
+  "events": [
+    {
+      "seq": 20,
+      "detail": "infra-manager"
+    },
+    {
+      "seq": 21,
+      "detail": "create"
+    },
+    {
+      "seq": 22,
+      "detail": "project g5-69dd110e3bc94713abca89803a436824"
+    },
+    {
+      "seq": 23,
+      "detail": "g5-69dd110e3bc94713abca89803a436824"
+    },
+    {
+      "seq": 24,
+      "detail": "network link12"
+    },
+    {
+      "seq": 25,
+      "detail": "subnet link12"
+    },
+    {
+      "seq": 26,
+      "detail": "network link23"
+    },
+    {
+      "seq": 27,
+      "detail": "subnet link23"
+    },
+    {
+      "seq": 28,
+      "detail": "link12, link23"
+    },
+    {
+      "seq": 29,
+      "detail": "port vm3.link23"
+    },
+    {
+      "seq": 30,
+      "detail": "port vm1.link12"
+    },
+    {
+      "seq": 31,
+      "detail": "port vm2.link12"
+    },
+    {
+      "seq": 32,
+      "detail": "port vm2.link23"
+    },
+    {
+      "seq": 33,
+      "detail": "server vm1"
+    },
+    {
+      "seq": 34,
+      "detail": "server vm3"
+    },
+    {
+      "seq": 35,
+      "detail": "server vm2"
+    },
+    {
+      "seq": 36,
+      "detail": "vm1@worker3, vm2@worker3, vm3@worker3"
+    },
+    {
+      "seq": 37,
+      "detail": "Instancias ACTIVE en Nova: vm1@worker3, vm2@worker3, vm3@worker3"
+    }
+  ]
+}

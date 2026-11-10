@@ -1,0 +1,100 @@
+{
+  "action": "delete",
+  "http": 202,
+  "slice_id": "69dd110e3bc94713abca89803a436824",
+  "final": "DELETED",
+  "seconds": 20.0,
+  "slice": {
+    "id": "69dd110e3bc94713abca89803a436824",
+    "name": "os-lineal-1g",
+    "provider": "openstack",
+    "status": "DELETED",
+    "owner": "infra-manager"
+  },
+  "events": [
+    {
+      "seq": 20,
+      "detail": "infra-manager"
+    },
+    {
+      "seq": 21,
+      "detail": "create"
+    },
+    {
+      "seq": 22,
+      "detail": "project g5-69dd110e3bc94713abca89803a436824"
+    },
+    {
+      "seq": 23,
+      "detail": "g5-69dd110e3bc94713abca89803a436824"
+    },
+    {
+      "seq": 24,
+      "detail": "network link12"
+    },
+    {
+      "seq": 25,
+      "detail": "subnet link12"
+    },
+    {
+      "seq": 26,
+      "detail": "network link23"
+    },
+    {
+      "seq": 27,
+      "detail": "subnet link23"
+    },
+    {
+      "seq": 28,
+      "detail": "link12, link23"
+    },
+    {
+      "seq": 29,
+      "detail": "port vm3.link23"
+    },
+    {
+      "seq": 30,
+      "detail": "port vm1.link12"
+    },
+    {
+      "seq": 31,
+      "detail": "port vm2.link12"
+    },
+    {
+      "seq": 32,
+      "detail": "port vm2.link23"
+    },
+    {
+      "seq": 33,
+      "detail": "server vm1"
+    },
+    {
+      "seq": 34,
+      "detail": "server vm3"
+    },
+    {
+      "seq": 35,
+      "detail": "server vm2"
+    },
+    {
+      "seq": 36,
+      "detail": "vm1@worker3, vm2@worker3, vm3@worker3"
+    },
+    {
+      "seq": 37,
+      "detail": "Instancias ACTIVE en Nova: vm1@worker3, vm2@worker3, vm3@worker3"
+    },
+    {
+      "seq": 38,
+      "detail": "delete"
+    },
+    {
+      "seq": 39,
+      "detail": "g5-69dd110e3bc94713abca89803a436824"
+    },
+    {
+      "seq": 40,
+      "detail": "Eliminación confirmada en todos los destinos; reservas liberadas"
+    }
+  ]
+}
