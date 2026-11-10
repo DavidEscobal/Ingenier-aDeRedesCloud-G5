@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Ident = str
 IDENT = r"^[a-z][a-z0-9-]{0,31}$"
+IMAGE_RE = __import__("re").compile(r"[a-z0-9][a-z0-9._-]{0,62}")
 MAX_NODES = 16
 MAX_SEGMENTS = 48
 MAX_NICS = 8
@@ -103,6 +104,8 @@ class Topology(Model):
         for n in self.nodes:
             if (n.vcpus, n.memory_mb, n.disk_gb) not in allowed:
                 problems.append(f"{n.id}: tamaño {n.vcpus} vCPU/{n.memory_mb} MB/{n.disk_gb} GB no disponible")
-            if n.image not in images():
-                problems.append(f"{n.id}: imagen {n.image} no disponible")
+            # La existencia real de la imagen la verifica el platform-manager (preflight en Glance) al desplegar;
+            # el catálogo de imágenes vive en el image-catalog (D-15).
+            if not IMAGE_RE.fullmatch(n.image):
+                problems.append(f"{n.id}: nombre de imagen inválido")
         return problems

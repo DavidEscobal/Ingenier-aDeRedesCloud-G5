@@ -73,6 +73,7 @@ export const Api = {
   assign: (id, userId) => api(`/v1/slices/${id}/assignments`, { method: 'POST', body: { user_id: userId } }),
   unassign: (id, userId) => api(`/v1/slices/${id}/assignments/${userId}`, { method: 'DELETE' }),
   students: (courseId) => api(`/v1/iam/courses/${courseId}/students`),
+  images: () => api('/v1/images'),
   // Topology Manager (paso 6)
   catalog: () => api('/v1/topologies/catalog'),
   generate: (kind, n, extra = {}) => api('/v1/topologies/generate', { method: 'POST', body: { kind, n, ...extra } }),
@@ -84,4 +85,27 @@ export const Api = {
   createDraft: (topology) => api('/v1/drafts', { method: 'POST', body: { topology } }),
   updateDraft: (id, topology, version) => api('/v1/drafts/' + id, { method: 'PUT', body: { topology, version } }),
   deleteDraft: (id) => api('/v1/drafts/' + id, { method: 'DELETE' }),
+}
+
+// Importar imagen (D-15): XMLHttpRequest para informar el progreso de la subida.
+export function uploadImage(file, { name, disk_format, description }, onProgress) {
+  return new Promise((resolve, reject) => {
+    const query = new URLSearchParams({ name, disk_format, description: description || '' })
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/v1/images?' + query.toString())
+    const token = getToken()
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token)
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)) }
+    xhr.onerror = () => reject(new ApiError(0, 'Se cortó la conexión durante la subida.'))
+    xhr.onload = () => {
+      let data = null
+      try { data = JSON.parse(xhr.responseText) } catch { /* sin JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data)
+      if (xhr.status === 401) clearSession()
+      const detail = xhr.status === 413 && !data ? 'La imagen supera el tamaño permitido.' : data?.detail
+      reject(new ApiError(xhr.status, Array.isArray(detail) ? 'Datos inválidos.' : detail))
+    }
+    xhr.send(file)
+  })
 }

@@ -69,6 +69,31 @@ services:
       retries: 3
       start_period: 10s
 
+  image-catalog:
+    # D-15: catálogo de imágenes (metadatos). Importa en streaming hacia el platform-manager (Glance).
+    build:
+      context: ../services/image-catalog
+    environment:
+      IAM_URL: http://iam:8000
+      PLATFORM_MANAGER_URL: http://platform-manager:8000
+      PLATFORM_TOKEN_FILE: /run/g5/platform.token
+      IMAGE_DB_PATH: /app/state/images/catalog.db
+      IMAGE_MAX_MB: "1024"
+    volumes:
+      - image-data:/app/state/images
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/image-catalog.token:/run/g5/platform.token:ro
+    depends_on:
+      iam:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   os-tunnel:
     # Túneles SSH hacia las APIs de OpenStack, visibles solo en la red `control`
     # (http://os-tunnel:5000, :8774, :9696, :9292, :6080). No toca g5-tunnels del host.
@@ -132,6 +157,7 @@ services:
       IAM_URL: http://iam:8000
       SLICE_MANAGER_URL: http://slice-manager:8000
       TOPOLOGY_MANAGER_URL: http://topology-manager:8000
+      IMAGE_CATALOG_URL: http://image-catalog:8000
       UPSTREAM_TIMEOUT_SECONDS: "3"
       SLICE_TIMEOUT_SECONDS: "30"
     ports:
@@ -142,6 +168,8 @@ services:
       slice-manager:
         condition: service_healthy
       topology-manager:
+        condition: service_healthy
+      image-catalog:
         condition: service_healthy
     restart: unless-stopped
     networks: [control]
@@ -179,3 +207,4 @@ volumes:
   platform-data:
   slice-data:
   topology-data:
+  image-data:

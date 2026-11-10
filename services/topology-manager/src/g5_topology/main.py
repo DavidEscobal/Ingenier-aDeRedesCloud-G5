@@ -222,8 +222,8 @@ def catalog(user: User):
 
 @app.post("/v1/topologies/generate", response_model=Topology, tags=["topologies"])
 def generate_topology(body: GenerateRequest, user: User) -> Topology:
-    if body.size not in {s["id"] for s in sizes()} or body.image not in images():
-        raise unprocessable("Tamaño o imagen no disponibles")
+    if body.size not in {s["id"] for s in sizes()}:
+        raise unprocessable("Tamaño no disponible")
     try:
         return generate(body.kind, body.n, body.name, body.prefix, body.image, body.size)
     except (ValueError, ValidationError) as exc:

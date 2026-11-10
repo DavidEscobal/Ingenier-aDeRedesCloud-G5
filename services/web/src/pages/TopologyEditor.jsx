@@ -53,8 +53,11 @@ export default function TopologyEditor() {
   const [deploy, setDeploy] = useState(null) // {courses, course, sliceName}
   const [renameValue, setRenameValue] = useState('')
 
+  const [imageNames, setImageNames] = useState(null)
   useEffect(() => {
     Api.catalog().then(setCatalog).catch((err) => setError(err.message))
+    // Imágenes reales del catálogo (D-15); si no responde, se usa la lista base del Topology Manager.
+    Api.images().then((list) => setImageNames(list.map((i) => i.name))).catch(() => setImageNames(null))
   }, [])
 
   useEffect(() => {
@@ -279,7 +282,7 @@ export default function TopologyEditor() {
                   </label>
                   <label>Imagen
                     <select value={selectedNode.data.image} onChange={(e) => updateSelected({ image: e.target.value })}>
-                      {(catalog?.images || [selectedNode.data.image]).map((i) => <option key={i} value={i}>{i}</option>)}
+                      {[...new Set([...(imageNames || catalog?.images || []), selectedNode.data.image])].map((i) => <option key={i} value={i}>{i}</option>)}
                     </select>
                   </label>
                 </>

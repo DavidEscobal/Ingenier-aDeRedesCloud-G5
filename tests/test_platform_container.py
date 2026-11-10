@@ -94,7 +94,8 @@ class ContainerArtifactTests(unittest.TestCase):
         folder = ROOT / 'services' / 'web'
         nginx = (folder / 'nginx.conf').read_text(encoding='utf-8')
         # Solo dos destinos: la API (gateway) y la consola noVNC de Nova a través de os-tunnel.
-        self.assertEqual(re.findall(r'proxy_pass\s+(\S+);', nginx), ['http://gateway:8000/', 'http://os-tunnel:6080/'])
+        self.assertEqual(re.findall(r'proxy_pass\s+(\S+);', nginx),
+                         ['http://gateway:8000/v1/images', 'http://gateway:8000/', 'http://os-tunnel:6080/'])
         console = nginx.split('location /console/')[1].split('location ')[0]
         self.assertIn('Upgrade $http_upgrade', console, 'la consola necesita WebSocket')
         self.assertIn("frame-ancestors 'none'", nginx)

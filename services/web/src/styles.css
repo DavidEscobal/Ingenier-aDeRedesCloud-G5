@@ -159,3 +159,11 @@ input:focus, select:focus { outline: 2px solid #9cc3e4; border-color: var(--bran
 .people { list-style: none; margin: 0 0 14px; padding: 0; }
 .people li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .assign-row select { flex: 1; min-width: 0; }
+
+/* --- Imágenes --- */
+.upload { margin-bottom: 24px; }
+.upload h2 { margin-top: 0; }
+.upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 16px; }
+.progress-bar { position: relative; height: 26px; background: var(--off-bg); border-radius: var(--radius); overflow: hidden; margin: 6px 0 14px; }
+.progress-bar div { position: absolute; inset: 0 auto 0 0; background: var(--accent); transition: width 0.2s; }
+.progress-bar span { position: relative; display: block; text-align: center; line-height: 26px; font-size: 12px; font-weight: 600; color: var(--text); }

@@ -92,9 +92,19 @@ async def lifespan(app: FastAPI):
                 if (tp.scheme not in {"http", "https"} or not tp.hostname or tp.username or tp.password
                         or tp.query or tp.fragment or tp.path not in {"", "/"}):
                     raise ValueError("TOPOLOGY_MANAGER_URL must be an HTTP(S) origin")
+            image_url = os.getenv("IMAGE_CATALOG_URL")
+            if image_url:
+                image_url = image_url.rstrip("/")
+                ip = urlsplit(image_url)
+                if (ip.scheme not in {"http", "https"} or not ip.hostname or ip.username or ip.password
+                        or ip.query or ip.fragment or ip.path not in {"", "/"}):
+                    raise ValueError("IMAGE_CATALOG_URL must be an HTTP(S) origin")
             async with httpx.AsyncClient(base_url=topo_url or "http://topology.invalid", timeout=timeout,
-                                         trust_env=False, follow_redirects=False) as topology:
+                                         trust_env=False, follow_redirects=False) as topology, \
+                    httpx.AsyncClient(base_url=image_url or "http://images.invalid", timeout=timeout,
+                                      trust_env=False, follow_redirects=False) as images:
                 app.state.topology_manager = topology if topo_url else None
+                app.state.image_catalog = images if image_url else None
                 yield
 
 
@@ -304,3 +314,46 @@ async def update_draft(draft_id: DraftId, body: JsonBody, request: Request, acce
 @app.delete("/v1/drafts/{draft_id}", tags=["drafts"], responses=ERROR_RESPONSES)
 async def delete_draft(draft_id: DraftId, request: Request, access_token=Depends(token)):
     return await topology_call(request, "DELETE", "/v1/drafts/" + draft_id, access_token)
+
+
+
+# --- Imágenes (D-15): rutas explícitas hacia el Image Catalog. La importación se reenvía en streaming.
+@app.get("/v1/images", tags=["images"], responses=ERROR_RESPONSES)
+async def list_images(request: Request, access_token=Depends(token)):
+    return await upstream_call(request.app.state.image_catalog, "image_catalog", "GET", "/v1/images", access_token)
+
+
+@app.post("/v1/images", status_code=201, tags=["images"], responses=ERROR_RESPONSES)
+async def import_image(request: Request, name: str, disk_format: Literal["qcow2", "raw"] = "qcow2",
+                       description: str = "", access_token=Depends(token)):
+    client = request.app.state.image_catalog
+    if client is None:
+        raise HTTPException(503, "image_catalog_unavailable")
+    length = request.headers.get("content-length")
+    if not length or not length.isdigit():
+        raise HTTPException(411, "Se requiere Content-Length")
+
+    async def body():
+        async for chunk in request.stream():
+            yield chunk
+
+    try:
+        response = await client.post("/v1/images", params={"name": name, "disk_format": disk_format, "description": description},
+                                     content=body(), headers={"Authorization": "Bearer " + access_token,
+                                                              "Content-Length": length,
+                                                              "Content-Type": "application/octet-stream"},
+                                     timeout=httpx.Timeout(900, connect=10))
+    except httpx.TimeoutException:
+        raise HTTPException(504, "image_catalog_timeout") from None
+    except httpx.RequestError:
+        raise HTTPException(503, "image_catalog_unavailable") from None
+    try:
+        data = response.json()
+    except ValueError:
+        raise HTTPException(502, "image_catalog_bad_response") from None
+    if response.status_code >= 400:
+        detail = data.get("detail") if isinstance(data, dict) else None
+        raise HTTPException(response.status_code if response.status_code in SLICE_STATUSES | {411} else 502,
+                            detail if isinstance(detail, str) else "image_catalog_error",
+                            headers={"WWW-Authenticate": "Bearer"} if response.status_code == 401 else {})
+    return JSONResponse(status_code=response.status_code, content=data)
