@@ -31,5 +31,7 @@ curso `TEL141`, `iam_registered = 1`. OpenStack después: 0 proyectos `g5-*`; 5 
 ## Pendientes observados
 
 - No se ejecutó en real el paso **Quitar** (la revocación está cubierta por `tests/app/test_slices.py`).
-- Al borrar un slice, su recurso y asignaciones siguen en IAM (inofensivo: el slice está DELETED y la web lo
-  oculta); conviene retirarlos al confirmar el borrado.
+- Al borrar un slice, su recurso y asignaciones seguían en IAM. **Corregido en `e3015b3`:** el slice-manager los
+  retira (`DELETE /v1/iam/internal/slices/{id}`, solo token de servicio) cuando el motor confirma DELETED. El registro
+  de esta prueba se retiró tras el despliegue: IAM quedó con 0 recursos y 0 asignaciones; auditoría
+  `service:slice-manager resource.retire_slice 7ea4fdb7…`.
