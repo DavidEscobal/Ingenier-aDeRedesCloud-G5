@@ -36,6 +36,8 @@ F0 y F1 terminadas; arquitectura de microservicios en Docker
 (D-08) e interfaz web (D-10), en la rama `fase2`.
 
 ## Cómo trabajar en este repo
+- Colaboradores: leer y seguir **GUIA_COLABORADOR.md** (rama propia, PR a `fase2`,
+  `bash scripts/verificar.sh` en verde, nunca subir secretos ni `down -v`).
 - Tests: `PYTHONPATH=tools/winshim python -m unittest discover -s tests`
   (en Linux, sin PYTHONPATH). Commit por paso, tests en verde.
 - Fechas: usar la guía LAB6 2026-2, no el cronograma 2025-2 del enunciado.

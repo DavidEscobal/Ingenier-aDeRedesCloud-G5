@@ -1,0 +1,40 @@
+# Ejecuta las pruebas en cada Pull Request y en cada push a fase2.
+# No necesita el clúster ni secretos: todo usa servicios locales y simuladores.
+name: tests
+
+on:
+  pull_request:
+    branches: [fase2]
+  push:
+    branches: [fase2]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependencias de los microservicios (versiones fijadas)
+        run: |
+          python -m pip install --upgrade pip
+          for svc in gateway iam-service slice-manager topology-manager image-catalog; do
+            pip install -r services/$svc/requirements.lock
+          done
+      - name: Tests del núcleo (g5)
+        run: python -m unittest discover -s tests
+      - name: Tests de los microservicios
+        env:
+          PYTHONPATH: services/gateway/src:services/iam-service/src:services/slice-manager/src:services/topology-manager/src:services/image-catalog/src:tests/app:.
+        run: python -m unittest discover -s tests/app
+      - name: Contratos OpenAPI al día
+        env:
+          PYTHONPATH: services/gateway/src:services/iam-service/src:services/slice-manager/src:services/topology-manager/src:services/image-catalog/src
+        run: |
+          python scripts/export_app_contracts.py
+          git diff --ignore-all-space --exit-code -- contracts/ || (echo "La API cambió: regenera y commitea contracts/http/*.json" && exit 1)
