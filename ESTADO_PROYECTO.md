@@ -65,8 +65,10 @@ Manager / Placement / IAM con login.
   healthy en el app server. **MS-08:** el usuario combinó anillo + árbol, guardó v1/v2, exportó/importó, desplegó
   6 VMs (READY en worker1-3) y borró; OpenStack limpio.
 - **Consola por VM desde la web (MS-09, 2026-11-10):** botón Consola en el detalle; noVNC vía `/console/` de la web.
-- **Siguiente:** pendientes de R1B — asignación de slices a alumnos (IAM), edición de slices desplegados, consumo de
-  recursos (D-13), importar imágenes.
+- **Asignación profesor → alumno (MS-10, 2026-11-10, D-14):** prof1 creó y asignó un slice real; alumno1 lo vio y abrió la
+  consola; IAM auditó cada acceso. `prof1`/`alumno1` tienen contraseñas que conoce el usuario (demo).
+- **Siguiente:** pendientes de R1B — edición de slices desplegados, consumo de recursos (D-13), importar imágenes;
+  limpiar el recurso IAM al borrar un slice.
 - `fase2` local va **varios commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
