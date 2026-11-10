@@ -37,13 +37,12 @@ Manager / Placement / IAM con login.
 - **Docker 28.1.1 + Compose v2.35.1** instalados (2026-11-08); `ubuntu` en el grupo `docker`; linger activado.
   Código de microservicios en `~/g5-app` (copia de `fase2`, revisión en `~/g5-app/REVISION`); imágenes
   `g5-app-{gateway,iam,slice-manager,platform-manager}` construidas. Ningún contenedor levantado aún.
-- **Punto exacto donde quedamos (2026-11-08):** el `init` de IAM **no quedó registrado en el app server** (no había
-  volumen ni contenedor de IAM). El volumen `g5-app_iam-data` existe pero **vacío**: lo creó por accidente una
-  revisión de Claude a las 22:38 UTC; IAM puede escribir en él (Compose avisa que no lo creó él; opcional
-  `docker volume rm g5-app_iam-data` antes del init). Siguiente acción, del usuario, en el app server:
-  `cd ~/g5-app && docker compose -f deploy/compose.yaml run --rm --no-deps iam python -m g5_iam.cli init`
-  y pegar la salida sin la contraseña. Luego Claude: verificar el volumen, `docker compose -f deploy/compose.yaml up -d`
-  (solo iam, slice-manager, gateway), healthchecks y pruebas 401/login/capacidades/revocación.
+- **Microservicios corriendo (2026-11-10):** `iam`, `slice-manager`, `gateway` en Docker, los tres *healthy*; solo el
+  gateway publica `127.0.0.1:8000`. IAM inicializado (admin `admin123`; contraseña solo la conoce el usuario).
+  Salud, 401 sin credenciales, login, rol admin y revocación verificados: `docs/evidencias/F2/MS-01_*.md` (7/7 OK).
+  El volumen `g5-app_iam-data` lo creó una revisión manual (aviso inofensivo de Compose); contiene `iam.db` y `jwt.key`.
+- **Siguiente:** platform-manager en compose (carpeta `deploy/platform-config/` y acceso a OpenStack desde el
+  contenedor: sidecar de túneles recomendado, pendiente de decisión del usuario) y luego el paso 5.
 - `fase2` local va **7 commits por delante** de `origin/fase2`, sin push (pendiente de autorización).
 - Túneles: servicio de usuario `g5-tunnels` activo (`systemctl --user status g5-tunnels`).
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
@@ -122,8 +121,7 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
 
 ## Próxima sesión: microservicios en el app server y servicio web (D-08, D-10)
 Pasos (cada uno con tests y commit propio; autorización antes de cambios remotos):
-1. **Levantar `iam`, `slice-manager`, `gateway`** en `~/g5-app` (tras `g5_iam.cli init`) y probar salud, login,
-   capacidades, 401 y revocación por el gateway (`127.0.0.1:8000`).
+1. ~~Levantar `iam`, `slice-manager`, `gateway`~~ **Hecho 2026-11-10** (MS-01, 7/7 OK).
 2. **Platform-manager en compose** (perfil `platform`): carpeta `deploy/platform-config/` (600) y acceso a OpenStack
    desde el contenedor (decidir: sidecar de túneles —recomendado— o túneles del host).
 3. **Paso 5: slice-manager → platform-manager** con token de servicio y autorización IAM: login → crear → estado →
