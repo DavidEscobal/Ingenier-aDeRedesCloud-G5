@@ -43,6 +43,27 @@ services:
       retries: 3
       start_period: 10s
 
+  topology-manager:
+    # Paso 6: topologías predefinidas, combinación, borradores versionados e importar/exportar.
+    build:
+      context: ../services/topology-manager
+    environment:
+      IAM_URL: http://iam:8000
+      TOPOLOGY_DB_PATH: /app/state/topology/drafts.db
+    volumes:
+      - topology-data:/app/state/topology
+    depends_on:
+      iam:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   os-tunnel:
     # Túneles SSH hacia las APIs de OpenStack, visibles solo en la red `control`
     # (http://os-tunnel:5000, :8774, :9696, :9292, :6080). No toca g5-tunnels del host.
@@ -105,6 +126,7 @@ services:
     environment:
       IAM_URL: http://iam:8000
       SLICE_MANAGER_URL: http://slice-manager:8000
+      TOPOLOGY_MANAGER_URL: http://topology-manager:8000
       UPSTREAM_TIMEOUT_SECONDS: "3"
       SLICE_TIMEOUT_SECONDS: "30"
     ports:
@@ -113,6 +135,8 @@ services:
       iam:
         condition: service_healthy
       slice-manager:
+        condition: service_healthy
+      topology-manager:
         condition: service_healthy
     restart: unless-stopped
     networks: [control]
@@ -149,3 +173,4 @@ volumes:
   iam-data:
   platform-data:
   slice-data:
+  topology-data:

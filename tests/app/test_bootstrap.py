@@ -198,7 +198,8 @@ class BootstrapTests(unittest.TestCase):
 
     def test_published_contracts_match_services(self):
         for name, module in (("gateway", "g5_gateway.main"),
-                             ("slice-manager", "g5_slice_manager.main"), ("iam", "g5_iam.main")):
+                             ("slice-manager", "g5_slice_manager.main"), ("iam", "g5_iam.main"),
+                             ("topology-manager", "g5_topology.main")):
             with self.subTest(service=name):
                 with service(module) as (base, _):
                     expected = json.loads((ROOT / "contracts" / "http" /
