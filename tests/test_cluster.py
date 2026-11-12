@@ -356,6 +356,31 @@ class AgentTests(Fixture):
         self.assertTrue(any('vlan_mode=trunk trunks=100' in c for c in flattened))
         self.assertFalse(any('del-br br-int' in c for c in flattened))
 
+    def test_diag_datapath_builds_slice_encapsulation_and_always_cleans_up(self):
+        agent = self.agent('worker'); commands = []
+        def fake_run(*args, **kw):
+            commands.append(' '.join(map(str, args)))
+            if args[0] == 'ping':
+                raise AgentError('fallo inyectado')
+            return 0, ''
+        with mock.patch('g5.agent.run', side_effect=fake_run), mock.patch('g5.agent.output', side_effect=lambda *a, **k: fake_run(*a, **k)[1]):
+            with self.assertRaises(AgentError):
+                agent.diag_datapath(mode='ping', svid=4001, cvid=112, index=2, peer='172.31.96.1')
+        self.assertTrue(any('add-port br-int g5diag' in c and 'type=internal' in c and 'vlan_mode=dot1q-tunnel' in c
+                            and 'tag=4001' in c and 'cvlans=112' in c and 'qinq-ethtype=802.1ad' in c for c in commands))
+        self.assertTrue(any(c.endswith('type vlan id 112') for c in commands))
+        self.assertIn('ip addr add 172.31.96.2/24 dev g5diag.112', commands)
+        self.assertEqual(commands[-2:], ['ip link del g5diag.112', 'ovs-vsctl --if-exists del-port br-int g5diag'])
+
+    def test_diag_datapath_rejects_slice_range_and_foreign_peer(self):
+        agent = self.agent('worker')
+        with mock.patch('g5.agent.run') as run_mock, mock.patch('g5.agent.output') as out_mock:
+            for kwargs in ({'svid': 1500}, {'svid': 4000, 'mode': 'ping', 'peer': '10.0.10.1'},
+                           {'svid': 4000, 'hold': 600}, {'svid': 4000, 'mode': 'rm -rf'}):
+                with self.assertRaises(AgentError):
+                    agent.diag_datapath(**kwargs)
+            run_mock.assert_not_called(); out_mock.assert_not_called()
+
     def test_firewall_targets_exact_public_port_and_source(self):
         job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
         agent = self.agent()

@@ -844,6 +844,65 @@ class Agent:
             output('ip', '-n', namespace, 'link', 'set', peer, 'name', local)
         output('ip', '-n', namespace, 'link', 'show', local)
 
+    # ------------------------------------------------------------------ diagnóstico del transporte (R2-D-07)
+    DIAG_PORT = 'g5diag'
+    DIAG_NET = ipaddress.ip_network('172.31.96.0/24')
+
+    def diag_datapath(self, mode='listen', svid=4000, cvid=None, index=1, peer=None, hold=40, **_):
+        """Prueba el transporte entre nodos sin un slice: puerto interno temporal en el bridge de datos con
+        la MISMA encapsulación que un slice (S-VLAN 802.1ad y, opcional, C-VLAN 802.1q dentro).
+        mode=listen: responde durante `hold` s; mode=ping: hace ping a `peer`. Siempre retira lo creado."""
+        ensure(self.cfg['role'] in ('worker', 'gateway'), 'Diagnóstico solo en workers o gateway')
+        ensure(mode in ('listen', 'ping'), 'Modo de diagnóstico inválido')
+        tag(svid)
+        ensure(4000 <= svid <= 4094, 'S-VLAN de diagnóstico fuera de 4000-4094 (no usar el rango de los slices)')
+        if cvid is not None:
+            tag(cvid)
+        ensure(type(index) is int and 1 <= index <= 254, 'Índice de diagnóstico inválido')
+        ensure(type(hold) is int and 5 <= hold <= 120, 'Duración de diagnóstico fuera de 5-120 s')
+        if mode == 'ping':
+            ensure(isinstance(peer, str), 'Indique peer')
+            ensure(ipaddress.IPv4Address(peer) in self.DIAG_NET, 'peer fuera de ' + str(self.DIAG_NET))
+        bridge, port = self.cfg['bridge'], self.DIAG_PORT
+        iface = port + '.' + str(cvid) if cvid is not None else port
+        address = str(self.DIAG_NET.network_address + index) + '/' + str(self.DIAG_NET.prefixlen)
+        settings = ['vlan_mode=dot1q-tunnel', 'tag=' + str(svid), 'other_config:qinq-ethtype=802.1ad']
+        if cvid is not None:
+            settings.append('cvlans=' + str(cvid))
+        with self.lock('diag'):
+            run('ovs-vsctl', '--if-exists', 'del-port', bridge, port, optional=True)
+            try:
+                output('ovs-vsctl', 'add-port', bridge, port, '--', 'set', 'Interface', port, 'type=internal',
+                       '--', 'set', 'Port', port, *settings)
+                output('ip', 'link', 'set', port, 'up')
+                if cvid is not None:
+                    output('ip', 'link', 'add', 'link', port, 'name', iface, 'type', 'vlan', 'id', str(cvid))
+                output('ip', 'addr', 'add', address, 'dev', iface)
+                output('ip', 'link', 'set', iface, 'up')
+                result = {'node': self.cfg['name'], 'mode': mode, 'svid': svid, 'cvid': cvid, 'address': address}
+                if mode == 'ping':
+                    rc, text = run('ping', '-c', '3', '-W', '2', peer, optional=True, timeout=30)
+                    result.update(peer=peer, returncode=rc, stdout=text[-2000:])
+                else:
+                    time.sleep(hold)
+                return result
+            finally:
+                if cvid is not None:
+                    run('ip', 'link', 'del', iface, optional=True)
+                run('ovs-vsctl', '--if-exists', 'del-port', bridge, port, optional=True)
+
+    def diag_capture(self, seconds=10, count=20, **_):
+        """Captura tramas VLAN en los puertos de datos (con -e para ver las etiquetas). Filtro fijo."""
+        ensure(self.cfg['role'] in ('worker', 'gateway'), 'Captura solo en workers o gateway')
+        ensure(type(seconds) is int and 1 <= seconds <= 60, 'Duración fuera de 1-60 s')
+        ensure(type(count) is int and 1 <= count <= 200, 'Cantidad fuera de 1-200')
+        lines = []
+        for iface in self.cfg['data_ports']:
+            _, text = run('timeout', str(seconds), 'tcpdump', '-l', '-i', iface, '-nn', '-e', '-c', str(count), 'vlan',
+                          optional=True, timeout=seconds + 10)
+            lines.extend(iface + ' ' + line for line in text.splitlines() if line.strip())
+        return {'node': self.cfg['name'], 'stdout': '\n'.join(lines[-400:])}
+
     def inspect(self, sid, **_):
         plan = self.load(sid, allow_deleted=True); n = self.names(plan)
         result = {'node': self.cfg['name'], 'vms': {}, 'time': time.time()}
@@ -964,7 +1023,8 @@ def main():
     request = json.loads(line.decode())
     action = request.pop('action')
     actions = ('doctor', 'bootstrap', 'prepare', 'image_status', 'image_receive', 'cache_gc',
-               'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete')
+               'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete',
+               'diag_datapath', 'diag_capture')
     ensure(action in actions, 'Acción no admitida')
     if action == 'image_receive':
         request['stream'] = sys.stdin.buffer
