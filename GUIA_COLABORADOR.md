@@ -23,7 +23,7 @@ fase2 (la rama "buena")  ──clonas──▶  fase2-<tu-nombre>  (trabajas, co
    es tu respaldo y no afecta a nadie.
 3. **Antes de proponer tus cambios**, ejecuta `bash scripts/verificar.sh` y deja todo en verde.
 4. **Abre un Pull Request** de `fase2-<tu-nombre>` hacia `fase2`. GitHub corre los tests automáticamente
-   (workflow `tests`). Cesar revisa el cambio y decide si entra.
+   (workflow `tests`). David revisa el cambio y decide si entra.
 5. **Nunca hagas push directo a `fase2`**, ni `git push --force` sobre ella.
 
 Si `fase2` avanzó mientras trabajabas: `git fetch origin && git merge origin/fase2` en tu rama, y vuelve a verificar.
@@ -76,9 +76,9 @@ Reglas de calidad:
 
 ## 6. Si necesitas el clúster o el app server
 
-- **Avisa a Cesar antes** de crear slices, reconstruir contenedores o cambiar configuración remota.
+- **Avisa a David antes** de crear slices, reconstruir contenedores o cambiar configuración remota.
 - Capacidad limitada: caben **~6 VMs** de 1 GB en total. **Borra tus slices al terminar.**
-- Usuarios de prueba (`prof1`, `alumno1`): pide las contraseñas a Cesar **por privado**.
+- Usuarios de prueba (`prof1`, `alumno1`): pide las contraseñas a David **por privado**.
 - Para probar cambios usa los tests en tu PC; el servidor solo recibe código ya integrado en `fase2`.
 
 ## 7. Qué puedes avanzar sin chocar con nadie
@@ -90,7 +90,7 @@ Reglas de calidad:
 ## 8. Si algo sale mal
 
 - Tu rama está rota: no pasa nada, `fase2` no se tocó. Vuelve a un commit anterior de tu rama o empieza otra desde `fase2`.
-- Algo entró mal a `fase2`: avisa a Cesar; existe la etiqueta `ex2-base-2026-11-10` como punto de restauración.
+- Algo entró mal a `fase2`: avisa a David; existe la etiqueta `ex2-base-2026-11-10` como punto de restauración.
 
 ## 9. Para el dueño del repositorio (David): proteger `fase2`
 
