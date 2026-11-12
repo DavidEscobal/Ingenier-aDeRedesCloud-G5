@@ -163,6 +163,23 @@ class WorkflowTests(Fixture):
         self.assertFalse(self.backend.images)
         self.assertEqual(self.store.rows('SELECT status FROM jobs WHERE id=?', (delete['id'],))[0]['status'], 'SUCCEEDED')
 
+    def test_phase2_without_managed_switch_skips_fabric(self):
+        """Fase 2: el switch del laboratorio ya transporta VLAN; sin 'switch' no hay fabric_add/fabric_delete."""
+        self.app.close()
+        self.cfg.pop('switch')
+        self.backend = MemoryBackend(self.cfg)
+        self.assertNotIn('ofs', self.backend.nodes)
+        self.app = Application(self.cfg, self.temp.name, self.keys, backend=self.backend)
+        self.store = self.app.store
+        job = self.ready(); sid = job['slice_id']
+        self.store.mutate(sid, 'profesor', True, 'delete-key-sw', 'delete')
+        self.app.engine.process_one()
+        self.assertEqual(self.store.get_slice(sid)['status'], 'DELETED')
+        actions = {a for _, a, _ in self.backend.calls}
+        self.assertTrue({'prepare', 'gateway', 'delete'} <= actions)
+        self.assertFalse(actions & {'fabric_add', 'fabric_delete'})
+        self.assertFalse(self.backend.resources)
+
     def test_temporary_failure_retries_successfully(self):
         self.backend.failures[('server1', 'network')] = 1
         self.ready()

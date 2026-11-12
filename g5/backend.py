@@ -19,7 +19,8 @@ class SSHBackend:
         self.config = config
         self.nodes = dict(config['workers'])
         self.nodes[config['gateway']['name']] = config['gateway']
-        self.nodes[config['switch']['name']] = config['switch']
+        if config.get('switch'):  # fase 2: el switch lo administra el laboratorio (ya transporta VLAN)
+            self.nodes[config['switch']['name']] = config['switch']
 
     def ssh(self, node):
         cfg = self.nodes[node]
@@ -97,7 +98,8 @@ class MemoryBackend:
         self.config = config
         self.nodes = dict(config['workers'])
         self.nodes[config['gateway']['name']] = config['gateway']
-        self.nodes[config['switch']['name']] = config['switch']
+        if config.get('switch'):  # fase 2: el switch lo administra el laboratorio (ya transporta VLAN)
+            self.nodes[config['switch']['name']] = config['switch']
         self.resources = {}
         self.images = set()
         self.calls = []

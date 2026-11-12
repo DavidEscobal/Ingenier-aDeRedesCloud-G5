@@ -119,12 +119,16 @@ class LinuxDriver(ProviderDriver):
     def validate(self, spec):
         return validate_spec(spec, self.cfg)
 
+    def switch(self):
+        """Nombre del switch administrado, o None si el transporte de VLAN lo provee el laboratorio (fase 2)."""
+        return (self.cfg.get('switch') or {}).get('name')
+
     def capabilities(self):
         return {'network': ['802.1ad-qinq'], 'images': ['qcow2'], 'console': 'novnc-token',
                 'topologies': ['ex1', 'lineal', 'anillo'], 'placement': 'worker explícito en la solicitud'}
 
     def preflight(self, spec):
-        targets = {v['worker'] for v in spec['vms']} | {self.cfg['gateway']['name'], self.cfg['switch']['name']}
+        targets = {v['worker'] for v in spec['vms']} | {self.cfg['gateway']['name']} | ({self.switch()} if self.switch() else set())
         for node in sorted(targets):
             report = self.backend.call(node, 'doctor')
             require(report['ok'], 'Preflight falló en ' + node + ': ' + '; '.join(report.get('problems', [])), 503)
@@ -204,9 +208,10 @@ class LinuxDriver(ProviderDriver):
 
     def deploy(self, plan, ctx):
         sid = plan['id']
-        switch = self.cfg['switch']['name']
+        switch = self.switch()
         nodes = self.participants(plan)
-        self.retry(switch, 'fabric_add', ctx, sid=sid, svid=plan['svid'])
+        if switch:
+            self.retry(switch, 'fabric_add', ctx, sid=sid, svid=plan['svid'])
         for node in nodes:
             self.retry(node, 'prepare', ctx, plan=plan)
         ctx.event('PREPARED', ','.join(nodes))
@@ -242,7 +247,8 @@ class LinuxDriver(ProviderDriver):
     def cleanup(self, plan, ctx):
         sid = plan['id']
         self.parallel([lambda node=node: self.retry(node, 'delete', ctx, sid=sid) for node in self.participants(plan)])
-        self.retry(self.cfg['switch']['name'], 'fabric_delete', ctx, sid=sid)
+        if self.switch():
+            self.retry(self.switch(), 'fabric_delete', ctx, sid=sid)
 
     def stop(self, plan, ctx):
         sid = plan['id']
