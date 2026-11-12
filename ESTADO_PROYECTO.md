@@ -110,6 +110,17 @@ Manager / Placement / IAM con login.
   `Restart=always`, 10 s, máx. 20 reinicios en 10 min). Probado: tras matar el proceso se relanzó solo (NRestarts=1).
   **Pendiente:** `sudo loginctl enable-linger ubuntu` (Linger=no) para que arranque tras reiniciar el app server sin sesión abierta.
 
+## Inventario Linux de fase 2 (2026-11-12, solo lectura, R2)
+- server1–4 = 192.168.201.1–4 (`ens3` gestión; `ens4` UP sin IP = red de datos hacia el switch). Acceso solo con
+  contraseña (`ssh -J g5-gw ubuntu@…`); nuestra llave no está autorizada; `sudo` pide contraseña.
+- server1–3: 4 vCPU, 3,9 GB RAM, ~6,7 GB de disco libre. server4: 4 vCPU, **7,9 GB RAM**, 6,7 GB libres.
+- Los 4: `/dev/kvm` presente (server1 verificado), Open vSwitch 2.13.8 instalado, **QEMU no instalado**.
+- Switch (192.168.201.5): no responde desde el gateway ("No route to host").
+- Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
+  (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
+- Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
+  decidir el nodo puerta de los slices Linux y escribir `cluster.json` de fase 2.
+
 ## Inventario OpenStack (2026-11-03, solo lectura)
 Evidencia: `docs/evidencias/F0/inventario_openstack_20261103.json` (sin tokens).
 - Servicios: Keystone, Nova (conductor/scheduler en headnode; compute en worker1–3, todos `up`),
