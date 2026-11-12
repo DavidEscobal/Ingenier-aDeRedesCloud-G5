@@ -114,7 +114,7 @@ Manager / Placement / IAM con login.
 - server1–4 = 192.168.201.1–4 (`ens3` gestión; `ens4` UP sin IP = red de datos hacia el switch). Acceso solo con
   contraseña (`ssh -J g5-gw ubuntu@…`); nuestra llave no está autorizada; `sudo` pide contraseña.
 - server1–3: 4 vCPU, 3,9 GB RAM, ~6,7 GB de disco libre. server4: 4 vCPU, **7,9 GB RAM**, 6,7 GB libres.
-- Los 4: `/dev/kvm` presente (server1 verificado), Open vSwitch 2.13.8 instalado, **QEMU no instalado**.
+- Los 4: `/dev/kvm`, Open vSwitch 2.13.8, salida a Internet. **QEMU 4.2.1, qemu-utils y genisoimage instalados por el usuario (2026-11-12)**. Alias SSH `g5-s1..4` (llave `id_ed25519_g5` autorizada en los 4).
 - Switch (192.168.201.5): no responde desde el gateway ("No route to host").
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
