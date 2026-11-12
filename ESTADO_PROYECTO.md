@@ -120,6 +120,9 @@ Manager / Placement / IAM con login.
   `config/cluster.json` provisional de fase 2 (gitignored; roles como EX1). `manage doctor`: los 4 nodos `ok`.
 - **Prueba del switch (2026-11-12):** VLAN 1000 en `ens4` server1↔server2: ping 3/3. El switch de fase 2 ya deja
   pasar tramas etiquetadas sin configurarlo; interfaces de prueba borradas (verificado).
+- **Switch administrado opcional** en el driver Linux (commit 57d17e9; test `test_phase2_without_managed_switch_skips_fabric`).
+  `cluster.json` de fase 2 sin `switch`. **`manage bootstrap` OK en server1–4 (2026-11-12):** `br-int` con `ens4`,
+  QinQ habilitado; `ip_forward=1` solo en server4 (puerta). Siguiente: desplegar `lineal` de prueba desde la PC.
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
