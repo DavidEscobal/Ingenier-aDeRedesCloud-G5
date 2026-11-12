@@ -618,7 +618,9 @@ class Agent:
         if marker.exists() and json.loads(marker.read_text()) == identity:
             return {'configured': True, 'reused': True}
         lines = ['set -eu', 'sudo sysctl -w net.ipv4.ip_forward=0 >/dev/null',
-                 'sudo killall udhcpc 2>/dev/null || true', 'sudo ip route del default 2>/dev/null || true']
+                 'sudo killall udhcpc 2>/dev/null || true',
+                 # CirrOS >= 0.6 usa dhcpcd (no udhcpc): si sigue vivo pelea con la IP fija (IPv4LL, RS/MLD).
+                 'sudo dhcpcd -x 2>/dev/null || true', 'sudo killall dhcpcd 2>/dev/null || true', 'sudo ip route del default 2>/dev/null || true']
         for idx, nic in enumerate(vm['nics']):
             net = next(n for n in plan['networks'] if n['name'] == nic['network'])
             name = nic.get('name', 'eth' + str(idx))
@@ -689,8 +691,9 @@ class Agent:
         ensure(vm is not None, 'VM no pertenece al worker')
         ensure(vm.get('guest', {}).get('os', 'cirros') == 'cirros',
                'Probe serie disponible para CirrOS; para Ubuntu utilice SSH, VNC o validate_ex1.py')
-        ensure(kind in ('addresses', 'ping', 'neighbors'), 'Sondeo no admitido')
-        commands = {'addresses': 'ip -4 addr; ip -4 route', 'neighbors': 'ip neigh show'}
+        ensure(kind in ('addresses', 'ping', 'neighbors', 'processes', 'links'), 'Sondeo no admitido')
+        commands = {'addresses': 'ip -4 addr; ip -4 route', 'neighbors': 'ip neigh show',
+                    'processes': 'ps', 'links': 'ip -s link'}
         if kind == 'ping':
             target = str(ipaddress.IPv4Address(target))
             ensure(type(packet_bytes) is int and 16 <= packet_bytes <= 1400, 'Tamaño ICMP inválido')
@@ -891,6 +894,15 @@ class Agent:
                     run('ip', 'link', 'del', iface, optional=True)
                 run('ovs-vsctl', '--if-exists', 'del-port', bridge, port, optional=True)
 
+    def diag_ovs(self, **_):
+        """Solo lectura: bridges/puertos OVS y tabla MAC de cada bridge del nodo."""
+        ensure(self.cfg['role'] in ('worker', 'gateway'), 'Diagnóstico solo en workers o gateway')
+        text = output('ovs-vsctl', 'show')
+        fdb = {}
+        for bridge in output('ovs-vsctl', 'list-br').split():
+            fdb[bridge] = run('ovs-appctl', 'fdb/show', bridge, optional=True)[1][-4000:]
+        return {'node': self.cfg['name'], 'show': text[-12000:], 'fdb': fdb}
+
     def diag_capture(self, seconds=10, count=20, **_):
         """Captura tramas VLAN en los puertos de datos (con -e para ver las etiquetas). Filtro fijo."""
         ensure(self.cfg['role'] in ('worker', 'gateway'), 'Captura solo en workers o gateway')
@@ -1024,7 +1036,7 @@ def main():
     action = request.pop('action')
     actions = ('doctor', 'bootstrap', 'prepare', 'image_status', 'image_receive', 'cache_gc',
                'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete',
-               'diag_datapath', 'diag_capture')
+               'diag_datapath', 'diag_capture', 'diag_ovs')
     ensure(action in actions, 'Acción no admitida')
     if action == 'image_receive':
         request['stream'] = sys.stdin.buffer

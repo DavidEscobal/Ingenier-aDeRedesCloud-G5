@@ -381,6 +381,28 @@ class AgentTests(Fixture):
                     agent.diag_datapath(**kwargs)
             run_mock.assert_not_called(); out_mock.assert_not_called()
 
+    def test_cirros_setup_stops_dhcpcd_and_udhcpc(self):
+        """CirrOS 0.6.x usa dhcpcd: si queda vivo pelea con la IP fija (bucle de MLD y ARP sin respuesta en fase 2)."""
+        job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
+        vm = next(v for v in plan['vms'] if v['worker'] == 'server1')
+        vm['guest'] = {'os': 'cirros'}
+        agent = self.agent('worker'); sent = []
+        stat = ' '.join(['0'] * 30)
+        with mock.patch.object(agent, 'load', return_value=plan), mock.patch.object(agent, 'process', return_value=4242),                 mock.patch('g5.agent.Path.read_text', return_value=stat), mock.patch('g5.agent.atomic'),                 mock.patch('g5.agent.serial_execute', side_effect=lambda path, cmd, *a: sent.append(cmd) or (0, '')):
+            agent.guest_setup(plan['id'], vm['name'])
+        self.assertIn('killall udhcpc', sent[0])
+        self.assertIn('killall dhcpcd', sent[0])
+        self.assertLess(sent[0].index('dhcpcd'), sent[0].index('ip addr flush'))
+
+    def test_diag_ovs_is_read_only(self):
+        agent = self.agent('worker'); commands = []
+        def fake_run(*args, **kw):
+            commands.append(args); return 0, 'br-int' if args[:2] == ('ovs-vsctl', 'list-br') else ''
+        with mock.patch('g5.agent.run', side_effect=fake_run), mock.patch('g5.agent.output', side_effect=lambda *a, **k: fake_run(*a, **k)[1]):
+            result = agent.diag_ovs()
+        self.assertIn('br-int', result['fdb'])
+        self.assertEqual({c[:2] for c in commands}, {('ovs-vsctl', 'show'), ('ovs-vsctl', 'list-br'), ('ovs-appctl', 'fdb/show')})
+
     def test_firewall_targets_exact_public_port_and_source(self):
         job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
         agent = self.agent()
