@@ -222,7 +222,7 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | 13 | Errores y reintentos | ✅ | Reintentos y compensación |
 | 14 | Enlaces punto a punto en Horizon | ✅ | Una red por enlace |
 | 15a | VNC a todas las VMs | ✅ | Consola web en Linux y OpenStack |
-| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» en el editor (OpenStack: red sin subred; Linux: interfaz sin dirección; ce6aafd). Falta probar en real y reinstalar el agente Linux (fab95970) |
+| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» (ce6aafd). **Linux probado (2026-11-13, agente 93cbd00f):** `to-sw` UP sin IPv4 en ambas VMs, la puerta no se conecta a ese enlace, el enlace con IP hace ping 3/3. Falta probar en OpenStack y configurar OVS con Ubuntu |
 | 15c–e | IPs manuales 10.100.10.x, tcpdump, ping | 🟡 | Depende de 15b y de Ubuntu (CirrOS no trae tcpdump/OVS) |
 | 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack ❌ (R5) |
 | 17 | SSH desde fuera a VM4 y VM5 | ❌ | Ambos clústeres; depende del rango 10.60.x (consulta al JP) |
