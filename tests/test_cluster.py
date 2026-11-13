@@ -425,6 +425,22 @@ class AgentTests(Fixture):
         self.assertGreater(backend.call_timeout('guest_setup'), 420)
         self.assertEqual(backend.call_timeout('doctor'), 300)
 
+    def test_diag_console_returns_tail_of_vm_serial_log(self):
+        job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
+        agent = self.agent('worker')
+        vm = next(v for v in plan['vms'] if v['worker'] == 'server1')
+        with mock.patch.object(agent, 'load', return_value=plan):
+            with self.assertRaisesRegex(AgentError, 'Sin registro'):
+                agent.diag_console(plan['id'], vm['name'])
+            directory = agent.vm_dir(plan['id'], vm['name']); directory.mkdir(parents=True)
+            (directory / 'console.log').write_bytes(b'\x1b[0mboot\r\n' + b'linea\n' * 50 + b'cirros login: ')
+            out = agent.diag_console(plan['id'], vm['name'], lines=3)
+            self.assertEqual(out['stdout'].splitlines(), ['linea', 'linea', 'cirros login: '])
+            with self.assertRaises(AgentError):
+                agent.diag_console(plan['id'], 'otra-vm')
+        source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
+        self.assertIn("logfile=%s,logappend=on", source)
+
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []
         def fake_run(*args, **kw):

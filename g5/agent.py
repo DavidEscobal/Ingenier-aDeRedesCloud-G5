@@ -574,7 +574,10 @@ class Agent:
                 '-object', 'rng-random,filename=/dev/urandom,id=rng0', '-device', 'virtio-rng-pci,rng=rng0',
                 '-vnc', '127.0.0.1:%s' % (vm['vnc'] - 5900), '-monitor', 'none',
                 '-qmp', 'unix:%s,server,nowait' % (directory / 'qmp.sock'),
-                '-serial', 'unix:%s,server,nowait' % (directory / 'serial.sock'),
+                # Consola serie por socket (guest_setup/sondeos) y copia íntegra en console.log (diag_console).
+                '-chardev', 'socket,id=ser0,path=%s,server,nowait,logfile=%s,logappend=on'
+                % (directory / 'serial.sock', directory / 'console.log'),
+                '-serial', 'chardev:ser0',
                 '-daemonize', '-pidfile', str(directory / 'qemu.pid'), '-runas', self.cfg['qemu_user']]
         if seed:
             argv += ['-drive', 'file=%s,format=raw,if=ide,media=cdrom,readonly=on' % seed]
@@ -927,6 +930,21 @@ class Agent:
             fdb[bridge] = run('ovs-appctl', 'fdb/show', bridge, optional=True)[1][-4000:]
         return {'node': self.cfg['name'], 'show': text[-12000:], 'fdb': fdb}
 
+    def diag_console(self, sid, vm_name, lines=300, **_):
+        """Solo lectura: últimas líneas de la consola serie de una VM local (arranque, login, errores del invitado)."""
+        ensure(type(lines) is int and 1 <= lines <= 2000, 'Cantidad de líneas fuera de 1-2000')
+        plan = self.load(sid)
+        ensure(any(v['name'] == vm_name for v in self.local_vms(plan)), 'VM no pertenece al worker')
+        path = self.vm_dir(sid, vm_name) / 'console.log'
+        ensure(path.exists(), 'Sin registro de consola (VM creada con un agente anterior)')
+        size = path.stat().st_size
+        with path.open('rb') as f:
+            f.seek(max(0, size - 256 * 1024))
+            text = f.read().decode(errors='replace').replace('\r', '')
+        text = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', '', text)
+        return {'node': self.cfg['name'], 'vm': vm_name, 'bytes': size, 'modified': path.stat().st_mtime,
+                'now': time.time(), 'stdout': '\n'.join(text.splitlines()[-lines:])}
+
     def diag_capture(self, seconds=10, count=20, **_):
         """Captura tramas VLAN en los puertos de datos (con -e para ver las etiquetas). Filtro fijo."""
         ensure(self.cfg['role'] in ('worker', 'gateway'), 'Captura solo en workers o gateway')
@@ -1060,7 +1078,7 @@ def main():
     action = request.pop('action')
     actions = ('doctor', 'bootstrap', 'prepare', 'image_status', 'image_receive', 'cache_gc',
                'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete',
-               'diag_datapath', 'diag_capture', 'diag_ovs')
+               'diag_datapath', 'diag_capture', 'diag_ovs', 'diag_console')
     ensure(action in actions, 'Acción no admitida')
     if action == 'image_receive':
         request['stream'] = sys.stdin.buffer
