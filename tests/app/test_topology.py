@@ -53,9 +53,10 @@ class GeneratorTests(unittest.TestCase):
 
     def test_addressing_is_deterministic_and_keeps_last_octet_per_node(self):
         spec = compile_spec(generate("lineal", 3), "openstack")
-        self.assertEqual([n["cidr"] for n in spec["networks"]], ["10.60.1.0/24", "10.60.2.0/24"])
+        self.assertEqual([n["cidr"] for n in spec["networks"]], ["192.168.1.0/24", "192.168.2.0/24"])
+        self.assertFalse(any(n["cidr"].startswith("10.60.") for n in spec["networks"]), "10.60/16 es del acceso externo (D-16)")
         vm2 = next(v for v in spec["vms"] if v["name"] == "n2")
-        self.assertEqual([nic["ip"] for nic in vm2["nics"]], ["10.60.1.12", "10.60.2.12"])
+        self.assertEqual([nic["ip"] for nic in vm2["nics"]], ["192.168.1.12", "192.168.2.12"])
 
     def test_limits_and_invalid_documents_are_explained(self):
         with self.assertRaisesRegex(ValueError, "entre 2 y 6"):

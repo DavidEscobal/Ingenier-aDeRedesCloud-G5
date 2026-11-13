@@ -12,10 +12,10 @@ SHA = 'a' * 64
 
 
 def neutral(n=4, image='cirros-062'):
-    nets = [{'name': 's%d' % k, 'cidr': '10.60.%d.0/24' % k, 'dhcp': True} for k in range(1, n)]
+    nets = [{'name': 's%d' % k, 'cidr': '192.168.%d.0/24' % k, 'dhcp': True} for k in range(1, n)]
     vms = []
     for i in range(1, n + 1):
-        nics = [{'network': 's%d' % k, 'ip': '10.60.%d.%d' % (k, 10 + i)} for k in (i - 1, i) if 1 <= k < n]
+        nics = [{'network': 's%d' % k, 'ip': '192.168.%d.%d' % (k, 10 + i)} for k in (i - 1, i) if 1 <= k < n]
         vms.append({'name': 'n%d' % i, 'image': image, 'vcpus': 1, 'memory_mb': 512, 'disk_gb': 1, 'nics': nics})
     return {'name': 'lineal', 'provider': 'linux', 'networks': nets, 'vms': vms}
 

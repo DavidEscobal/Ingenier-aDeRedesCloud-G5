@@ -358,7 +358,7 @@ export default function TopologyEditor() {
               <p className="small muted">Linux: solo imágenes CirrOS. Las VMs se reparten por turnos entre server1–3
                 (provisional, hasta definir el placement). Sin salida a Internet.</p>
             )}
-            <p className="small muted">{vmCount} VMs · {topology.segments.length} redes (10.60.k.0/24)</p>
+            <p className="small muted">{vmCount} VMs · {topology.segments.length} redes (192.168.k.0/24)</p>
             {error && <p className="error">{error}</p>}
             <div className="dialog-actions">
               <button className="ghost" onClick={() => { setDeploy(null); setError('') }} disabled={busy}>Cancelar</button>
