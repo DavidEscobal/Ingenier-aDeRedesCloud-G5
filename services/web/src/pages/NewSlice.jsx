@@ -79,8 +79,8 @@ export default function NewSlice() {
           <div className="provider-choice">
             <span>Proveedor</span>
             <label className="radio"><input type="radio" checked readOnly /> OpenStack</label>
-            <label className="radio disabled" title="Falta la configuración Linux de fase 2">
-              <input type="radio" disabled /> Linux <small>(próximamente)</small>
+            <label className="radio disabled" title="Para Linux, dibuja o genera la topología en el editor y elige Linux al desplegar">
+              <input type="radio" disabled /> Linux <small>(desde el editor)</small>
             </label>
           </div>
           {error && <p className="error" role="alert">{error}</p>}

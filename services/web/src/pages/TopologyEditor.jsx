@@ -50,7 +50,7 @@ export default function TopologyEditor() {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [generator, setGenerator] = useState(null) // {kind, n}
-  const [deploy, setDeploy] = useState(null) // {courses, course, sliceName}
+  const [deploy, setDeploy] = useState(null) // {courses, course, sliceName, provider}
   const [renameValue, setRenameValue] = useState('')
 
   const [imageNames, setImageNames] = useState(null)
@@ -202,7 +202,7 @@ export default function TopologyEditor() {
     setError('')
     try {
       const courses = await Api.courses()
-      setDeploy({ courses, course: courses[0]?.id || '', sliceName: name })
+      setDeploy({ courses, course: courses[0]?.id || '', sliceName: name, provider: 'openstack' })
     } catch (err) {
       setError(err.message)
     }
@@ -213,7 +213,7 @@ export default function TopologyEditor() {
     setBusy(true)
     setError('')
     try {
-      const spec = await Api.compile(topology, 'openstack', deploy.sliceName)
+      const spec = await Api.compile(topology, deploy.provider, deploy.sliceName)
       const accepted = await Api.createSlice(deploy.course, spec)
       navigate('/slices/' + accepted.slice_id)
     } catch (err) {
@@ -348,7 +348,17 @@ export default function TopologyEditor() {
             <label>Nombre del slice
               <input value={deploy.sliceName} onChange={(e) => setDeploy({ ...deploy, sliceName: e.target.value.toLowerCase() })} />
             </label>
-            <p className="small muted">Proveedor: OpenStack · {vmCount} VMs · {topology.segments.length} redes (10.60.k.0/24)</p>
+            <label>Proveedor
+              <select value={deploy.provider} onChange={(e) => setDeploy({ ...deploy, provider: e.target.value })}>
+                <option value="openstack">OpenStack</option>
+                <option value="linux">Linux (clúster server1–3)</option>
+              </select>
+            </label>
+            {deploy.provider === 'linux' && (
+              <p className="small muted">Linux: solo imágenes CirrOS. Las VMs se reparten por turnos entre server1–3
+                (provisional, hasta definir el placement). Sin salida a Internet.</p>
+            )}
+            <p className="small muted">{vmCount} VMs · {topology.segments.length} redes (10.60.k.0/24)</p>
             {error && <p className="error">{error}</p>}
             <div className="dialog-actions">
               <button className="ghost" onClick={() => { setDeploy(null); setError('') }} disabled={busy}>Cancelar</button>
