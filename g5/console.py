@@ -5,8 +5,17 @@ import socket
 import sqlite3
 import threading
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from .model import require
+
+
+def console_link(base, token):
+    """URL de noVNC para el navegador. Si `console_url` lleva ruta (p. ej. "/lconsole" detrás del nginx de la web),
+    el WebSocket también debe pasar por ella: path=lconsole/websockify?token=..."""
+    base = base.rstrip('/')
+    prefix = urlsplit(base).path.strip('/')
+    ws = (prefix + '/' if prefix else '') + 'websockify?token=' + token
+    return base + '/vnc.html?' + urlencode({'autoconnect': 'true', 'resize': 'scale', 'path': ws})
 
 
 class ExpiringToken:
@@ -70,7 +79,7 @@ class Consoles:
             self.tunnels[h] = process
             self.store.event(sid, None, 'CONSOLE', owner + '/' + vm_name)
             return {'token': token, 'expires_at': expires,
-                    'url': self.store.config['console_url'].rstrip('/') + '/vnc.html?' + urlencode({'autoconnect': 'true', 'path': 'websockify?token=' + token})}
+                    'url': console_link(self.store.config['console_url'], token), 'provider': 'linux'}
 
     def janitor(self):
         while not self.stop.wait(1):
@@ -104,6 +113,7 @@ def serve():
     parser = argparse.ArgumentParser()
     parser.add_argument('--state', required=True)
     parser.add_argument('--port', type=int, default=6080)
+    parser.add_argument('--host', default='127.0.0.1', help='0.0.0.0 solo dentro de la red interna de Docker')
     parser.add_argument('--web', default='/usr/share/novnc')
     args = parser.parse_args()
 
@@ -111,7 +121,7 @@ def serve():
         def log_message(self, fmt, *values):
             # No registrar URLs que contienen credenciales de consola.
             return
-    proxy = WebSocketProxy(listen_host='127.0.0.1', listen_port=args.port,
+    proxy = WebSocketProxy(listen_host=args.host, listen_port=args.port,
                            web=args.web, token_plugin=ExpiringToken(Path(args.state) / 'cluster.db'),
                            RequestHandlerClass=PrivateHandler)
     proxy.start_server()

@@ -496,7 +496,8 @@ async def vm_console(slice_id: SliceId, vm: VmName, request: Request, token=Depe
     """URL de consola (noVNC con token de Nova, de vida corta): dueño, admin o alumno asignado a la VM (IAM)."""
     _, registry = platform_ready(request)
     await readable(request, registry, slice_id, user, token, "vm.console", f"{slice_id}-{vm}")
-    data = await platform_call(request, "POST", "/v1/slices/%s/vms/%s/console" % (slice_id, vm), {})
+    # ttl: en Linux es la vida del túnel VNC (máx. 600 s); OpenStack lo ignora (token de Nova).
+    data = await platform_call(request, "POST", "/v1/slices/%s/vms/%s/console" % (slice_id, vm), {"ttl": 600})
     url = data.get("url") if isinstance(data, dict) else None
     if not isinstance(url, str) or not url:
         raise HTTPException(502, "platform_bad_response")

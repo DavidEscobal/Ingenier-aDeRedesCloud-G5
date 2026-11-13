@@ -32,8 +32,9 @@ class BindRuleTests(unittest.TestCase):
 class ContainerArtifactTests(unittest.TestCase):
     def test_dockerfile_copies_only_core_and_listens_on_internal_network(self):
         text = (ROOT / 'services' / 'platform-manager' / 'Dockerfile').read_text(encoding='utf-8')
-        copies = re.findall(r'^COPY\s+(\S+)', text, re.M)
-        self.assertEqual(copies, ['g5', 'api', 'templates'])
+        copies = re.findall(r'^COPY\s+(?:--chmod=\d+\s+)?(\S+)', text, re.M)
+        # Núcleo + el entrypoint que arranca la consola Linux (noVNC) junto a la API: nada más.
+        self.assertEqual(copies, ['g5', 'api', 'templates', 'services/platform-manager/entrypoint.sh'])
         self.assertIn('--internal-network', text)
         self.assertRegex(text, r'(?m)^USER appuser$', 'no debe correr como root')
 
@@ -42,7 +43,7 @@ class ContainerArtifactTests(unittest.TestCase):
                  if l.strip() and not l.startswith('#')]
         self.assertEqual(lines[0], '*')
         allowed = {l[1:].rstrip('/') for l in lines if l.startswith('!')}
-        self.assertEqual(allowed, {'g5', 'api', 'templates'})
+        self.assertEqual(allowed, {'g5', 'api', 'templates', 'services/platform-manager/entrypoint.sh'})
 
     def test_compose_keeps_platform_manager_private_and_secrets_read_only(self):
         block = compose_service('platform-manager')
@@ -93,9 +94,14 @@ class ContainerArtifactTests(unittest.TestCase):
     def test_web_talks_only_to_gateway_and_novnc_and_runs_unprivileged(self):
         folder = ROOT / 'services' / 'web'
         nginx = (folder / 'nginx.conf').read_text(encoding='utf-8')
-        # Solo dos destinos: la API (gateway) y la consola noVNC de Nova a través de os-tunnel.
+        # Solo tres destinos: la API (gateway), la consola Linux (websockify del platform-manager) y la consola
+        # noVNC de Nova a través de os-tunnel. La API del platform-manager (:8000) nunca se expone.
         self.assertEqual(re.findall(r'proxy_pass\s+(\S+);', nginx),
-                         ['http://gateway:8000/v1/images', 'http://gateway:8000/', 'http://os-tunnel:6080/'])
+                         ['http://gateway:8000/v1/images', 'http://gateway:8000/', 'http://platform-manager:6080/',
+                          'http://os-tunnel:6080/'])
+        self.assertNotIn('platform-manager:8000', nginx)
+        lconsole = nginx.split('location /lconsole/')[1].split('location ')[0]
+        self.assertIn('Upgrade $http_upgrade', lconsole, 'la consola Linux necesita WebSocket')
         console = nginx.split('location /console/')[1].split('location ')[0]
         self.assertIn('Upgrade $http_upgrade', console, 'la consola necesita WebSocket')
         self.assertIn("frame-ancestors 'none'", nginx)

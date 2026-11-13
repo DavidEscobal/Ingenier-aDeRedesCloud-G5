@@ -4,5 +4,6 @@
 !g5/
 !api/
 !templates/
+!services/platform-manager/entrypoint.sh
 **/__pycache__
 **/*.pyc
