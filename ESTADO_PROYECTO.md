@@ -130,6 +130,16 @@ Manager / Placement / IAM con login.
 - **MS-13 (2026-11-13): Internet selectivo y consola en Linux de fase 2.** vm1 sale a 8.8.8.8 (3/3) por el
   namespace del slice en server4; vm2 sin ruta, como se pidió; VNC de ambas responde `RFB 003.008` por túnel SSH.
   Borrado sin restos (ni namespaces). Pendiente: SSH publicado, topología de más VMs, integración con la web.
+- **Integración R2, fase A (2026-11-13, autorizada por el usuario):** llave exclusiva `id_ed25519_linux` en
+  `platform-config/ssh/` del app server (no sale de ahí). Gateway: línea nueva `restrict,port-forwarding,
+  command="/bin/false",from="10.20.11.248"` con `permitopen` solo a 192.168.201.1-4:22 (respaldo
+  `~/.ssh/authorized_keys.bak-20261113`; línea de OpenStack intacta; no ejecuta comandos, verificado).
+  server1–4: la llave solo se acepta `from="192.168.201.10"` (respaldos `.bak-20261113`). `platform-config/ssh/config`
+  con salto `g5gw`; known_hosts con huellas ECDSA verificadas contra cada servidor (server3=server4 y
+  server1=gateway comparten llave de host: imágenes clonadas). `cluster.json` del app server con la sección Linux de
+  fase 2 (respaldo `.bak-20261113`), OpenStack intacto. Código del app server actualizado a 55d7f20; solo se
+  reconstruyó `platform-manager`. `doctor` desde el contenedor: server1–4 ok. Siguiente: fase B (imagen CirrOS en el
+  almacén Linux) y fase C (compilador/web/consola Linux).
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
