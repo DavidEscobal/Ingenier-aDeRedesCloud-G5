@@ -145,6 +145,12 @@ Manager / Placement / IAM con login.
   verificada con `qemu-img` (a8772ca). Ping 3/3 en ambos sentidos; borrado sin restos. READY tardó 391 s por los
   reintentos de `guest_setup`. **Pendientes R2:** acelerar `guest_setup` (esperar fin de arranque), consola Linux
   en el navegador, Internet/publicaciones desde el editor, placement real (D-07).
+- **Arranque de CirrOS acelerado (2026-11-13): de 391 s a 57 s hasta READY, sin reintentos.** Diagnóstico con el
+  registro de consola nuevo (`console.log` + `diag_console`): (1) el agente tomaba una línea del arranque por prompt y
+  escribía el payload a los 3 s → ahora confirma el shell con `echo G5RDY$((6*7))`; (2) CirrOS 0.6 exige meta-data
+  NoCloud en JSON (`json2fstree`) → corregido, `datasource: nocloud local`, 0 reintentos EC2 (antes 20, ~55 s);
+  (3) virtio-rng para entropía. Ping 3/3 en ambos sentidos, vigilante 1 trama/10 s. Agente 0214bacb en server1–3;
+  **server4 quedó con 4a112e40: reinstalar**. Orquestador: llamada a guest_setup > espera del agente (cdef4d7).
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
