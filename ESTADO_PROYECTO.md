@@ -127,6 +127,9 @@ Manager / Placement / IAM con login.
   `dhcpcd` de CirrOS 0.6 (ráfagas MLD, ARP sin respuesta); corregido en el agente (dhcpcd/IPv6 fuera, tope 10 Mbit/s
   por TAP, diagnósticos sin sudo del usuario). Pendiente R2: Internet por server4, SSH publicado, VNC, integración
   con el platform-manager (requiere ampliar `permitopen` del gateway hacia 192.168.201.1-4:22).
+- **MS-13 (2026-11-13): Internet selectivo y consola en Linux de fase 2.** vm1 sale a 8.8.8.8 (3/3) por el
+  namespace del slice en server4; vm2 sin ruta, como se pidió; VNC de ambas responde `RFB 003.008` por túnel SSH.
+  Borrado sin restos (ni namespaces). Pendiente: SSH publicado, topología de más VMs, integración con la web.
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
