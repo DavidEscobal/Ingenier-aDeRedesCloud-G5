@@ -745,7 +745,7 @@ class Agent:
                'Probe serie disponible para CirrOS; para Ubuntu utilice SSH, VNC o validate_ex1.py')
         ensure(kind in ('addresses', 'ping', 'neighbors', 'processes', 'links'), 'Sondeo no admitido')
         commands = {'addresses': 'ip -4 addr; ip -4 route', 'neighbors': 'ip neigh show',
-                    'processes': 'ps', 'links': 'ip -s link'}
+                    'processes': 'ps', 'links': 'ip link'}  # BusyBox (CirrOS) no admite 'ip -s link'
         if kind == 'ping':
             target = str(ipaddress.IPv4Address(target))
             ensure(type(packet_bytes) is int and 16 <= packet_bytes <= 1400, 'Tamaño ICMP inválido')
