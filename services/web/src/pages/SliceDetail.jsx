@@ -117,16 +117,18 @@ export default function SliceDetail({ user }) {
                   <td><strong>{vm.name}</strong></td><td>{vm.image}</td><td>{vm.vcpus}</td><td>{vm.memory_mb} MB</td>
                   <td>{vm.disk_gb} GB</td><td className="mono small">{vm.networks.join(' · ')}</td>
                   <td className="actions">
-                    {slice.status === 'READY' && slice.provider === 'openstack'
+                    {slice.status === 'READY' && (slice.provider === 'openstack' || slice.provider === 'linux')
                       ? <button className="ghost" onClick={() => openConsole(vm.name)} disabled={opening === vm.name}>
                           {opening === vm.name ? 'Abriendo…' : 'Consola'}</button>
-                      : <span className="muted small">{slice.status === 'READY' ? 'Consola: solo OpenStack por ahora' : ''}</span>}
+                      : null}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {slice.status === 'READY' && <p className="hint">La consola se abre en otra pestaña. El enlace de Nova caduca en pocos minutos: si expira, vuelve a pulsar Consola.</p>}
+          {slice.status === 'READY' && <p className="hint">La consola se abre en otra pestaña. {slice.provider === 'linux'
+            ? 'En Linux el enlace dura 10 minutos (CirrOS: usuario cirros, contraseña gocubsgo).'
+            : 'El enlace de Nova caduca en pocos minutos.'} Si expira, vuelve a pulsar Consola.</p>}
         </>
       )}
 
