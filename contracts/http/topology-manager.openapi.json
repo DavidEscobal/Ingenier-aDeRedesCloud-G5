@@ -514,7 +514,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
               },
               {
                 "type": "null"
@@ -659,7 +659,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
               },
               {
                 "type": "null"
@@ -759,6 +759,18 @@
             "title": "Internet",
             "default": false
           },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
           "position": {
             "anyOf": [
               {
@@ -828,6 +840,11 @@
             "minItems": 2,
             "title": "Members"
           },
+          "addressed": {
+            "type": "boolean",
+            "title": "Addressed",
+            "default": true
+          },
           "position": {
             "anyOf": [
               {
@@ -858,7 +875,7 @@
           },
           "name": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
             "title": "Name"
           },
           "description": {

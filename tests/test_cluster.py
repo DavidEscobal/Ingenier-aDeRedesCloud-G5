@@ -471,6 +471,30 @@ class AgentTests(Fixture):
         ex1 = urlsplit(console_link('http://127.0.0.1:6080', 'TOK'))   # EX1: sin prefijo, igual que antes
         self.assertEqual((ex1.netloc, ex1.path, parse_qs(ex1.query)['path']), ('127.0.0.1:6080', '/vnc.html', ['websockify?token=TOK']))
 
+    def test_unaddressed_nic_is_raised_without_ip_and_gateway_skips_it(self):
+        """Ex2 15b: la VM switch recibe sus puertos arriba y sin IP; la puerta del slice no se conecta a ese enlace."""
+        job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
+        vm = next(v for v in plan['vms'] if v['worker'] == 'server1')
+        vm['guest'] = {'os': 'cirros'}
+        for net in plan['networks']:
+            net.pop('cidr', None); net.pop('gateway', None); net['dhcp'] = False
+        plan['publications'] = []  # publicar exige IP (lo rechaza el validador)
+        for v in plan['vms']:
+            v['internet'] = False
+            for nic in v['nics']:
+                nic.pop('ip', None)
+        agent = self.agent('worker'); sent = []
+        with mock.patch.object(agent, 'load', return_value=plan), mock.patch.object(agent, 'process', return_value=4242),                 mock.patch('g5.agent.Path.read_text', return_value=' '.join(['0'] * 30)), mock.patch('g5.agent.atomic'),                 mock.patch('g5.agent.serial_execute', side_effect=lambda path, cmd, *a, **k: sent.append(cmd) or (0, '')):
+            agent.guest_setup(plan['id'], vm['name'])
+        self.assertNotIn('ip addr add', sent[0])
+        self.assertIn('mtu 1450 up', sent[0])
+        gw = self.agent('gateway')
+        gw.manifest_path(plan['id']).write_text(json.dumps(plan))
+        commands = []
+        with mock.patch('g5.agent.output', side_effect=lambda *a, **k: commands.append(' '.join(map(str, a))) or ''),                 mock.patch('g5.agent.run', return_value=(0, '')), mock.patch.object(gw, 'owned_ovs'),                 mock.patch.object(gw, 'ensure_veth'), mock.patch.object(gw, 'ipt'), mock.patch.object(gw, 'stop_process'):
+            gw.gateway(plan['id'])
+        self.assertFalse(any(' addr replace ' in c and 'lan' in c for c in commands), 'sin IP en enlaces L2')
+
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []
         def fake_run(*args, **kw):

@@ -187,7 +187,9 @@ def cloud_documents(plan, vm, mtu):
         name = nic.get('name', 'eth' + str(idx))
         cfg = {'match': {'macaddress': nic['mac']}, 'set-name': name,
                'dhcp4': False, 'dhcp6': False, 'accept-ra': False, 'optional': True,
-               'mtu': mtu, 'addresses': [nic['ip'] + '/' + net['cidr'].split('/')[1]]}
+               'mtu': mtu}
+        if 'ip' in nic:  # enlace sin IP: interfaz levantada sin dirección
+            cfg['addresses'] = [nic['ip'] + '/' + net['cidr'].split('/')[1]]
         if idx == 0 and (vm['internet'] or any(p['vm'] == vm['name'] for p in plan['publications'])):
             cfg['gateway4'] = net['gateway']
             cfg['nameservers'] = {'addresses': ['8.8.8.8']}
@@ -368,8 +370,9 @@ class Agent:
         tag(plan['svid'])
         ensure(1 <= len(plan['networks']) <= 64 and 1 <= len(plan['vms']) <= 64, 'Plan demasiado grande')
         for n in plan['networks']:
-            ident(n['name']); tag(n['cvid']); ipaddress.IPv4Network(n['cidr'])
-            ipaddress.IPv4Address(n['gateway'])
+            ident(n['name']); tag(n['cvid'])
+            if 'cidr' in n:  # sin cidr: enlace L2 sin IP (la puerta no se conecta)
+                ipaddress.IPv4Network(n['cidr']); ipaddress.IPv4Address(n['gateway'])
         ipaddress.IPv4Network(plan['transit'])
         for vm in plan['vms']:
             ident(vm['name']); ident(vm['worker']); ident(vm['image'], r'[0-9a-f]{64}')
@@ -377,7 +380,9 @@ class Agent:
             ensure(type(vm.get('image_bytes')) is int and 0 < vm['image_bytes'] <= self.cfg['max_image_gb'] * 1024**3, 'Tamaño de base inválido')
             ensure(5900 <= vm['vnc'] < 6900 and 1 <= len(vm['nics']) <= 8, 'VNC o NIC inválido')
             for nic in vm['nics']:
-                ident(nic['network']); ipaddress.IPv4Address(nic['ip'])
+                ident(nic['network'])
+                if 'ip' in nic:
+                    ipaddress.IPv4Address(nic['ip'])
                 ident(nic['mac'], r'02(:[0-9a-f]{2}){5}')
         for pub in plan['publications']:
             ensure(pub['protocol'] in ('tcp', 'udp'), 'Protocolo inválido')
@@ -673,9 +678,10 @@ class Agent:
             lines += ['dev=""; for p in /sys/class/net/*; do [ "$(cat "$p/address")" != "' + nic['mac'] + '" ] || dev=${p##*/}; done',
                       'test -n "$dev"',
                       'if [ "$dev" != "' + name + '" ]; then sudo ip link set "$dev" down; sudo ip link set "$dev" name ' + name + '; fi',
-                      'sudo ip addr flush dev ' + name,
-                      'sudo ip addr add ' + nic['ip'] + '/' + net['cidr'].split('/')[1] + ' dev ' + name,
-                      'sudo ip link set ' + name + ' mtu ' + str(self.cfg['guest_mtu']) + ' up']
+                      'sudo ip addr flush dev ' + name]
+            if 'ip' in nic:  # en un enlace sin IP la interfaz queda arriba y sin dirección (Ex2 15b)
+                lines += ['sudo ip addr add ' + nic['ip'] + '/' + net['cidr'].split('/')[1] + ' dev ' + name]
+            lines += ['sudo ip link set ' + name + ' mtu ' + str(self.cfg['guest_mtu']) + ' up']
             if idx == 0 and vm['internet']:
                 lines += ['sudo ip route replace default via ' + net['gateway'] + ' dev ' + name]
         rc, result = serial_execute(str(directory / 'serial.sock'), '\n'.join(lines),
@@ -799,6 +805,8 @@ class Agent:
             output('ip', '-n', ns, 'link', 'set', 'lo', 'up')
             output('ip', '-n', ns, 'route', 'replace', 'default', 'via', hostip)
             for idx, net in enumerate(plan['networks']):
+                if 'cidr' not in net:
+                    continue
                 port, local = 'g5g' + sid[:8] + str(idx), 'lan' + str(idx)
                 self.owned_ovs('Port', port, sid)
                 self.ensure_veth(sid, port, 'g5l' + sid[:8] + str(idx), ns, local)
@@ -820,6 +828,8 @@ class Agent:
         add('FORWARD', '-m', 'conntrack', '--ctstate', 'INVALID', '-j', 'DROP')
         add('FORWARD', '-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT')
         for idx, net in enumerate(plan['networks']):
+            if 'cidr' not in net:
+                continue
             local = 'lan' + str(idx)
             add('INPUT', '-i', local, '-p', 'icmp', '-j', 'ACCEPT')
             if net['dhcp']:

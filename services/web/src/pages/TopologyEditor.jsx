@@ -17,7 +17,7 @@ function VmNode({ id, data, selected }) {
       <Handle type="source" position={Position.Top} />
       <div className="vm-icon" aria-hidden="true">▣</div>
       <div className="vm-name">{id}</div>
-      <div className="vm-meta">{data.image} · {data.vcpus} vCPU · {data.memory_mb} MB · {data.disk_gb} GB{data.internet ? ' · Internet' : ''}</div>
+      <div className="vm-meta">{data.image} · {data.vcpus} vCPU · {data.memory_mb} MB · {data.disk_gb} GB{data.internet ? ' · Internet' : ''}{data.host ? ' · ' + data.host : ''}</div>
       <Handle type="source" position={Position.Bottom} />
     </div>
   )
@@ -77,6 +77,12 @@ export default function TopologyEditor() {
   const sizes = catalog?.sizes || []
   const selectedNode = nodes.find((n) => n.selected)
   const selectedEdge = edges.find((e) => e.selected)
+
+  function setLinkAddressed(id, addressed) {
+    setEdges((es) => es.map((x) => (x.id === id
+      ? { ...x, data: { ...x.data, addressed }, style: addressed ? undefined : { strokeDasharray: '6 4' } } : x)))
+    setDirty(true)
+  }
   useEffect(() => { setRenameValue(selectedNode?.id || '') }, [selectedNode?.id])
 
   const topology = useMemo(() => fromFlow(nodes, edges, name, description), [nodes, edges, name, description])
@@ -228,7 +234,7 @@ export default function TopologyEditor() {
 
       <div className="editor-grid">
         <aside className="panel side">
-          <label>Nombre<input value={name} onChange={(e) => { setName(e.target.value.toLowerCase()); changed() }} /></label>
+          <label>Nombre<input value={name} onChange={(e) => { setName(e.target.value); changed() }} /></label>
           <label>Descripción<input value={description} maxLength={300} onChange={(e) => { setDescription(e.target.value); changed() }} /></label>
           <h3>Topologías predefinidas</h3>
           <div className="chips">
@@ -247,6 +253,13 @@ export default function TopologyEditor() {
           {selectedNode && (
             <div className="inspector">
               <h3>{selectedNode.type === 'bus' ? 'Bus' : 'VM'} seleccionado</h3>
+              {selectedNode.type === 'bus' && (
+                <label className="checkbox">
+                  <input type="checkbox" checked={selectedNode.data?.addressed === false}
+                    onChange={(ev) => updateSelected({ addressed: !ev.target.checked })} />
+                  Sin IP <small className="muted">(segmento L2)</small>
+                </label>
+              )}
               <label>Nombre
                 <div className="inline"><input value={renameValue} onChange={(e) => setRenameValue(e.target.value.toLowerCase())} />
                   <button className="ghost" onClick={renameSelected}>Renombrar</button></div>
@@ -272,6 +285,16 @@ export default function TopologyEditor() {
                       onChange={(e) => updateSelected({ internet: e.target.checked })} />
                     Salida a Internet <small className="muted">(Linux)</small>
                   </label>
+                  <label>Servidor
+                    <select value={selectedNode.data.host || ''} onChange={(e) => updateSelected({ host: e.target.value })}>
+                      <option value="">Automático</option>
+                      {Object.entries(catalog?.hosts || {}).map(([provider, list]) => (
+                        <optgroup key={provider} label={provider === 'linux' ? 'Linux' : 'OpenStack'}>
+                          {list.map((h) => <option key={h} value={h}>{h}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
                 </>
               )}
             </div>
@@ -280,6 +303,13 @@ export default function TopologyEditor() {
             <div className="inspector">
               <h3>Enlace seleccionado</h3>
               <p className="small">{selectedEdge.source} ↔ {selectedEdge.target}</p>
+              {!selectedEdge.data?.bus && (
+                <label className="checkbox">
+                  <input type="checkbox" checked={selectedEdge.data?.addressed === false}
+                    onChange={(ev) => setLinkAddressed(selectedEdge.id, !ev.target.checked)} />
+                  Sin IP <small className="muted">(enlace L2; p. ej. puertos de una VM switch)</small>
+                </label>
+              )}
             </div>
           )}
           {problems.length > 0 && vmCount > 0 && (

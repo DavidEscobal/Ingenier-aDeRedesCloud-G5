@@ -8,25 +8,30 @@ import copy
 import ipaddress
 import re
 from ..backend import RemoteError
-from ..model import Fault, require, integer, disk_bytes, slug, digest, fields, fingerprint
+from ..model import Fault, require, integer, disk_bytes, slug, display_name, digest, fields, fingerprint
 from .base import ProviderDriver
 
 
 def validate_spec(spec, config):
     fields(spec, ('name', 'provider', 'networks', 'vms', 'publications'), ('name', 'networks', 'vms'))
     spec = copy.deepcopy(spec)
-    slug(spec['name'])
+    display_name(spec['name'])
     nets, vms = spec['networks'], spec['vms']
     require(isinstance(nets, list) and 1 <= len(nets) <= 64, 'Se requieren 1..64 redes')
     require(isinstance(vms, list) and 1 <= len(vms) <= 64, 'Se requieren 1..64 VMs')
     networks, ranges, cvlans = {}, [], set()
     for n in nets:
-        fields(n, ('name', 'cidr', 'cvid', 'dhcp'), ('name', 'cidr', 'cvid'))
+        fields(n, ('name', 'cidr', 'cvid', 'dhcp'), ('name', 'cvid'))
         slug(n['name'])
         require(n['name'] not in networks, 'Nombre de red repetido')
         integer(n['cvid'], 1, 4094, 'cvid')
         require(n['cvid'] not in cvlans, 'C-VLAN repetida dentro del slice')
         cvlans.add(n['cvid'])
+        if 'cidr' not in n:  # enlace L2 sin IP: la puerta del slice no se conecta a él (Ex2 15b)
+            n.setdefault('dhcp', False)
+            require(n['dhcp'] is False, 'Una red sin CIDR no puede tener DHCP')
+            networks[n['name']] = n
+            continue
         try:
             net = ipaddress.IPv4Network(n['cidr'], strict=True)
         except (ValueError, TypeError):
@@ -71,11 +76,15 @@ def validate_spec(spec, config):
         require(len(nic_names) == len(set(nic_names)), 'Nombre de NIC repetido')
         attached = set()
         for nic in vm['nics']:
-            fields(nic, ('network', 'ip', 'name'), ('network', 'ip'))
+            fields(nic, ('network', 'ip', 'name'), ('network',))
             if 'name' in nic:
                 require(isinstance(nic['name'], str) and re.fullmatch(r'[a-z][a-z0-9-]{0,14}', nic['name']), 'Nombre de NIC inválido')
             require(nic['network'] in networks and nic['network'] not in attached, 'Red inexistente o NIC duplicada')
             attached.add(nic['network'])
+            if 'cidr' not in networks[nic['network']]:
+                require('ip' not in nic, 'IP fija en una red sin CIDR')
+                continue
+            require('ip' in nic, 'IP requerida en una red con CIDR')
             net = ipaddress.ip_network(networks[nic['network']]['cidr'])
             try:
                 addr = ipaddress.IPv4Address(nic['ip'])
@@ -86,6 +95,9 @@ def validate_spec(spec, config):
             require(pair not in addresses, 'IP repetida en el segmento')
             addresses.add(pair)
             nic['ip'] = str(addr)
+    for vm in vms:
+        if vm['internet']:
+            require('cidr' in networks[vm['nics'][0]['network']], 'Internet requiere que la primera NIC tenga IP')
     spec.setdefault('publications', [])
     require(isinstance(spec['publications'], list) and len(spec['publications']) <= 128, 'Máximo 128 publicaciones')
     ports = set()
@@ -95,6 +107,7 @@ def validate_spec(spec, config):
         require(pub['vm'] in ids, 'VM publicada inexistente')
         vm = next(v for v in vms if v['name'] == pub['vm'])
         require(pub['network'] == vm['nics'][0]['network'], 'Publicar por la NIC primaria (ruta de retorno)')
+        require('cidr' in networks[pub['network']], 'No se puede publicar por un enlace sin IP')
         require(pub['protocol'] in ('tcp', 'udp'), 'Protocolo TCP o UDP requerido')
         integer(pub['external_port'], *config['public_port_range'], name='external_port')
         integer(pub['guest_port'], 1, 65535, 'guest_port')
@@ -152,7 +165,8 @@ class LinuxDriver(ProviderDriver):
         require(slot is not None, 'Pool de tránsito agotado', 409)
         plan.update(svid=svid, transit=str(ipaddress.ip_network((int(pool.network_address) + slot * 4, 30))))
         for network in plan['networks']:
-            network['gateway'] = str(ipaddress.ip_network(network['cidr']).network_address + 1)
+            if 'cidr' in network:
+                network['gateway'] = str(ipaddress.ip_network(network['cidr']).network_address + 1)
         for vm in plan['vms']:
             worker = vm['worker']
             require(db.execute('SELECT enabled FROM nodes WHERE id=?', (worker,)).fetchone()[0], 'Worker en mantenimiento', 409)

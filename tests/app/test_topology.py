@@ -81,6 +81,25 @@ class GeneratorTests(unittest.TestCase):
         self.assertTrue(all("worker" not in v for v in linux["vms"]))
         with self.assertRaisesRegex(CompileError, "aún no disponible"):
             compile_spec(generate("lineal", 2), "vmware")
+        exam = generate("anillo", 4)
+        exam.name = "Ex2_G5_test"                       # nombre del examen: mayúsculas y "_"
+        self.assertEqual(compile_spec(Topology.model_validate(exam.model_dump()), "openstack", "Ex2_G5_test_2")["name"],
+                         "Ex2_G5_test_2")
+        for bad in ("2abc", "con espacio", "x" * 65, "a;rm", "ñandú"):
+            with self.assertRaises(ValidationError):
+                Topology.model_validate(dict(exam.model_dump(), name=bad))
+        pinned = generate("lineal", 3)
+        pinned.nodes[0].host = "server2"
+        self.assertEqual(compile_spec(pinned, "linux")["vms"][0]["host"], "server2")
+        self.assertNotIn("host", compile_spec(pinned, "linux")["vms"][1])
+        with self.assertRaisesRegex(CompileError, "no son de openstack"):
+            compile_spec(pinned, "openstack")
+        l2 = generate("lineal", 3)
+        l2.segments[0].addressed = False                 # enlace sin IP (VM switch del Ex2, paso 15b)
+        spec = compile_spec(l2, "openstack")
+        self.assertNotIn("cidr", spec["networks"][0])
+        self.assertTrue(all("ip" not in nic for vm in spec["vms"] for nic in vm["nics"] if nic["network"] == l2.segments[0].id))
+        self.assertIn("cidr", spec["networks"][1])
         online = generate("lineal", 2)
         online.nodes[0].internet = True
         self.assertTrue(compile_spec(online, "linux")["vms"][0]["internet"])

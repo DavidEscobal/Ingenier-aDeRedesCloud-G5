@@ -3,22 +3,26 @@
 // - Segmento 'link' (2 VMs) → arista directa VM–VM.
 // - Segmento 'bus' (N VMs)   → nodo tipo 'bus' + una arista por VM miembro.
 
-export const IDENT = /^[a-z][a-z0-9-]{0,31}$/
+export const IDENT = /^[a-z][a-z0-9-]{0,31}$/ // nodos y segmentos
+export const NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/ // nombre visible: Ex2_G5_test
 
 export function toFlow(topology) {
   const nodes = topology.nodes.map((n, i) => ({
     id: n.id,
     type: 'vm',
     position: n.position || { x: 80 + (i % 6) * 170, y: 80 + Math.floor(i / 6) * 150 },
-    data: { image: n.image, vcpus: n.vcpus, memory_mb: n.memory_mb, disk_gb: n.disk_gb, internet: !!n.internet },
+    data: { image: n.image, vcpus: n.vcpus, memory_mb: n.memory_mb, disk_gb: n.disk_gb, internet: !!n.internet, host: n.host || '' },
   }))
   const edges = []
   for (const s of topology.segments || []) {
     if (s.kind === 'link') {
-      edges.push({ id: s.id, source: s.members[0], target: s.members[1], type: 'straight', data: { segment: s.id } })
+      edges.push({ id: s.id, source: s.members[0], target: s.members[1], type: 'straight',
+        data: { segment: s.id, addressed: s.addressed !== false },
+        ...(s.addressed === false ? { style: { strokeDasharray: '6 4' } } : {}) })
     } else {
       const xs = s.members.map((m) => nodes.find((n) => n.id === m)?.position.x || 0)
-      nodes.push({ id: s.id, type: 'bus', position: s.position || { x: xs.reduce((a, b) => a + b, 0) / xs.length, y: 40 }, data: {} })
+      nodes.push({ id: s.id, type: 'bus', position: s.position || { x: xs.reduce((a, b) => a + b, 0) / xs.length, y: 40 },
+        data: { addressed: s.addressed !== false } })
       for (const m of s.members) edges.push({ id: `${s.id}:${m}`, source: m, target: s.id, type: 'straight', data: { bus: s.id } })
     }
   }
@@ -32,19 +36,22 @@ export function fromFlow(nodes, edges, name, description = '') {
   const segments = []
   for (const e of edges) {
     if (isBus.has(e.source) || isBus.has(e.target)) continue
-    segments.push({ id: e.data?.segment || e.id, kind: 'link', members: [e.source, e.target] })
+    segments.push({ id: e.data?.segment || e.id, kind: 'link', members: [e.source, e.target],
+      ...(e.data?.addressed === false ? { addressed: false } : {}) })
   }
   for (const b of buses) {
     const members = edges.filter((e) => e.source === b.id || e.target === b.id)
       .map((e) => (e.source === b.id ? e.target : e.source))
-    segments.push({ id: b.id, kind: 'bus', members, position: round(b.position) })
+    segments.push({ id: b.id, kind: 'bus', members, position: round(b.position),
+      ...(b.data?.addressed === false ? { addressed: false } : {}) })
   }
   return {
     schema_version: 1,
     name,
     description,
     nodes: vms.map((n) => ({ id: n.id, image: n.data.image, vcpus: n.data.vcpus, memory_mb: n.data.memory_mb,
-      disk_gb: n.data.disk_gb, ...(n.data.internet ? { internet: true } : {}), position: round(n.position) })),
+      disk_gb: n.data.disk_gb, ...(n.data.internet ? { internet: true } : {}),
+      ...(n.data.host ? { host: n.data.host } : {}), position: round(n.position) })),
     segments,
   }
 }
@@ -56,7 +63,7 @@ function round(p) {
 // Comprobaciones locales rápidas; el Topology Manager vuelve a validar todo al guardar o compilar.
 export function localProblems(topology) {
   const problems = []
-  if (!IDENT.test(topology.name)) problems.push('Nombre: empieza con letra; minúsculas, números y guiones (máx. 32).')
+  if (!NAME.test(topology.name)) problems.push('Nombre: empieza con letra; letras, números, _ o - (máx. 64). Ej.: Ex2_G5_test')
   if (topology.nodes.length === 0) problems.push('Agrega al menos una VM.')
   if (topology.nodes.length > 16) problems.push('Máximo 16 VMs por topología.')
   for (const s of topology.segments) {

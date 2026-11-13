@@ -67,6 +67,19 @@ class OpenStackDriverTests(OpenStackFixture):
         self.cloud.flavors.append({'id': 'f-s', 'name': 'g5-1c-512m-1g', 'vcpus': 1, 'ram': 512, 'disk': 1})
         self.driver.preflight(spec)  # con los flavors presentes, se admite
 
+    def test_unaddressed_network_creates_no_subnet_and_ports_without_ip(self):
+        spec = copy.deepcopy(LINEAL)
+        spec['networks'][0] = {'name': spec['networks'][0]['name']}
+        for vm in spec['vms']:
+            for nic in vm['nics']:
+                if nic['network'] == spec['networks'][0]['name']:
+                    nic.pop('ip', None)
+        job = self.create(spec, key='os-l2-0001'); self.run_job(job)
+        self.assertEqual(self.store.get_slice(job['slice_id'])['status'], 'READY')
+        l2 = next(n for n in self.cloud.networks.values() if n['name'].endswith('-' + spec['networks'][0]['name']))
+        self.assertFalse([sn for sn in self.cloud.subnets.values() if sn['network_id'] == l2['id']], 'sin subred')
+        self.assertTrue(all(not p.get('fixed_ips') for p in self.cloud.ports.values() if p['network_id'] == l2['id']))
+
     def test_validation_is_provider_specific(self):
         spec = validate(LINEAL, self.cfg)
         self.assertEqual(spec['networks'][0]['dhcp'], False)

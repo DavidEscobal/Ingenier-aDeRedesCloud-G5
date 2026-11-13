@@ -30,6 +30,13 @@ def disk_bytes(value, unit='GiB'):
     return int((Decimal(str(value)) * factor / 512).to_integral_value(rounding=ROUND_CEILING)) * 512
 
 
+def display_name(value):
+    """Nombre visible de un slice (p. ej. Ex2_G5_test). Nunca se usa para nombrar recursos: se usan IDs propios."""
+    require(isinstance(value, str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,63}', value),
+            'Nombre inválido: letra inicial; letras, números, _ o - (máx. 64)')
+    return value
+
+
 def slug(value):
     require(isinstance(value, str) and re.fullmatch(r'[a-z][a-z0-9-]{0,31}', value), 'Identificador inválido')
     return value

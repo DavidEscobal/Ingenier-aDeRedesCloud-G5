@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Api } from '../api.js'
+import { NAME } from '../topology.js'
 
 // Nuevo slice = elegir una topología (predefinida o guardada en el editor), el proveedor, el nombre y el curso.
 // El catálogo (formas, tamaños, imágenes, proveedores) lo da el topology-manager: nada fijo en este código.
-const IDENT = /^[a-z][a-z0-9-]{0,31}$/
 const PROVIDER_LABEL = { openstack: 'OpenStack', linux: 'Linux (clúster server1–3)' }
 
 export default function NewSlice() {
@@ -61,7 +61,7 @@ export default function NewSlice() {
   useEffect(() => {
     if (!topology) return
     let cancelled = false
-    Api.compile(topology, provider, IDENT.test(name) ? name : undefined)
+    Api.compile(topology, provider, NAME.test(name) ? name : undefined)
       .then((spec) => { if (!cancelled) { setPreview(spec); setError('') } })
       .catch((err) => { if (!cancelled) { setPreview(null); setError(err.message) } })
     return () => { cancelled = true }
@@ -76,7 +76,7 @@ export default function NewSlice() {
   async function submit(event) {
     event.preventDefault()
     if (!course) return setError('Elige un curso.')
-    if (!IDENT.test(name)) return setError('Nombre: empieza con letra; solo minúsculas, números y guiones (máx. 32).')
+    if (!NAME.test(name)) return setError('Nombre: empieza con letra; letras, números, _ o - (máx. 64). Ej.: Ex2_G5_test')
     if (!topology) return setError('Elige una topología válida.')
     setBusy(true)
     setError('')
@@ -147,7 +147,7 @@ export default function NewSlice() {
           )}
           {!generator && <p className="muted small">Imagen, tamaño e Internet de cada VM se definen en el editor de la topología.</p>}
           <label>Nombre del slice
-            <input value={name} onChange={(e) => { setName(e.target.value.toLowerCase()); setError('') }} />
+            <input value={name} onChange={(e) => { setName(e.target.value); setError('') }} />
           </label>
           <label>Proveedor
             <select value={provider} onChange={(e) => setProvider(e.target.value)}>
@@ -174,7 +174,7 @@ export default function NewSlice() {
                 <tbody>
                   {vms.map((vm) => (
                     <tr key={vm.name}>
-                      <td>{vm.name}{vm.internet ? ' · Internet' : ''}</td><td>{vm.image}</td><td>{vm.vcpus}</td>
+                      <td>{vm.name}{vm.internet ? ' · Internet' : ''}{vm.host ? ' · ' + vm.host : ''}</td><td>{vm.image}</td><td>{vm.vcpus}</td>
                       <td>{vm.memory_mb} MB</td><td>{vm.disk_gb} GB</td>
                       <td className="mono small">{vm.nics.map((x) => `${x.network} ${x.ip || 'DHCP'}`).join(' · ')}</td>
                     </tr>

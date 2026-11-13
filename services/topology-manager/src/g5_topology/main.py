@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .compiler import PROVIDERS, CompileError, compile_spec
 from .generators import GENERATORS, combine, generate
-from .model import IDENT, Topology, images, sizes
+from .model import NAME, Topology, hosts, images, sizes
 
 
 class Health(BaseModel):
@@ -37,7 +37,7 @@ class Model(BaseModel):
 class GenerateRequest(Model):
     kind: str = Field(max_length=32)
     n: int = Field(ge=1, le=64)
-    name: str | None = Field(default=None, pattern=IDENT)
+    name: str | None = Field(default=None, pattern=NAME)
     prefix: str = Field(default="n", pattern=r"^[a-z][a-z0-9]{0,8}$")
     image: str = "cirros"
     size: str = "small"
@@ -52,7 +52,7 @@ class CombineRequest(Model):
 class CompileRequest(Model):
     topology: Topology
     provider: Literal["openstack", "linux"] = "openstack"
-    name: str | None = Field(default=None, pattern=IDENT)
+    name: str | None = Field(default=None, pattern=NAME)
 
 
 class DraftWrite(Model):
@@ -217,7 +217,7 @@ def health() -> Health:
 @app.get("/v1/topologies/catalog", tags=["topologies"])
 def catalog(user: User):
     return {"generators": [dict(id=k, **v) for k, v in GENERATORS.items()], "sizes": sizes(),
-            "images": images(), "providers": list(PROVIDERS), "schema_version": 1}
+            "images": images(), "providers": list(PROVIDERS), "hosts": hosts(), "schema_version": 1}
 
 
 @app.post("/v1/topologies/generate", response_model=Topology, tags=["topologies"])

@@ -11,7 +11,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Ident = str
-IDENT = r"^[a-z][a-z0-9-]{0,31}$"
+IDENT = r"^[a-z][a-z0-9-]{0,31}$"   # nodos y segmentos (nombres de interfaces y recursos)
+NAME = r"^[A-Za-z][A-Za-z0-9_-]{0,63}$"  # nombre visible de la topología/slice (Ex2_G5_test)
 IMAGE_RE = __import__("re").compile(r"[a-z0-9][a-z0-9._-]{0,62}")
 MAX_NODES = 16
 MAX_SEGMENTS = 48
@@ -28,6 +29,14 @@ DEFAULT_SIZES = [
     {"id": "xlarge", "label": "Extra grande · 2 vCPU · 2 GB · 4 GB", "vcpus": 2, "memory_mb": 2048, "disk_gb": 4},
 ]
 DEFAULT_IMAGES = ["cirros"]
+
+
+# Servidores que se pueden elegir a mano por proveedor (el platform-manager vuelve a validar). Configurable.
+DEFAULT_HOSTS = {"linux": ["server1", "server2", "server3"], "openstack": ["worker1", "worker2", "worker3"]}
+
+
+def hosts():
+    return json.loads(os.environ["TOPOLOGY_HOSTS"]) if os.getenv("TOPOLOGY_HOSTS") else DEFAULT_HOSTS
 
 
 def sizes():
@@ -54,6 +63,7 @@ class Node(Model):
     memory_mb: int = Field(ge=64, le=524288)
     disk_gb: int = Field(ge=1, le=2048)
     internet: bool = False  # salida a Internet por la puerta del slice (Linux; OpenStack pendiente de R5)
+    host: str | None = Field(default=None, pattern=IDENT)  # servidor fijo (Ex2 paso 3); None = automático
     position: Position | None = None
 
 
@@ -61,12 +71,13 @@ class Segment(Model):
     id: Ident = Field(pattern=IDENT)
     kind: Literal["link", "bus"]
     members: list[Ident] = Field(min_length=2, max_length=MAX_NODES)
+    addressed: bool = True  # False = enlace sin IP (p. ej. puertos de una VM que hará de switch, Ex2 paso 15b)
     position: Position | None = None  # solo para dibujar el bus en el lienzo
 
 
 class Topology(Model):
     schema_version: Literal[1] = 1
-    name: Ident = Field(pattern=IDENT)
+    name: str = Field(pattern=NAME)
     description: str = Field(default="", max_length=300)
     nodes: list[Node] = Field(min_length=1, max_length=MAX_NODES)
     segments: list[Segment] = Field(default_factory=list, max_length=MAX_SEGMENTS)

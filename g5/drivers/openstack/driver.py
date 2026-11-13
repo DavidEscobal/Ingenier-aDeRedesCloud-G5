@@ -12,7 +12,7 @@ import re
 import ipaddress
 import time
 import urllib.parse
-from ...model import Fault, require, integer, slug, fields
+from ...model import Fault, require, integer, slug, display_name, fields
 from ..base import ProviderDriver
 from .session import OpenStackError, Session
 
@@ -49,15 +49,20 @@ def validate_spec(spec, config):
     require('openstack' in config, 'El proveedor OpenStack no está configurado en cluster.json')
     fields(spec, ('name', 'provider', 'networks', 'vms'), ('name', 'provider', 'networks', 'vms'))
     spec = copy.deepcopy(spec)
-    slug(spec['name'])
+    display_name(spec['name'])
     nets, vms = spec['networks'], spec['vms']
     require(isinstance(nets, list) and 1 <= len(nets) <= 64, 'Se requieren 1..64 redes')
     require(isinstance(vms, list) and 1 <= len(vms) <= 64, 'Se requieren 1..64 VMs')
     networks, ranges = {}, []
     for n in nets:
-        fields(n, ('name', 'cidr', 'dhcp'), ('name', 'cidr'))
+        fields(n, ('name', 'cidr', 'dhcp'), ('name',))
         slug(n['name'])
         require(n['name'] not in networks, 'Nombre de red repetido')
+        if 'cidr' not in n:  # red L2 sin subred: sus puertos no reciben IP (VM que hará de switch, Ex2 15b)
+            n.setdefault('dhcp', False)
+            require(n['dhcp'] is False, 'Una red sin CIDR no puede tener DHCP')
+            networks[n['name']] = n
+            continue
         try:
             net = ipaddress.IPv4Network(n['cidr'], strict=True)
         except (ValueError, TypeError):
@@ -72,9 +77,11 @@ def validate_spec(spec, config):
         ranges.append(net)
     ids, addresses = set(), set()
     for vm in vms:
-        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics'),
+        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host'),
                ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics'))
         slug(vm['name'])
+        if 'host' in vm:  # compute fijo (paso 3 del Ex2); sin él decide Nova (o, más adelante, el placement)
+            slug(vm['host'])
         require(vm['name'] not in ids, 'VM repetida')
         ids.add(vm['name'])
         require(isinstance(vm['image'], str) and 1 <= len(vm['image']) <= 255, 'Nombre de imagen Glance requerido')
@@ -88,6 +95,7 @@ def validate_spec(spec, config):
             require(nic['network'] in networks and nic['network'] not in attached, 'Red inexistente o NIC duplicada')
             attached.add(nic['network'])
             if 'ip' in nic:
+                require('cidr' in networks[nic['network']], 'IP fija en una red sin CIDR')
                 net = ipaddress.ip_network(networks[nic['network']]['cidr'])
                 try:
                     addr = ipaddress.IPv4Address(nic['ip'])
@@ -241,6 +249,9 @@ class OpenStackDriver(ProviderDriver):
                             lambda: self.find('network', '/v2.0/networks', 'networks', pid, name=net['os_name'], project_id=pid),
                             lambda: self.call('POST', 'network', '/v2.0/networks', {'network': {
                                 'name': net['os_name'], 'port_security_enabled': False}}, pid)['network'])
+            if 'cidr' not in net:  # red sin subred
+                subnets[net['name']] = (n['id'], None)
+                continue
             s = self.ensure(ctx, 'subnet', net['name'],
                             lambda: self.find('network', '/v2.0/subnets', 'subnets', pid, name=net['os_name'], network_id=n['id']),
                             lambda: self.call('POST', 'network', '/v2.0/subnets', {'subnet': {
@@ -263,8 +274,10 @@ class OpenStackDriver(ProviderDriver):
             image, flavor = self.image(vm['image']), self.flavor(vm)
             created = self.ensure(ctx, 'server', vm['name'],
                                   lambda: self.find('compute', '/servers', 'servers', pid, name='^%s$' % vm['os_name']),
-                                  lambda: self.call('POST', 'compute', '/servers', {'server': {
-                                      'name': vm['os_name'], 'imageRef': image, 'flavorRef': flavor, 'networks': ports}}, pid)['server'])
+                                  lambda: self.call('POST', 'compute', '/servers', {'server': dict({
+                                      'name': vm['os_name'], 'imageRef': image, 'flavorRef': flavor, 'networks': ports},
+                                      # host forzado: zona "nova:<compute>" (requiere rol admin en el proyecto)
+                                      **({'availability_zone': 'nova:' + vm['host']} if vm.get('host') else {}))}, pid)['server'])
             current = self.call('GET', 'compute', '/servers/' + created['id'], project_id=pid)['server']
             if current['status'] == 'SHUTOFF':  # 'start' reutiliza deploy sobre VMs detenidas
                 self.call('POST', 'compute', '/servers/%s/action' % created['id'], {'os-start': None}, pid)

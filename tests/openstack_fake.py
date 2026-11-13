@@ -205,8 +205,10 @@ class FakeCloud:
                     ip = item['fixed_ips'][0]['ip_address']
                     if any(f['ip_address'] == ip for p in self.ports.values() if p['network_id'] == item['network_id'] for f in p['fixed_ips']):
                         return 409, {'NeutronError': {'message': 'IP en uso'}}
+                elif any(sn['network_id'] == item['network_id'] for sn in self.subnets.values()):
+                    item['fixed_ips'] = [{'ip_address': 'auto'}]   # IPAM de Neutron: solo si la red tiene subred
                 else:
-                    item['fixed_ips'] = [{'ip_address': 'auto'}]
+                    item['fixed_ips'] = []
                 item['device_id'] = ''
             table[item['id']] = item
             return 201, {kind: item}
