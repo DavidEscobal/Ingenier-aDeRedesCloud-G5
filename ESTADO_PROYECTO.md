@@ -202,6 +202,49 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
   17 NT por funciones pendientes de F2–F4). El plan está redactado; Slice Manager **no** está completo.
 - Actividad 1: la ejecuta el grupo en el headnode con `docs/pruebas/LAB6_ACTIVIDAD1_GUIA_EJECUCION.md`.
 
+## Brecha frente a la demo del Ex2 (referencia: `Contexto_md/Ex2_Validacion_de_Implementacion.md`, 2026-11-13)
+El documento es el **Ex2 de 2026-1** (13/07/2026): sirve como referencia de lo que se pedirá; el de 2026-2 puede variar.
+Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
+
+| Paso | Pide | Estado | Nota |
+|---|---|---|---|
+| 2 | Zona de disponibilidad con servidores 2–4 (sin server1) | ❌ | Sin concepto de zona; hoy server4 es puerta y server1–3 workers (al revés de lo pedido) |
+| 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | ❌ | La web no elige servidor; Linux solo CirrOS; host forzado de Nova sin probar |
+| 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | Manual por consola; requiere Ubuntu |
+| 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | ❌ | D-13 pausado: **bloqueante** |
+| 6 | Procesos QEMU en workers OpenStack | 🟡 | Manual; confirmar acceso SSH a los workers |
+| 7 | Explicar placement, no fijo | ❌ | Hoy reparto por turnos; falta R4 (BFD/BCDP) con datos del monitoreo |
+| 8 | Crear `Ex2_GXX_test` en el editor sin desplegar | 🟡 | Guardar ✅; **el nombre no pasa** (IDENT solo minúsculas, números y `-`) |
+| 9 | Exportar la topología y explicar parámetros | ✅ | Exportar JSON |
+| 10 | Importar como `Ex2_GXX_test_2` | 🟡 | Importar ✅; mismo problema de nombre |
+| 11 | Desplegar en OpenStack según placement | ❌ | Depende de R4 |
+| 12 | Horizon (proyecto y VMs por worker) + QEMU | ✅ | Proyecto `g5-…` por slice |
+| 13 | Errores y reintentos | ✅ | Reintentos y compensación |
+| 14 | Enlaces punto a punto en Horizon | ✅ | Una red por enlace |
+| 15a | VNC a todas las VMs | ✅ | Consola web en Linux y OpenStack |
+| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡/❌ | Port security ya deshabilitado en OpenStack; **falta crear enlaces sin IP** (el compilador numera todo) |
+| 15c–e | IPs manuales 10.100.10.x, tcpdump, ping | 🟡 | Depende de 15b y de Ubuntu (CirrOS no trae tcpdump/OVS) |
+| 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack ❌ (R5) |
+| 17 | SSH desde fuera a VM4 y VM5 | ❌ | Ambos clústeres; depende del rango 10.60.x (consulta al JP) |
+| 18 | Borrar y mostrar QEMU | ✅ | — |
+
+**Anexo 1** (6 VMs: anillo VM1–VM2–VM3–VM4 + VM4–VM5–VM6; Internet en VM4 y VM5): la forma se dibuja en el editor ✅;
+pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
+
+**Pendientes, por prioridad**
+1. **Bloqueantes:** monitoreo (D-13); placement R4 con BFD/BCDP alimentado por el monitoreo; imágenes Ubuntu
+   (Linux: habilitar en el adaptador el camino cloud-init de EX1 con usuario/contraseña/llave; OpenStack: **sin disco**,
+   computes con 1–2 GB libres y Ubuntu pide 2,5–3,5 GB → tratar con el JP `lab5`/`topo1_lab6` o más disco).
+   Verificar con la imagen real que 2,5 GB alcanza (Nova solo admite GB enteros y Ubuntu minimal ronda 3,5 GB virtuales).
+2. **Necesarios:** zona de disponibilidad y roles Linux (server2–4 alojan VMs, puerta en otro nodo, según decida el grupo);
+   elegir servidor por VM (incluye host forzado en Nova); nombres con mayúsculas y `_`; enlaces sin IP en el editor;
+   R5 en OpenStack (Internet y SSH desde fuera) y SSH desde fuera en Linux.
+3. **Menores:** acceso a los workers de OpenStack para mostrar QEMU.
+
+**Para llevar al JP:** espacio en los computes de OpenStack; ruta y rango 10.60.9.0/24 (y 10.60.10.0/24) para acceso
+externo; qué nodo Linux puede hacer de puerta si server2–4 deben alojar VMs; si la zona de disponibilidad es de Linux,
+de OpenStack o de ambos.
+
 ## Pendientes que dependen del grupo o de permisos
 | Pendiente | Quién | Nota |
 |---|---|---|
