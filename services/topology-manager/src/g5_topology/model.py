@@ -18,9 +18,14 @@ MAX_SEGMENTS = 48
 MAX_NICS = 8
 
 # Tamaños = flavors existentes en Nova (el driver no crea flavors; D-11). Configurable por variable de entorno.
+# Opción A (2026-11-13): tamaños predefinidos; cada uno necesita su flavor público en Nova (los nuevos se crean
+# con autorización, como g5-1c-512m-1g). Linux acepta cualquiera que quepa en el worker.
 DEFAULT_SIZES = [
-    {"id": "small", "label": "1 vCPU · 512 MB · 1 GB", "vcpus": 1, "memory_mb": 512, "disk_gb": 1},
-    {"id": "standard", "label": "1 vCPU · 512 MB · 4 GB", "vcpus": 1, "memory_mb": 512, "disk_gb": 4},
+    {"id": "small", "label": "Pequeña · 1 vCPU · 512 MB · 1 GB", "vcpus": 1, "memory_mb": 512, "disk_gb": 1},
+    {"id": "standard", "label": "Estándar · 1 vCPU · 512 MB · 4 GB", "vcpus": 1, "memory_mb": 512, "disk_gb": 4},
+    {"id": "medium", "label": "Mediana · 1 vCPU · 1 GB · 2 GB", "vcpus": 1, "memory_mb": 1024, "disk_gb": 2},
+    {"id": "large", "label": "Grande · 2 vCPU · 1 GB · 2 GB", "vcpus": 2, "memory_mb": 1024, "disk_gb": 2},
+    {"id": "xlarge", "label": "Extra grande · 2 vCPU · 2 GB · 4 GB", "vcpus": 2, "memory_mb": 2048, "disk_gb": 4},
 ]
 DEFAULT_IMAGES = ["cirros"]
 

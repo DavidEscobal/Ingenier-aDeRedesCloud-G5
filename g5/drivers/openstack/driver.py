@@ -122,9 +122,15 @@ class OpenStackDriver(ProviderDriver):
                 'isolation': 'un proyecto Keystone por slice', 'placement': 'Nova Scheduler (VM Placement G5 en F3)'}
 
     def preflight(self, spec):
-        # Antes de admitir: Keystone responde y cada imagen existe en Glance (rechazo sin efectos).
+        # Antes de admitir: Keystone responde, cada imagen existe en Glance y cada tamaño tiene flavor en Nova
+        # (rechazo sin efectos; antes un tamaño sin flavor fallaba a mitad del despliegue).
         for name in sorted({vm['image'] for vm in spec['vms']}):
             self.image(name)
+        if not self.os_cfg.get('create_flavors', False):
+            existing = {(f['vcpus'], f['ram'], f['disk']) for f in self.call('GET', 'compute', '/flavors/detail')['flavors']}
+            missing = sorted({(v['vcpus'], v['memory_mb'], v['disk_gb']) for v in spec['vms']} - existing)
+            require(not missing, 'Tamaño no disponible en OpenStack (falta su flavor): ' +
+                    ', '.join('%d vCPU · %d MB · %d GB' % m for m in missing), 409)
 
     def inspect(self, plan, store):
         servers = {}

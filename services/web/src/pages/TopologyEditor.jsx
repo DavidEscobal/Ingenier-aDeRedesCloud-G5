@@ -50,7 +50,6 @@ export default function TopologyEditor() {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [generator, setGenerator] = useState(null) // {kind, n}
-  const [deploy, setDeploy] = useState(null) // {courses, course, sliceName, provider}
   const [renameValue, setRenameValue] = useState('')
 
   const [imageNames, setImageNames] = useState(null)
@@ -197,30 +196,13 @@ export default function TopologyEditor() {
     }
   }
 
-  async function openDeploy() {
+  // Una sola forma de desplegar: "Nuevo slice" con esta topología ya elegida (proveedor, nombre y curso allí).
+  function openDeploy() {
     if (problems.length) return setError(problems.join(' '))
     setError('')
-    try {
-      const courses = await Api.courses()
-      setDeploy({ courses, course: courses[0]?.id || '', sliceName: name, provider: 'openstack' })
-    } catch (err) {
-      setError(err.message)
-    }
+    navigate('/slices/nuevo', { state: { topology } })
   }
 
-  async function confirmDeploy() {
-    if (!IDENT.test(deploy.sliceName)) return setError('Nombre del slice inválido.')
-    setBusy(true)
-    setError('')
-    try {
-      const spec = await Api.compile(topology, deploy.provider, deploy.sliceName)
-      const accepted = await Api.createSlice(deploy.course, spec)
-      navigate('/slices/' + accepted.slice_id)
-    } catch (err) {
-      setError(err.message)
-      setBusy(false)
-    }
-  }
 
   const vmCount = topology.nodes.length
   const totals = topology.nodes.reduce((a, n) => ({ cpu: a.cpu + n.vcpus, ram: a.ram + n.memory_mb, disk: a.disk + n.disk_gb }),
@@ -340,39 +322,6 @@ export default function TopologyEditor() {
         </div>
       )}
 
-      {deploy && (
-        <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="dep-title">
-          <div className="dialog">
-            <h3 id="dep-title">Desplegar «{name}»</h3>
-            <label>Curso
-              <select value={deploy.course} onChange={(e) => setDeploy({ ...deploy, course: e.target.value })}>
-                {deploy.courses.length === 0 && <option value="">No estás matriculado en ningún curso</option>}
-                {deploy.courses.map((c) => <option key={c.id} value={c.id}>{c.id} · {c.name}</option>)}
-              </select>
-            </label>
-            <label>Nombre del slice
-              <input value={deploy.sliceName} onChange={(e) => setDeploy({ ...deploy, sliceName: e.target.value.toLowerCase() })} />
-            </label>
-            <label>Proveedor
-              <select value={deploy.provider} onChange={(e) => setDeploy({ ...deploy, provider: e.target.value })}>
-                <option value="openstack">OpenStack</option>
-                <option value="linux">Linux (clúster server1–3)</option>
-              </select>
-            </label>
-            {deploy.provider === 'linux' && (
-              <p className="small muted">Linux: solo imágenes CirrOS. Las VMs se reparten por turnos entre server1–3
-                (provisional, hasta definir el placement). Las VMs marcadas con «Salida a Internet» reciben una interfaz
-                extra hacia la puerta del slice.</p>
-            )}
-            <p className="small muted">{vmCount} VMs · {topology.segments.length} redes (192.168.k.0/24)</p>
-            {error && <p className="error">{error}</p>}
-            <div className="dialog-actions">
-              <button className="ghost" onClick={() => { setDeploy(null); setError('') }} disabled={busy}>Cancelar</button>
-              <button onClick={confirmDeploy} disabled={busy || !deploy.course}>{busy ? 'Desplegando…' : 'Desplegar'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   )
 }

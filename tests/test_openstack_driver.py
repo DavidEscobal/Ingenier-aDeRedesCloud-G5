@@ -54,6 +54,19 @@ class OpenStackFixture(unittest.TestCase):
 
 
 class OpenStackDriverTests(OpenStackFixture):
+    def test_size_without_flavor_is_rejected_before_admission(self):
+        """Sin create_flavors, un tamaño sin flavor se rechaza en el preflight: nada se crea en OpenStack."""
+        self.driver.os_cfg['create_flavors'] = False
+        spec = copy.deepcopy(LINEAL)
+        spec['vms'][0].update(vcpus=2, memory_mb=2048, disk_gb=4)
+        before = self.counts()
+        with self.assertRaisesRegex(Fault, '2 vCPU · 2048 MB · 4 GB'):
+            self.driver.preflight(spec)
+        self.assertEqual(self.counts(), before)
+        self.cloud.flavors.append({'id': 'f-x', 'name': 'g5-2c-2048m-4g', 'vcpus': 2, 'ram': 2048, 'disk': 4})
+        self.cloud.flavors.append({'id': 'f-s', 'name': 'g5-1c-512m-1g', 'vcpus': 1, 'ram': 512, 'disk': 1})
+        self.driver.preflight(spec)  # con los flavors presentes, se admite
+
     def test_validation_is_provider_specific(self):
         spec = validate(LINEAL, self.cfg)
         self.assertEqual(spec['networks'][0]['dhcp'], False)
