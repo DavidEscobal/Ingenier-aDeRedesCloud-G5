@@ -155,7 +155,11 @@ Manager / Placement / IAM con login.
   platform-manager (:6080, red interna, token que vence; túnel de 10 min) → túnel SSH al VNC del worker. Llave del
   orquestador en server1–4 ahora `from="192.168.201.10",no-agent-forwarding,no-X11-forwarding,permitopen="127.0.0.1:*"`
   (cambio hecho por el usuario; respaldo `authorized_keys.bak-consola`); reenviar a otros equipos sigue prohibido
-  (verificado). Pendiente R2: Internet/publicaciones desde el editor, topología grande y concurrencia, placement.
+  (verificado).
+- **MS-16 (2026-11-13): salida a Internet por VM desde el editor (Linux).** Casilla en el editor; el adaptador da a
+  cada VM con Internet una red de acceso propia (`10.200.i.0/27`, NIC `inet0`) hacia la puerta del slice (24abd2b).
+  n1 → 8.8.8.8 3/3; n2 sin ruta; enlace n1↔n2 3/3. Pendiente R2: SSH publicado (ruta 10.60.9.0/24 en el gateway,
+  coordinar con el JP), topología grande y concurrencia, placement (D-07).
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
