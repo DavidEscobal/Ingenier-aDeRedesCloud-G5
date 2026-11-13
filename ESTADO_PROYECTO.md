@@ -123,6 +123,10 @@ Manager / Placement / IAM con login.
 - **Switch administrado opcional** en el driver Linux (commit 57d17e9; test `test_phase2_without_managed_switch_skips_fabric`).
   `cluster.json` de fase 2 sin `switch`. **`manage bootstrap` OK en server1–4 (2026-11-12):** `br-int` con `ens4`,
   QinQ habilitado; `ip_forward=1` solo en server4 (puerta). Siguiente: desplegar `lineal` de prueba desde la PC.
+- **MS-12 (2026-11-13): slice Linux de 2 VMs (server1↔server2) con ping 3/3 en ambos sentidos.** Antes falló por
+  `dhcpcd` de CirrOS 0.6 (ráfagas MLD, ARP sin respuesta); corregido en el agente (dhcpcd/IPv6 fuera, tope 10 Mbit/s
+  por TAP, diagnósticos sin sudo del usuario). Pendiente R2: Internet por server4, SSH publicado, VNC, integración
+  con el platform-manager (requiere ampliar `permitopen` del gateway hacia 192.168.201.1-4:22).
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
