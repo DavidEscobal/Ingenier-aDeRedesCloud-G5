@@ -222,7 +222,7 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | 13 | Errores y reintentos | ✅ | Reintentos y compensación |
 | 14 | Enlaces punto a punto en Horizon | ✅ | Una red por enlace |
 | 15a | VNC a todas las VMs | ✅ | Consola web en Linux y OpenStack |
-| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» (ce6aafd). **Linux probado (2026-11-13, agente 93cbd00f):** `to-sw` UP sin IPv4 en ambas VMs, la puerta no se conecta a ese enlace, el enlace con IP hace ping 3/3. Falta probar en OpenStack y configurar OVS con Ubuntu |
+| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» (ce6aafd). **Linux probado (2026-11-13, agente 93cbd00f):** `to-sw` UP sin IPv4 en ambas VMs, la puerta no se conecta a ese enlace, el enlace con IP hace ping 3/3. **OpenStack (2026-11-13): Nova rechaza puertos sin IP** (`Port … requires a FixedIP`; slice FAILED_CLEANED, compensación correcta). Opción propuesta, en espera de consultar al JP: subred sin DHCP ni gateway en un rango reservado (p. ej. 10.255.k.0/24); CirrOS queda sin IP, Ubuntu podría tomarla de los metadatos (flush manual). Falta OVS con Ubuntu |
 | 15c–e | IPs manuales 10.100.10.x, tcpdump, ping | 🟡 | Depende de 15b y de Ubuntu (CirrOS no trae tcpdump/OVS) |
 | 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack ❌ (R5) |
 | 17 | SSH desde fuera a VM4 y VM5 | ❌ | Ambos clústeres; depende del rango 10.60.x (consulta al JP) |
@@ -241,7 +241,7 @@ pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
    R5 en OpenStack (Internet y SSH desde fuera) y SSH desde fuera en Linux.
 3. **Menores:** acceso a los workers de OpenStack para mostrar QEMU.
 
-**Para llevar al JP:** espacio en los computes de OpenStack; ruta y rango 10.60.9.0/24 (y 10.60.10.0/24) para acceso
+**Para llevar al JP:** enlaces sin IP en OpenStack (Nova exige IP fija por puerto: ¿subred sin DHCP en rango reservado es aceptable para el paso 15b?); espacio en los computes de OpenStack; ruta y rango 10.60.9.0/24 (y 10.60.10.0/24) para acceso
 externo; qué nodo Linux puede hacer de puerta si server2–4 deben alojar VMs; si la zona de disponibilidad es de Linux,
 de OpenStack o de ambos.
 
