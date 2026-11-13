@@ -3,8 +3,9 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 # openssh-client: LinuxDriver (agente por SSH) y túneles a OpenStack.
+# qemu-utils: qemu-img valida las imágenes qcow2 que se materializan para Linux (sin backing file ni cifrado).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openssh-client \
+ && apt-get install -y --no-install-recommends openssh-client qemu-utils \
  && rm -rf /var/lib/apt/lists/*
 # El UID debe coincidir con el dueño de la clave SSH montada (permisos 600) y
 # tener entrada en /etc/passwd, que OpenSSH exige.

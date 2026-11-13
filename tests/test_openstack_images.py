@@ -41,6 +41,33 @@ class GlanceImportTests(OpenStackFixture):
         self.assertEqual(len(self.cloud.images), before)
 
 
+class LinuxMaterializationTests(OpenStackFixture):
+    """Fase 2: la copia Linux de una imagen del catálogo se trae de Glance, se verifica y se reutiliza."""
+
+    def test_pulls_once_from_glance_and_registers_by_sha(self):
+        from unittest import mock
+        self.driver.import_image('cirros-test', 'qcow2', len(QCOW2), io.BytesIO(QCOW2))
+        with mock.patch('g5.api.inspect_image', return_value={'virtual-size': 117440512}) as inspect:
+            first = self.app.linux_image('cirros-test')
+            second = self.app.linux_image('cirros-test')
+        self.assertEqual(first, hashlib.sha256(QCOW2).hexdigest())
+        self.assertEqual(second, first)
+        self.assertEqual(inspect.call_count, 1, 'la segunda vez se reutiliza la copia local')
+        self.assertEqual((self.store.directory / 'images' / (first + '.qcow2')).read_bytes(), QCOW2)
+        self.assertEqual(self.store.rows('SELECT name FROM images WHERE id=?', (first,))[0]['name'], 'cirros-test')
+
+    def test_unknown_or_unsafe_image_leaves_nothing(self):
+        from unittest import mock
+        with self.assertRaises(Fault):
+            self.app.linux_image('no-existe')
+        self.driver.import_image('mala', 'qcow2', len(QCOW2), io.BytesIO(QCOW2))
+        with mock.patch('g5.api.inspect_image', side_effect=Fault('Importar una base autónoma sin backing file')):
+            with self.assertRaises(Fault):
+                self.app.linux_image('mala')
+        self.assertEqual(list((self.store.directory / 'images').iterdir()), [])
+        self.assertEqual(self.store.rows('SELECT * FROM images'), [])
+
+
 class ProviderImageAPITests(OpenStackFixture):
     """Rutas HTTP del platform-manager: PUT en streaming con Content-Length, solo admin/service."""
 

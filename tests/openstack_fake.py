@@ -35,11 +35,12 @@ class FakeOpenStack:
                 body = raw if binary else (json.loads(raw) if raw else None)
                 path = self.path.split('?')[0]
                 status, payload, headers = fake.dispatch(self.command, path, self.path, body, self.headers)
-                data = json.dumps(payload).encode() if payload is not None else b''
+                raw_out = isinstance(payload, bytes)
+                data = payload if raw_out else (json.dumps(payload).encode() if payload is not None else b'')
                 self.send_response(status)
                 for k, v in headers.items():
                     self.send_header(k, v)
-                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Type', 'application/octet-stream' if raw_out else 'application/json')
                 self.send_header('Content-Length', str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
@@ -160,6 +161,8 @@ class FakeCloud:
                     return 500, {'error': 'falla inyectada en Glance'}
                 image.update(status='active', size=len(body), data=body)
                 return 204, None
+            if method == 'GET' and rest[2:] == ['file']:
+                return 200, image.get('data', b'')
             if method == 'GET':
                 return 200, {k: v for k, v in image.items() if k != 'data'}
             if method == 'DELETE':

@@ -75,8 +75,11 @@ class GeneratorTests(unittest.TestCase):
         big = dict(base, nodes=[dict(base["nodes"][0], vcpus=8), base["nodes"][1]])
         with self.assertRaisesRegex(CompileError, "no disponible"):
             compile_spec(Topology.model_validate(big), "openstack")
+        linux = compile_spec(generate("lineal", 2), "linux")  # neutral: el platform-manager completa Linux
+        self.assertEqual(linux["provider"], "linux")
+        self.assertTrue(all("worker" not in v for v in linux["vms"]))
         with self.assertRaisesRegex(CompileError, "aún no disponible"):
-            compile_spec(generate("lineal", 2), "linux")
+            compile_spec(generate("lineal", 2), "vmware")
 
     def test_combining_renames_collisions_and_links_both_parts(self):
         merged = combine(generate("anillo", 3), generate("estrella", 4), connect=("n1", "n1"))

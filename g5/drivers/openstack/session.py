@@ -187,3 +187,27 @@ class Session:
             raise OpenStackError('PUT %s -> HTTP %s: %s' % (urllib.parse.urlsplit(url).path, exc.code, detail), exc.code)
         except (urllib.error.URLError, socket.timeout, ConnectionError) as exc:
             raise OpenStackError('PUT %s -> sin respuesta: %s' % (urllib.parse.urlsplit(url).path, getattr(exc, 'reason', exc)))
+
+    def download(self, service, path, sink, limit, timeout=900):
+        """GET binario en bloques hacia `sink` (callable). Corta si supera `limit` bytes. Devuelve bytes leídos."""
+        entry = self._auth()
+        if service not in entry['catalog']:
+            raise OpenStackError('Servicio ausente del catálogo: ' + service)
+        url = entry['catalog'][service] + path
+        request = urllib.request.Request(url, headers={'X-Auth-Token': entry['token'], 'Accept': 'application/octet-stream'})
+        total = 0
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        return total
+                    total += len(chunk)
+                    if total > limit:
+                        raise OpenStackError('GET %s -> imagen mayor que el límite' % urllib.parse.urlsplit(url).path, 413)
+                    sink(chunk)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode(errors='replace')[:300]
+            raise OpenStackError('GET %s -> HTTP %s: %s' % (urllib.parse.urlsplit(url).path, exc.code, detail), exc.code)
+        except (urllib.error.URLError, socket.timeout, ConnectionError) as exc:
+            raise OpenStackError('GET %s -> sin respuesta: %s' % (urllib.parse.urlsplit(url).path, getattr(exc, 'reason', exc)))

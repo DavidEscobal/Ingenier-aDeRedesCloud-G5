@@ -359,6 +359,16 @@ class OpenStackDriver(ProviderDriver):
         return [{k: i.get(k) for k in ('id', 'name', 'status', 'size', 'disk_format', 'visibility', 'created_at')}
                 for i in images]
 
+    def download_image(self, name, sink, limit):
+        """Copia el contenido de una imagen activa de Glance (por nombre) hacia `sink`. Para materializarla en Linux."""
+        require(isinstance(name, str) and IMAGE_NAME.fullmatch(name), 'Nombre de imagen inválido', 400)
+        found = [i for i in self.call('GET', 'image', '/v2/images?' + urllib.parse.urlencode({'name': name}))['images']
+                 if i.get('status') == 'active']
+        require(len(found) == 1, 'Imagen %s no encontrada (o ambigua) en Glance' % name, 404)
+        require(found[0].get('disk_format') == 'qcow2', 'Linux requiere imágenes qcow2', 409)
+        total = self.session.download('image', '/v2/images/%s/file' % found[0]['id'], sink, limit)
+        return {'id': found[0]['id'], 'size': total}
+
     def import_image(self, name, disk_format, size, stream):
         require(isinstance(name, str) and IMAGE_NAME.fullmatch(name), 'Nombre de imagen inválido (minúsculas, números, . _ -)')
         require(disk_format in DISK_FORMATS, 'Formato no soportado: use qcow2 o raw', 400)

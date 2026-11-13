@@ -19,6 +19,7 @@ from .backend import SSHBackend, MemoryBackend, RemoteError
 from .console import Consoles
 from .domain import provider_of
 from .drivers import default_drivers
+from .drivers.linux_adapter import adapt, needs_adapter
 from .drivers.openstack.session import load_env_file
 from .engine import Engine
 from .model import Fault, require, validate, digest, fields, canonical
@@ -112,6 +113,10 @@ class Application:
             if method == 'GET':
                 return 200, s.rows('SELECT id,owner,name,provider,status,reserved FROM slices' + ('' if admin else ' WHERE owner=?'), () if admin else (owner,))
             if method == 'POST':
+                if needs_adapter(body):
+                    workers = [r['id'] for r in s.rows('SELECT id FROM nodes WHERE enabled=1 ORDER BY id')
+                               if r['id'] in self.config.get('workers', {})]
+                    body = adapt(body, workers, self.linux_image)
                 spec = validate(body, self.config)
                 # La misma petición ya aceptada conserva respuesta incluso si un nodo cayó después.
                 with s.tx() as db:
@@ -163,6 +168,36 @@ class Application:
             require(vm, 'VM inexistente', 404)
             return 200, self.backend.call(vm['worker'], 'guest_probe', sid=row['id'], vm_name=vm['name'], **body)
         raise Fault('Ruta o método inexistente', 404)
+
+    def linux_image(self, name):
+        """Copia local (almacén Linux) de una imagen del catálogo, traída de Glance si falta. Devuelve su SHA-256."""
+        with self.image_lock:
+            row = self.store.rows('SELECT id FROM images WHERE name=? ORDER BY created DESC', (name,))
+            if row and (self.store.directory / 'images' / (row[0]['id'] + '.qcow2')).exists():
+                return row[0]['id']
+            require('openstack' in self.store.drivers and 'openstack' in self.config,
+                    'Imagen %s ausente del almacén Linux y sin Glance para traerla' % name, 409)
+            limit = self.config['max_image_gb'] * 1024**3
+            tmp = self.store.directory / 'images' / ('pull-' + os.urandom(8).hex() + '.part')
+            h = hashlib.sha256()
+            try:
+                with tmp.open('wb') as target:
+                    def sink(chunk):
+                        target.write(chunk); h.update(chunk)
+                    got = self.store.drivers['openstack'].download_image(name, sink, limit)
+                    target.flush(); os.fsync(target.fileno())
+                require(got['size'] > 0, 'Imagen vacía en Glance', 502)
+                image = h.hexdigest()
+                info = inspect_image(tmp)
+                path = self.store.directory / 'images' / (image + '.qcow2')
+                os.chmod(str(tmp), 0o444)
+                os.replace(str(tmp), str(path))
+                with self.store.tx() as db:
+                    db.execute('INSERT OR IGNORE INTO images VALUES(?,?,?,?,?)', (image, name, got['size'], info['virtual-size'], time.time()))
+                return image
+            finally:
+                if tmp.exists():
+                    tmp.unlink()
 
     def upload(self, image, name, size, stream):
         digest(image)

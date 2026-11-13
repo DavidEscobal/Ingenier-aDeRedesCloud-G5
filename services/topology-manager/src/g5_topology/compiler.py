@@ -6,7 +6,7 @@ en todas sus redes, lo que facilita las prácticas.
 """
 from .model import Topology
 
-PROVIDERS = ("openstack",)  # Linux: pendiente de su configuración de fase 2.
+PROVIDERS = ("openstack", "linux")  # Linux: el platform-manager completa workers, C-VLAN e imagen.
 
 
 class CompileError(ValueError):
