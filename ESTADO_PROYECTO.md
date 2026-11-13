@@ -209,20 +209,20 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | Paso | Pide | Estado | Nota |
 |---|---|---|---|
 | 2 | Zona de disponibilidad con servidores 2–4 (sin server1) | ❌ | Sin concepto de zona; hoy server4 es puerta y server1–3 workers (al revés de lo pedido) |
-| 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | ❌ | La web no elige servidor; Linux solo CirrOS; host forzado de Nova sin probar |
+| 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | 🟡 | **Servidor por VM en el editor (ce6aafd); host forzado de Nova probado: vm1@worker1 (2026-11-13)**. Falta Ubuntu |
 | 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | Manual por consola; requiere Ubuntu |
 | 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | ❌ | D-13 pausado: **bloqueante** |
 | 6 | Procesos QEMU en workers OpenStack | 🟡 | Manual; confirmar acceso SSH a los workers |
 | 7 | Explicar placement, no fijo | ❌ | Hoy reparto por turnos; falta R4 (BFD/BCDP) con datos del monitoreo |
-| 8 | Crear `Ex2_GXX_test` en el editor sin desplegar | 🟡 | Guardar ✅; **el nombre no pasa** (IDENT solo minúsculas, números y `-`) |
+| 8 | Crear `Ex2_GXX_test` en el editor sin desplegar | ✅ | Nombres con mayúsculas y `_` (ce6aafd) |
 | 9 | Exportar la topología y explicar parámetros | ✅ | Exportar JSON |
-| 10 | Importar como `Ex2_GXX_test_2` | 🟡 | Importar ✅; mismo problema de nombre |
+| 10 | Importar como `Ex2_GXX_test_2` | ✅ | Importar + nombres del examen (ce6aafd) |
 | 11 | Desplegar en OpenStack según placement | ❌ | Depende de R4 |
 | 12 | Horizon (proyecto y VMs por worker) + QEMU | ✅ | Proyecto `g5-…` por slice |
 | 13 | Errores y reintentos | ✅ | Reintentos y compensación |
 | 14 | Enlaces punto a punto en Horizon | ✅ | Una red por enlace |
 | 15a | VNC a todas las VMs | ✅ | Consola web en Linux y OpenStack |
-| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡/❌ | Port security ya deshabilitado en OpenStack; **falta crear enlaces sin IP** (el compilador numera todo) |
+| 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» en el editor (OpenStack: red sin subred; Linux: interfaz sin dirección; ce6aafd). Falta probar en real y reinstalar el agente Linux (fab95970) |
 | 15c–e | IPs manuales 10.100.10.x, tcpdump, ping | 🟡 | Depende de 15b y de Ubuntu (CirrOS no trae tcpdump/OVS) |
 | 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack ❌ (R5) |
 | 17 | SSH desde fuera a VM4 y VM5 | ❌ | Ambos clústeres; depende del rango 10.60.x (consulta al JP) |
