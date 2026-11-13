@@ -140,6 +140,11 @@ Manager / Placement / IAM con login.
   fase 2 (respaldo `.bak-20261113`), OpenStack intacto. Código del app server actualizado a 55d7f20; solo se
   reconstruyó `platform-manager`. `doctor` desde el contenedor: server1–4 ok. Siguiente: fase B (imagen CirrOS en el
   almacén Linux) y fase C (compilador/web/consola Linux).
+- **MS-14 (2026-11-13): slice Linux creado y borrado DESDE LA WEB** (editor → proveedor Linux). Adaptador neutral→Linux
+  en el platform-manager (C-VLAN, reparto rotativo provisional server1–3, CirrOS), imagen traída de Glance y
+  verificada con `qemu-img` (a8772ca). Ping 3/3 en ambos sentidos; borrado sin restos. READY tardó 391 s por los
+  reintentos de `guest_setup`. **Pendientes R2:** acelerar `guest_setup` (esperar fin de arranque), consola Linux
+  en el navegador, Internet/publicaciones desde el editor, placement real (D-07).
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
