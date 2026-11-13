@@ -17,7 +17,7 @@ function VmNode({ id, data, selected }) {
       <Handle type="source" position={Position.Top} />
       <div className="vm-icon" aria-hidden="true">▣</div>
       <div className="vm-name">{id}</div>
-      <div className="vm-meta">{data.image} · {data.vcpus} vCPU · {data.memory_mb} MB · {data.disk_gb} GB</div>
+      <div className="vm-meta">{data.image} · {data.vcpus} vCPU · {data.memory_mb} MB · {data.disk_gb} GB{data.internet ? ' · Internet' : ''}</div>
       <Handle type="source" position={Position.Bottom} />
     </div>
   )
@@ -285,6 +285,11 @@ export default function TopologyEditor() {
                       {[...new Set([...(imageNames || catalog?.images || []), selectedNode.data.image])].map((i) => <option key={i} value={i}>{i}</option>)}
                     </select>
                   </label>
+                  <label className="checkbox">
+                    <input type="checkbox" checked={!!selectedNode.data.internet}
+                      onChange={(e) => updateSelected({ internet: e.target.checked })} />
+                    Salida a Internet <small className="muted">(Linux)</small>
+                  </label>
                 </>
               )}
             </div>
@@ -356,7 +361,8 @@ export default function TopologyEditor() {
             </label>
             {deploy.provider === 'linux' && (
               <p className="small muted">Linux: solo imágenes CirrOS. Las VMs se reparten por turnos entre server1–3
-                (provisional, hasta definir el placement). Sin salida a Internet.</p>
+                (provisional, hasta definir el placement). Las VMs marcadas con «Salida a Internet» reciben una interfaz
+                extra hacia la puerta del slice.</p>
             )}
             <p className="small muted">{vmCount} VMs · {topology.segments.length} redes (192.168.k.0/24)</p>
             {error && <p className="error">{error}</p>}

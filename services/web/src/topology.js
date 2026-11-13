@@ -10,7 +10,7 @@ export function toFlow(topology) {
     id: n.id,
     type: 'vm',
     position: n.position || { x: 80 + (i % 6) * 170, y: 80 + Math.floor(i / 6) * 150 },
-    data: { image: n.image, vcpus: n.vcpus, memory_mb: n.memory_mb, disk_gb: n.disk_gb },
+    data: { image: n.image, vcpus: n.vcpus, memory_mb: n.memory_mb, disk_gb: n.disk_gb, internet: !!n.internet },
   }))
   const edges = []
   for (const s of topology.segments || []) {
@@ -44,7 +44,7 @@ export function fromFlow(nodes, edges, name, description = '') {
     name,
     description,
     nodes: vms.map((n) => ({ id: n.id, image: n.data.image, vcpus: n.data.vcpus, memory_mb: n.data.memory_mb,
-      disk_gb: n.data.disk_gb, position: round(n.position) })),
+      disk_gb: n.data.disk_gb, ...(n.data.internet ? { internet: true } : {}), position: round(n.position) })),
     segments,
   }
 }

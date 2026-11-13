@@ -41,6 +41,20 @@ class AdapterTests(unittest.TestCase):
         validate_spec(out, self.cfg)  # el driver Linux la acepta tal cual
         self.assertNotIn('worker', spec['vms'][0], 'no modifica la entrada')
 
+    def test_internet_vm_gets_its_own_access_network_first(self):
+        spec = neutral(3)
+        spec['vms'][1]['internet'] = True
+        out = adapt(spec, ['server1', 'server2', 'server3'], self.resolve)
+        n2 = out['vms'][1]
+        self.assertEqual(n2['nics'][0], {'name': 'inet0', 'network': 'inet2', 'ip': '10.200.2.10'})
+        self.assertEqual(len(n2['nics']), 3, 'acceso + sus dos enlaces')
+        access = next(n for n in out['networks'] if n['name'] == 'inet2')
+        self.assertEqual(access['cidr'], '10.200.2.0/27')
+        self.assertEqual(len({n['cvid'] for n in out['networks']}), len(out['networks']), 'C-VLAN únicas')
+        self.assertFalse(out['vms'][0].get('internet'))
+        self.assertTrue(all(n['nics'][0]['name'] != 'inet0' for n in out['vms'] if not n.get('internet')))
+        validate_spec(out, self.cfg)
+
     def test_rejects_non_cirros_and_no_workers(self):
         with self.assertRaisesRegex(Fault, 'CirrOS'):
             adapt(neutral(image='ubuntu-22'), ['server1'], self.resolve)

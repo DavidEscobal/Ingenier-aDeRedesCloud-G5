@@ -754,6 +754,11 @@
             "minimum": 1.0,
             "title": "Disk Gb"
           },
+          "internet": {
+            "type": "boolean",
+            "title": "Internet",
+            "default": false
+          },
           "position": {
             "anyOf": [
               {

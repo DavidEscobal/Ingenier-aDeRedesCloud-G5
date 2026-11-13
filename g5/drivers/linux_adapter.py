@@ -8,6 +8,9 @@ El editor de topologías no conoce detalles del clúster Linux; aquí se complet
 - SO invitado: por ahora solo CirrOS (configuración por consola serie). Ubuntu necesita usuario,
   hash de contraseña y llaves SSH que el editor todavía no pide.
 - Sin DHCP: las IPs que asigna el compilador se fijan dentro del invitado.
+- Internet: cada VM con `internet: true` recibe una red de acceso propia (10.200.i.0/27, NIC `inet0`, primera)
+  hacia la puerta del slice (.1 en server4, NAT y firewall). Como en EX1, el acceso va separado de los enlaces
+  del laboratorio para no unir VMs que el dibujo no une; la ruta por defecto sale solo por esa NIC.
 """
 import copy
 from ..model import Fault
@@ -23,9 +26,14 @@ def adapt(spec, workers, resolve_image):
     spec = copy.deepcopy(spec)
     if not workers:
         raise Fault('No hay workers Linux habilitados', 409)
-    networks = spec.get('networks') or []
+    networks = spec.setdefault('networks', [])
+    for i, vm in enumerate(spec['vms']):
+        if isinstance(vm, dict) and vm.get('internet') is True:
+            access = 'inet%d' % (i + 1)  # nombre corto: el de la VM puede tener hasta 32 caracteres
+            networks.append({'name': access, 'cidr': '10.200.%d.0/27' % (i + 1)})
+            vm['nics'] = [{'name': 'inet0', 'network': access, 'ip': '10.200.%d.10' % (i + 1)}] + list(vm.get('nics') or [])
     if len(networks) > 64:
-        raise Fault('Linux admite hasta 64 redes por slice')
+        raise Fault('Linux admite hasta 64 redes por slice (incluidas las de acceso a Internet)')
     for k, net in enumerate(networks):
         if not isinstance(net, dict):
             raise Fault('Red inválida')

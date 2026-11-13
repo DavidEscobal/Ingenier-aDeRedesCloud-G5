@@ -81,6 +81,12 @@ class GeneratorTests(unittest.TestCase):
         self.assertTrue(all("worker" not in v for v in linux["vms"]))
         with self.assertRaisesRegex(CompileError, "aún no disponible"):
             compile_spec(generate("lineal", 2), "vmware")
+        online = generate("lineal", 2)
+        online.nodes[0].internet = True
+        self.assertTrue(compile_spec(online, "linux")["vms"][0]["internet"])
+        self.assertNotIn("internet", compile_spec(online, "linux")["vms"][1])
+        with self.assertRaisesRegex(CompileError, "solo en Linux"):
+            compile_spec(online, "openstack")
 
     def test_combining_renames_collisions_and_links_both_parts(self):
         merged = combine(generate("anillo", 3), generate("estrella", 4), connect=("n1", "n1"))

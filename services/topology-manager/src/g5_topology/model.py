@@ -48,6 +48,7 @@ class Node(Model):
     vcpus: int = Field(ge=1, le=64)
     memory_mb: int = Field(ge=64, le=524288)
     disk_gb: int = Field(ge=1, le=2048)
+    internet: bool = False  # salida a Internet por la puerta del slice (Linux; OpenStack pendiente de R5)
     position: Position | None = None
 
 

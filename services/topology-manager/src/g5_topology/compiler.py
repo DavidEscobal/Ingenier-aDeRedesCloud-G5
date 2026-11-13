@@ -27,6 +27,8 @@ def compile_spec(topology: Topology, provider: str, name: str | None = None):
         problems.append("La topología necesita al menos un enlace o bus")
     if len(topology.segments) > MAX_SEGMENTS:
         problems.append(f"Demasiados segmentos (máximo {MAX_SEGMENTS}, direccionamiento 192.168.k.0/24)")
+    if provider != "linux" and any(n.internet for n in topology.nodes):
+        problems.append("Salida a Internet desde el editor: por ahora solo en Linux (OpenStack, pendiente de R5)")
     if problems:
         raise CompileError("; ".join(problems))
     index = {n.id: i + 1 for i, n in enumerate(topology.nodes)}
@@ -36,5 +38,5 @@ def compile_spec(topology: Topology, provider: str, name: str | None = None):
         for m in s.members:
             nics[m].append({"network": s.id, "ip": f"192.168.{k}.{10 + index[m]}"})
     vms = [{"name": n.id, "image": n.image, "vcpus": n.vcpus, "memory_mb": n.memory_mb, "disk_gb": n.disk_gb,
-            "nics": nics[n.id]} for n in topology.nodes]
+            "nics": nics[n.id], **({"internet": True} if n.internet else {})} for n in topology.nodes]
     return {"name": name or topology.name, "provider": provider, "networks": networks, "vms": vms}
