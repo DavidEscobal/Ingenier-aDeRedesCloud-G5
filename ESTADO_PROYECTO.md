@@ -150,7 +150,12 @@ Manager / Placement / IAM con login.
   escribía el payload a los 3 s → ahora confirma el shell con `echo G5RDY$((6*7))`; (2) CirrOS 0.6 exige meta-data
   NoCloud en JSON (`json2fstree`) → corregido, `datasource: nocloud local`, 0 reintentos EC2 (antes 20, ~55 s);
   (3) virtio-rng para entropía. Ping 3/3 en ambos sentidos, vigilante 1 trama/10 s. Agente 0214bacb en server1–3;
-  **server4 quedó con 4a112e40: reinstalar**. Orquestador: llamada a guest_setup > espera del agente (cdef4d7).
+  server4 reinstalado después (0214bacb en los 4). Orquestador: llamada a guest_setup > espera del agente (cdef4d7).
+- **MS-15 (2026-11-13): consola noVNC de VMs Linux desde la web.** `/lconsole/` (nginx) → websockify+noVNC en el
+  platform-manager (:6080, red interna, token que vence; túnel de 10 min) → túnel SSH al VNC del worker. Llave del
+  orquestador en server1–4 ahora `from="192.168.201.10",no-agent-forwarding,no-X11-forwarding,permitopen="127.0.0.1:*"`
+  (cambio hecho por el usuario; respaldo `authorized_keys.bak-consola`); reenviar a otros equipos sigue prohibido
+  (verificado). Pendiente R2: Internet/publicaciones desde el editor, topología grande y concurrencia, placement.
 - Gateway: `ens6` DOWN; **`ens7` ahora UP con 172.31.255.1/30** y existe la ruta `10.60.10.0/24 via 192.168.202.1`
   (cambios ajenos a esta sesión, posteriores al 2026-11-03: averiguar quién los hizo). No hay ruta para `10.60.9.0/24`.
 - Para R2 falta: autorizar llave en los servidores, resolver sudo para el agente, instalar QEMU, ubicar el switch,
