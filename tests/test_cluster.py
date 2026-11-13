@@ -420,6 +420,11 @@ class AgentTests(Fixture):
         self.assertIn('virtio-rng-pci', source, 'entropía para no esperar ~60 s en el arranque')
         self.assertIn("guest_boot_timeout', 420", source, 'un solo intento cubre el arranque completo')
 
+    def test_guest_setup_call_outlasts_agent_boot_wait(self):
+        backend = SSHBackend(self.cfg)
+        self.assertGreater(backend.call_timeout('guest_setup'), 420)
+        self.assertEqual(backend.call_timeout('doctor'), 300)
+
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []
         def fake_run(*args, **kw):

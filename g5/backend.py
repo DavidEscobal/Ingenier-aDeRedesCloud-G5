@@ -30,12 +30,19 @@ class SSHBackend:
                 '-o', 'ServerAliveInterval=10', '-o', 'ServerAliveCountMax=3',
                 cfg.get('ssh_user', 'ubuntu') + '@' + cfg['host']]
 
+    def call_timeout(self, action):
+        # guest_setup espera el arranque del invitado dentro del agente (guest_boot_timeout, 420 s por defecto):
+        # cortar antes repetía la llamada y duplicaba la espera (452 s en la prueba del 2026-11-13).
+        if action == 'guest_setup':
+            return int(self.config.get('common', {}).get('guest_boot_timeout', 420)) + 60
+        return 300
+
     def call(self, node, action, **params):
         payload = canonical(dict(params, action=action)) + '\n'
         try:
             p = subprocess.run(self.ssh(node) + ['sudo -n /usr/local/sbin/g5-cluster-agent'],
                                input=payload, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               universal_newlines=True, timeout=300)
+                               universal_newlines=True, timeout=self.call_timeout(action))
         except subprocess.TimeoutExpired:
             raise RemoteError('%s/%s: timeout; se consultará el recurso antes de repetir' % (node, action))
         return self.decode(p.returncode, p.stdout, p.stderr, node, action)
