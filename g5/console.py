@@ -5,17 +5,15 @@ import socket
 import sqlite3
 import threading
 import time
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 from .model import require
 
 
 def console_link(base, token):
-    """URL de noVNC para el navegador. Si `console_url` lleva ruta (p. ej. "/lconsole" detrás del nginx de la web),
-    el WebSocket también debe pasar por ella: path=lconsole/websockify?token=..."""
-    base = base.rstrip('/')
-    prefix = urlsplit(base).path.strip('/')
-    ws = (prefix + '/' if prefix else '') + 'websockify?token=' + token
-    return base + '/vnc.html?' + urlencode({'autoconnect': 'true', 'resize': 'scale', 'path': ws})
+    """URL de noVNC para el navegador. noVNC resuelve `path` relativo a su página: con la página en
+    /lconsole/vnc.html, path=websockify lleva el WebSocket a /lconsole/websockify (no repetir el prefijo)."""
+    return base.rstrip('/') + '/vnc.html?' + urlencode({'autoconnect': 'true', 'resize': 'scale',
+                                                        'path': 'websockify?token=' + token})
 
 
 class ExpiringToken:

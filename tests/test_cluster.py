@@ -462,12 +462,12 @@ class AgentTests(Fixture):
         source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
         self.assertIn("not action.startswith('diag_')", source, 'diagnósticos sin candado del slice')
 
-    def test_console_link_routes_websocket_through_web_prefix(self):
+    def test_console_link_is_relative_to_the_novnc_page(self):
         from urllib.parse import parse_qs, urlsplit
         from g5.console import console_link
         web = urlsplit(console_link('/lconsole', 'TOK'))
         self.assertEqual(web.path, '/lconsole/vnc.html')
-        self.assertEqual(parse_qs(web.query)['path'], ['lconsole/websockify?token=TOK'])
+        self.assertEqual(parse_qs(web.query)['path'], ['websockify?token=TOK'], 'relativo a la página: sin repetir prefijo')
         ex1 = urlsplit(console_link('http://127.0.0.1:6080', 'TOK'))   # EX1: sin prefijo, igual que antes
         self.assertEqual((ex1.netloc, ex1.path, parse_qs(ex1.query)['path']), ('127.0.0.1:6080', '/vnc.html', ['websockify?token=TOK']))
 
