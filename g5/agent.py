@@ -179,6 +179,13 @@ def cloud_documents(plan, vm, mtu):
             'network-config': json.dumps(network, indent=2)}
 
 
+def cirros_documents(plan, vm):
+    """CirrOS >= 0.6 busca metadatos (ConfigDrive, NoCloud y luego EC2 por red, con reintentos de minutos).
+    Un disco NoCloud mínimo le da los metadatos al instante; las IPs se siguen fijando por consola serie."""
+    meta = 'instance-id: %s-%s\nlocal-hostname: %s\n' % (plan['id'], vm['name'], vm['name'])
+    return {'meta-data': meta, 'user-data': ''}
+
+
 class Agent:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -560,7 +567,7 @@ class Agent:
             user = pwd.getpwnam(self.cfg['qemu_user'])
             os.chown(str(directory), user.pw_uid, user.pw_gid); os.chmod(str(directory), 0o750)
             os.chown(str(disk), user.pw_uid, user.pw_gid); os.chmod(str(disk), 0o600)
-        seed = self.cloud_seed(plan, vm, directory) if vm.get('guest', {}).get('os') == 'ubuntu' else None
+        seed = self.cloud_seed(plan, vm, directory) if vm.get('guest', {}).get('os') in ('ubuntu', 'cirros') else None
         argv = ['qemu-system-x86_64', '-name', token, '-enable-kvm', '-m', str(vm['memory_mb']),
                 '-smp', str(vm['vcpus']), '-drive', 'file=%s,format=qcow2,if=virtio' % disk,
                 '-vnc', '127.0.0.1:%s' % (vm['vnc'] - 5900), '-monitor', 'none',
@@ -595,7 +602,10 @@ class Agent:
         seed = directory / 'seed.iso'
         if seed.exists():
             return seed
-        documents = cloud_documents(plan, vm, self.cfg['guest_mtu'])
+        if vm.get('guest', {}).get('os') == 'cirros':
+            documents = cirros_documents(plan, vm)
+        else:
+            documents = cloud_documents(plan, vm, self.cfg['guest_mtu'])
         staging = directory / 'seed-data'
         staging.mkdir(exist_ok=True)
         for name, value in documents.items():
@@ -604,7 +614,7 @@ class Agent:
         temp = directory / 'seed.part'
         try:
             output('genisoimage', '-quiet', '-output', temp, '-volid', 'cidata', '-joliet', '-rock',
-                   *[str(staging / name) for name in ('user-data', 'meta-data', 'network-config')])
+                   *[str(staging / name) for name in sorted(documents)])
             user = pwd.getpwnam(self.cfg['qemu_user'])
             os.chown(str(temp), user.pw_uid, user.pw_gid); os.chmod(str(temp), 0o600)
             os.replace(str(temp), str(seed))

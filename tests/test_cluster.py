@@ -406,6 +406,18 @@ class AgentTests(Fixture):
         source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
         self.assertIn('output(*self.police(tap))', source[source.index('def vm_ensure'):source.index('def cloud_seed')])
 
+    def test_cirros_gets_minimal_nocloud_seed(self):
+        """Sin metadatos, CirrOS 0.6 reintenta EC2 por minutos y guest_setup agota su plazo (MS-14: 391 s)."""
+        from g5.agent import cirros_documents
+        job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
+        vm = dict(plan['vms'][0], guest={'os': 'cirros'})
+        docs = cirros_documents(plan, vm)
+        self.assertEqual(sorted(docs), ['meta-data', 'user-data'])
+        self.assertIn('instance-id: %s-%s' % (plan['id'], vm['name']), docs['meta-data'])
+        self.assertIn('local-hostname: %s' % vm['name'], docs['meta-data'])
+        source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
+        self.assertIn("in ('ubuntu', 'cirros') else None", source)
+
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []
         def fake_run(*args, **kw):
