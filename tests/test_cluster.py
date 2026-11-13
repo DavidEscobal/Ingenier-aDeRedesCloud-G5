@@ -388,7 +388,7 @@ class AgentTests(Fixture):
         vm['guest'] = {'os': 'cirros'}
         agent = self.agent('worker'); sent = []
         stat = ' '.join(['0'] * 30)
-        with mock.patch.object(agent, 'load', return_value=plan), mock.patch.object(agent, 'process', return_value=4242),                 mock.patch('g5.agent.Path.read_text', return_value=stat), mock.patch('g5.agent.atomic'),                 mock.patch('g5.agent.serial_execute', side_effect=lambda path, cmd, *a: sent.append(cmd) or (0, '')):
+        with mock.patch.object(agent, 'load', return_value=plan), mock.patch.object(agent, 'process', return_value=4242),                 mock.patch('g5.agent.Path.read_text', return_value=stat), mock.patch('g5.agent.atomic'),                 mock.patch('g5.agent.serial_execute', side_effect=lambda path, cmd, *a, **k: sent.append(cmd) or (0, '')):
             agent.guest_setup(plan['id'], vm['name'])
         self.assertIn('killall udhcpc', sent[0])
         self.assertIn('killall dhcpcd', sent[0])
@@ -417,6 +417,8 @@ class AgentTests(Fixture):
         self.assertIn('local-hostname: %s' % vm['name'], docs['meta-data'])
         source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
         self.assertIn("in ('ubuntu', 'cirros') else None", source)
+        self.assertIn('virtio-rng-pci', source, 'entropía para no esperar ~60 s en el arranque')
+        self.assertIn("guest_boot_timeout', 420", source, 'un solo intento cubre el arranque completo')
 
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []

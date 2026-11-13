@@ -570,6 +570,8 @@ class Agent:
         seed = self.cloud_seed(plan, vm, directory) if vm.get('guest', {}).get('os') in ('ubuntu', 'cirros') else None
         argv = ['qemu-system-x86_64', '-name', token, '-enable-kvm', '-m', str(vm['memory_mb']),
                 '-smp', str(vm['vcpus']), '-drive', 'file=%s,format=qcow2,if=virtio' % disk,
+                # Entropía del host: sin ella CirrOS espera ~60 s ("crng init done") antes de iniciar servicios.
+                '-object', 'rng-random,filename=/dev/urandom,id=rng0', '-device', 'virtio-rng-pci,rng=rng0',
                 '-vnc', '127.0.0.1:%s' % (vm['vnc'] - 5900), '-monitor', 'none',
                 '-qmp', 'unix:%s,server,nowait' % (directory / 'qmp.sock'),
                 '-serial', 'unix:%s,server,nowait' % (directory / 'serial.sock'),
@@ -655,7 +657,8 @@ class Agent:
             if idx == 0 and vm['internet']:
                 lines += ['sudo ip route replace default via ' + net['gateway'] + ' dev ' + name]
         rc, result = serial_execute(str(directory / 'serial.sock'), '\n'.join(lines),
-                                    self.cfg['probe_user'], self.cfg['probe_password'])
+                                    self.cfg['probe_user'], self.cfg['probe_password'],
+                                    timeout=int(self.cfg.get('guest_boot_timeout', 420)))
         ensure(rc == 0, 'No se configuró CirrOS: ' + result[-2000:])
         atomic(marker, identity)
         return {'configured': True, 'pid': pid, 'interfaces': [n.get('name') for n in vm['nics']]}
