@@ -103,6 +103,19 @@ def qmp(path, command):
         s.close()
 
 
+def shell_ready(sock, wait=6):
+    sock.sendall(b'echo G5RDY$((6*7))\n')
+    seen=''; end=time.monotonic()+wait
+    while time.monotonic()<end:
+        try:data=sock.recv(65536)
+        except socket.timeout:continue
+        if not data:return False
+        seen+=data.decode(errors='replace').replace('\r','')
+        if re.search(r'(?m)^G5RDY42\s*$',seen):
+            return True
+    return False
+
+
 def serial_execute(path, command, username, password, timeout=180):
     sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
     sock.settimeout(1)
@@ -121,7 +134,12 @@ def serial_execute(path, command, username, password, timeout=180):
             elif re.search(r'(?im)^password:\s*$',buf):
                 sock.sendall((password+'\n').encode());buf=''
             elif re.search(r'(?m)^[^\n$#]*[$#][ \t]*$',buf):
-                break
+                # Un "$"/"#" al final de una línea del arranque no garantiza un shell: se confirma con una
+                # orden cuyo resultado difiere de lo tecleado (G5RDY42). Sin esto, el payload se escribía
+                # durante el arranque, se perdía y guest_setup agotaba su plazo (consola, 2026-11-13).
+                if shell_ready(sock):
+                    break
+                buf=''
             if time.monotonic()-last>8:
                 sock.sendall(b'\n');last=time.monotonic()
         else:raise RuntimeError('Consola no reconocida. Ultima respuesta: ' + repr(buf[-3000:]))
@@ -182,7 +200,8 @@ def cloud_documents(plan, vm, mtu):
 def cirros_documents(plan, vm):
     """CirrOS >= 0.6 busca metadatos (ConfigDrive, NoCloud y luego EC2 por red, con reintentos de minutos).
     Un disco NoCloud mínimo le da los metadatos al instante; las IPs se siguen fijando por consola serie."""
-    meta = 'instance-id: %s-%s\nlocal-hostname: %s\n' % (plan['id'], vm['name'], vm['name'])
+    # CirrOS 0.6 interpreta meta-data como JSON (json2fstree); en YAML falla y cae a EC2 (20 intentos, ~55 s).
+    meta = json.dumps({'instance-id': plan['id'] + '-' + vm['name'], 'local-hostname': vm['name']})
     return {'meta-data': meta, 'user-data': ''}
 
 
@@ -1085,7 +1104,8 @@ def main():
     sid = request.get('sid') or request.get('plan', {}).get('id')
     if sid:
         ident(sid, r'[0-9a-f]{32}')
-    with a.lock('slice-' + sid if sid else 'action-' + action):
+    # Los diagnósticos son de solo lectura: no esperan al candado del slice (que guest_setup retiene minutos).
+    with a.lock('slice-' + sid if sid and not action.startswith('diag_') else 'action-' + action):
         result = getattr(a, action)(**request)
     print(json.dumps({'ok': True, 'result': result}))
 

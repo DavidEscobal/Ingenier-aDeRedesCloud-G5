@@ -413,8 +413,8 @@ class AgentTests(Fixture):
         vm = dict(plan['vms'][0], guest={'os': 'cirros'})
         docs = cirros_documents(plan, vm)
         self.assertEqual(sorted(docs), ['meta-data', 'user-data'])
-        self.assertIn('instance-id: %s-%s' % (plan['id'], vm['name']), docs['meta-data'])
-        self.assertIn('local-hostname: %s' % vm['name'], docs['meta-data'])
+        meta = json.loads(docs['meta-data'])  # CirrOS 0.6 exige JSON (json2fstree)
+        self.assertEqual(meta, {'instance-id': plan['id'] + '-' + vm['name'], 'local-hostname': vm['name']})
         source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
         self.assertIn("in ('ubuntu', 'cirros') else None", source)
         self.assertIn('virtio-rng-pci', source, 'entropía para no esperar ~60 s en el arranque')
@@ -440,6 +440,27 @@ class AgentTests(Fixture):
                 agent.diag_console(plan['id'], 'otra-vm')
         source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
         self.assertIn("logfile=%s,logappend=on", source)
+
+    def test_shell_ready_rejects_boot_line_that_looks_like_a_prompt(self):
+        """Un "#" al final de una línea del arranque no es un shell: solo vale si responde G5RDY42."""
+        import socket as socketmod
+        from g5.agent import shell_ready
+
+        class Console:
+            def __init__(self, replies):
+                self.replies, self.sent = list(replies), []
+            def sendall(self, data):
+                self.sent.append(data)
+            def recv(self, n):
+                if self.replies:
+                    return self.replies.pop(0)
+                raise socketmod.timeout()
+        booting = Console([b'echo G5RDY$((6*7))\r\n'])          # eco del tecleo, sin resultado
+        self.assertFalse(shell_ready(booting, wait=0.3))
+        shell = Console([b'echo G5RDY$((6*7))\r\n', b'G5RDY42\r\n$ '])
+        self.assertTrue(shell_ready(shell, wait=2))
+        source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
+        self.assertIn("not action.startswith('diag_')", source, 'diagnósticos sin candado del slice')
 
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []
