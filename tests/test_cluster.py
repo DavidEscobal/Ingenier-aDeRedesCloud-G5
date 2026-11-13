@@ -393,6 +393,18 @@ class AgentTests(Fixture):
         self.assertIn('killall udhcpc', sent[0])
         self.assertIn('killall dhcpcd', sent[0])
         self.assertLess(sent[0].index('dhcpcd'), sent[0].index('ip addr flush'))
+        self.assertIn('disable_ipv6', sent[0])
+        self.assertLess(sent[0].index('disable_ipv6'), sent[0].index('ip addr flush'))
+
+    def test_vm_tap_is_rate_limited(self):
+        agent = self.agent('worker')
+        self.assertEqual(agent.police('g5tabc'), ('ovs-vsctl', 'set', 'Interface', 'g5tabc',
+                                                   'ingress_policing_rate=10000', 'ingress_policing_burst=1000'))
+        agent.cfg['vm_rate_kbps'] = 10 ** 9
+        with self.assertRaises(AgentError):
+            agent.police('g5tabc')
+        source = (ROOT / 'g5/agent.py').read_text(encoding='utf-8')
+        self.assertIn('output(*self.police(tap))', source[source.index('def vm_ensure'):source.index('def cloud_seed')])
 
     def test_diag_ovs_is_read_only(self):
         agent = self.agent('worker'); commands = []

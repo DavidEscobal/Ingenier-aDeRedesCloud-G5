@@ -522,6 +522,14 @@ class Agent:
                 time.sleep(0.1)
             raise AgentError('No se confirmó la detención del proceso propio')
 
+    def police(self, tap):
+        """Tope de lo que una VM puede inyectar en la red compartida (protección contra ráfagas).
+        OVS mide lo que RECIBE del TAP, es decir, lo que la VM transmite."""
+        rate, burst = self.cfg.get('vm_rate_kbps', 10000), self.cfg.get('vm_burst_kb', 1000)
+        ensure(type(rate) is int and 100 <= rate <= 1000000 and type(burst) is int and 10 <= burst <= 100000,
+               'Tope de tráfico por VM inválido')
+        return ('ovs-vsctl', 'set', 'Interface', tap, 'ingress_policing_rate=%d' % rate, 'ingress_policing_burst=%d' % burst)
+
     def vm_ensure(self, sid, vm_name, **_):
         plan = self.load(sid)
         vm = next((v for v in self.local_vms(plan) if v['name'] == vm_name), None)
@@ -574,6 +582,7 @@ class Agent:
                 net = next(x for x in plan['networks'] if x['name'] == nic['network'])
                 output('ovs-vsctl', '--may-exist', 'add-port', bridge, tap, '--', 'set', 'Port', tap,
                        'vlan_mode=access', 'tag=' + str(net['cvid']), 'external_ids:g5_slice=' + sid)
+                output(*self.police(tap))
                 output('ip', 'link', 'set', tap, 'mtu', str(self.cfg['guest_mtu']), 'up')
                 argv += ['-netdev', 'tap,id=n%s,ifname=%s,script=no,downscript=no' % (i, tap),
                          '-device', 'e1000,netdev=n%s,mac=%s' % (i, nic['mac'])]
@@ -620,7 +629,9 @@ class Agent:
         lines = ['set -eu', 'sudo sysctl -w net.ipv4.ip_forward=0 >/dev/null',
                  'sudo killall udhcpc 2>/dev/null || true',
                  # CirrOS >= 0.6 usa dhcpcd (no udhcpc): si sigue vivo pelea con la IP fija (IPv4LL, RS/MLD).
-                 'sudo dhcpcd -x 2>/dev/null || true', 'sudo killall dhcpcd 2>/dev/null || true', 'sudo ip route del default 2>/dev/null || true']
+                 'sudo dhcpcd -x 2>/dev/null || true', 'sudo killall dhcpcd 2>/dev/null || true',
+                 # Solo usamos IPv4: sin IPv6 no hay RS/MLD automáticos en los enlaces del slice.
+                 'for f in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -e "$f" ] && echo 1 | sudo tee "$f" >/dev/null || true; done', 'sudo ip route del default 2>/dev/null || true']
         for idx, nic in enumerate(vm['nics']):
             net = next(n for n in plan['networks'] if n['name'] == nic['network'])
             name = nic.get('name', 'eth' + str(idx))
