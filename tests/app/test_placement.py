@@ -140,6 +140,11 @@ class Planner(unittest.TestCase):
         self.assertEqual(r["status"], "PLANNING_TIMEOUT")
         self.assertLess(r["elapsed_ms"], 2000)
 
+    def test_tope_de_vcpu(self):
+        r = plan(request([host(1, vcpus_max=2)], [vm(i, cpu_cent=10) for i in range(3)]))
+        self.assertEqual(r["status"], "HEURISTIC_NO_PLAN")
+        self.assertIn("vCPU insuficiente", r["reason"])
+
     def test_determinista(self):
         req = request([host(i) for i in range(1, 5)], [vm(i, cpu_cent=30 + 7 * i) for i in range(8)])
         self.assertEqual(plan(req)["plan"], plan(req)["plan"])

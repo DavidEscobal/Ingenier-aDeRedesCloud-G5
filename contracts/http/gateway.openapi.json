@@ -1873,6 +1873,138 @@
         }
       }
     },
+    "/v1/monitoring/state": {
+      "get": {
+        "tags": [
+          "monitoring"
+        ],
+        "summary": "Monitoring State",
+        "operationId": "monitoring_state_v1_monitoring_state_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "linux",
+                    "openstack"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/monitoring/history": {
+      "get": {
+        "tags": [
+          "monitoring"
+        ],
+        "summary": "Monitoring History",
+        "operationId": "monitoring_history_v1_monitoring_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "host",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+              "title": "Host"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1440,
+              "minimum": 1,
+              "default": 60,
+              "title": "Minutes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Respuesta inválida o error del Slice Manager"
+          },
+          "503": {
+            "description": "Slice Manager no disponible"
+          },
+          "504": {
+            "description": "Slice Manager excedió el tiempo límite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/images": {
       "get": {
         "tags": [

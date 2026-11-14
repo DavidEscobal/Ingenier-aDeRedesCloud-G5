@@ -30,6 +30,7 @@ class Host(Model):
     id: str = Field(pattern=ID)
     zone: str | None = Field(default=None, max_length=64)
     cpu_cores: int = Field(ge=1, le=1024, description="CPU físicas del host")
+    vcpus_max: int | None = Field(default=None, ge=0, description="Tope de vCPU reservables (si es menor que ratio × CPU)")
     ram_mb: int = Field(ge=0, description="RAM neta (ya descontada la reserva del host)")
     disk_mb: int = Field(ge=0, description="Disco neto")
     vcpus_used: int = Field(default=0, ge=0, description="vCPU ya comprometidas")

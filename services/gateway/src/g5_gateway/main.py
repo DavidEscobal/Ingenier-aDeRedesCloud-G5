@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
@@ -99,12 +99,22 @@ async def lifespan(app: FastAPI):
                 if (ip.scheme not in {"http", "https"} or not ip.hostname or ip.username or ip.password
                         or ip.query or ip.fragment or ip.path not in {"", "/"}):
                     raise ValueError("IMAGE_CATALOG_URL must be an HTTP(S) origin")
+            monitoring_url = os.getenv("MONITORING_URL")
+            if monitoring_url:
+                monitoring_url = monitoring_url.rstrip("/")
+                mp = urlsplit(monitoring_url)
+                if (mp.scheme not in {"http", "https"} or not mp.hostname or mp.username or mp.password
+                        or mp.query or mp.fragment or mp.path not in {"", "/"}):
+                    raise ValueError("MONITORING_URL must be an HTTP(S) origin")
             async with httpx.AsyncClient(base_url=topo_url or "http://topology.invalid", timeout=timeout,
                                          trust_env=False, follow_redirects=False) as topology, \
                     httpx.AsyncClient(base_url=image_url or "http://images.invalid", timeout=timeout,
-                                      trust_env=False, follow_redirects=False) as images:
+                                      trust_env=False, follow_redirects=False) as images, \
+                    httpx.AsyncClient(base_url=monitoring_url or "http://monitoring.invalid", timeout=timeout,
+                                      trust_env=False, follow_redirects=False) as monitoring:
                 app.state.topology_manager = topology if topo_url else None
                 app.state.image_catalog = images if image_url else None
+                app.state.monitoring = monitoring if monitoring_url else None
                 yield
 
 
@@ -315,6 +325,22 @@ async def update_draft(draft_id: DraftId, body: JsonBody, request: Request, acce
 async def delete_draft(draft_id: DraftId, request: Request, access_token=Depends(token)):
     return await topology_call(request, "DELETE", "/v1/drafts/" + draft_id, access_token)
 
+
+
+# --- Monitoreo (D-13): estado actual e historial de los servidores; lectura para usuarios autenticados.
+@app.get("/v1/monitoring/state", tags=["monitoring"], responses=ERROR_RESPONSES)
+async def monitoring_state(request: Request, provider: Literal["linux", "openstack"] | None = None,
+                           access_token=Depends(token)):
+    path = "/v1/monitoring/state" + ("?provider=" + provider if provider else "")
+    return await upstream_call(request.app.state.monitoring, "monitoring", "GET", path, access_token)
+
+
+@app.get("/v1/monitoring/history", tags=["monitoring"], responses=ERROR_RESPONSES)
+async def monitoring_history(request: Request,
+                             host: Annotated[str, Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")],
+                             minutes: Annotated[int, Query(ge=1, le=1440)] = 60, access_token=Depends(token)):
+    return await upstream_call(request.app.state.monitoring, "monitoring", "GET",
+                               "/v1/monitoring/history?host=%s&minutes=%d" % (host, minutes), access_token)
 
 
 # --- Imágenes (D-15): rutas explícitas hacia el Image Catalog. La importación se reenvía en streaming.

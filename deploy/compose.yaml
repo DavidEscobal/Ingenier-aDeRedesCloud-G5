@@ -168,6 +168,40 @@ services:
       retries: 3
       start_period: 10s
 
+  monitoring:
+    # D-13: recolecta cada 10 s una muestra del platform-manager (agente Linux y Nova) y guarda 24 h en SQLite.
+    # Lo leen el slice-manager (token de servicio) y la web vía gateway (usuario validado por IAM).
+    # Tokens en platform-config: monitoring.token (su identidad ante el platform-manager, en keys.json con rol
+    # service) y monitoring-read.token (el del slice-manager para leerlo).
+    profiles: [platform]
+    build:
+      context: ../services/monitoring
+    environment:
+      IAM_URL: http://iam:8000
+      PLATFORM_MANAGER_URL: http://platform-manager:8000
+      PLATFORM_TOKEN_FILE: /run/g5/platform.token
+      MONITORING_TOKEN_FILE: /run/g5/monitoring-read.token
+      MONITORING_DB_PATH: /app/state/monitoring/samples.db
+      MONITORING_INTERVAL_S: "10"
+      MONITORING_RETENTION_H: "24"
+    volumes:
+      - monitoring-data:/app/state/monitoring
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/monitoring.token:/run/g5/platform.token:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/monitoring-read.token:/run/g5/monitoring-read.token:ro
+    depends_on:
+      iam:
+        condition: service_healthy
+      platform-manager:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   gateway:
     build:
       context: ../services/gateway
@@ -176,6 +210,8 @@ services:
       SLICE_MANAGER_URL: http://slice-manager:8000
       TOPOLOGY_MANAGER_URL: http://topology-manager:8000
       IMAGE_CATALOG_URL: http://image-catalog:8000
+      # Opcional: sin el perfil platform, las rutas /v1/monitoring responden 503.
+      MONITORING_URL: http://monitoring:8000
       UPSTREAM_TIMEOUT_SECONDS: "3"
       SLICE_TIMEOUT_SECONDS: "30"
     ports:
@@ -226,3 +262,4 @@ volumes:
   slice-data:
   topology-data:
   image-data:
+  monitoring-data:

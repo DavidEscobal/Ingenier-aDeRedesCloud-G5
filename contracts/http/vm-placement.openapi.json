@@ -151,6 +151,19 @@
             "title": "Cpu Cores",
             "description": "CPU físicas del host"
           },
+          "vcpus_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vcpus Max",
+            "description": "Tope de vCPU reservables (si es menor que ratio × CPU)"
+          },
           "ram_mb": {
             "type": "integer",
             "minimum": 0.0,

@@ -55,7 +55,7 @@ Requisitos: **Python 3.12** y Git. (Node 20 solo si vas a tocar la web; también
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate      Linux/Mac: source .venv/bin/activate
-for s in gateway iam-service slice-manager topology-manager image-catalog vm-placement; do pip install -r services/$s/requirements.lock; done
+for s in gateway iam-service slice-manager topology-manager image-catalog vm-placement monitoring; do pip install -r services/$s/requirements.lock; done
 ```
 
 ## 5. Antes de cada Pull Request: `bash scripts/verificar.sh`

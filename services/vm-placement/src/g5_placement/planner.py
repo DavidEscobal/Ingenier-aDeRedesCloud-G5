@@ -14,7 +14,10 @@ INVALID = "INVALID_OR_ERROR"
 
 def host_vectors(h, policy):
     """Capacidad y uso de un host en las 4 dimensiones."""
-    cap = [int(policy["cpu_ratio"] * h["cpu_cores"]), int(policy["cpu_limit"] * 100 * h["cpu_cores"]),
+    vcpu_cap = int(policy["cpu_ratio"] * h["cpu_cores"])
+    if h.get("vcpus_max") is not None:
+        vcpu_cap = min(vcpu_cap, int(h["vcpus_max"]))
+    cap = [vcpu_cap, int(policy["cpu_limit"] * 100 * h["cpu_cores"]),
            int(h["ram_mb"]), int(h["disk_mb"])]
     real = h.get("cpu_real_cent")
     if real is None:                       # dato ausente no equivale a cero: demanda completa de lo comprometido
