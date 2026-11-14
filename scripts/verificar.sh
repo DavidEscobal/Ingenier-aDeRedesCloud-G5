@@ -7,7 +7,7 @@ BASE="${1:-origin/fase2}"
 OK=1
 SEP=":"; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) SEP=";";; esac
 PY="${PYTHON:-python}"
-APP_PATH="services/gateway/src${SEP}services/iam-service/src${SEP}services/slice-manager/src${SEP}services/topology-manager/src${SEP}services/image-catalog/src${SEP}tests/app${SEP}."
+APP_PATH="services/gateway/src${SEP}services/iam-service/src${SEP}services/slice-manager/src${SEP}services/topology-manager/src${SEP}services/image-catalog/src${SEP}services/vm-placement/src${SEP}tests/app${SEP}."
 
 echo "== 1/4 Tests del núcleo (g5)"
 CORE_PATH=""; [ "$SEP" = ";" ] && CORE_PATH="tools/winshim"

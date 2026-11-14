@@ -94,6 +94,24 @@ services:
       retries: 3
       start_period: 10s
 
+  vm-placement:
+    # R4: plan de ubicación por slice (BCDP v2). Sin estado y sin puertos publicados; solo lo llama el
+    # slice-manager con un token de servicio (platform-config/placement.token, una línea, ≥32 caracteres).
+    build:
+      context: ../services/vm-placement
+    environment:
+      PLACEMENT_TOKEN_FILE: /run/g5/placement.token
+    volumes:
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/placement.token:/run/g5/placement.token:ro
+    restart: unless-stopped
+    networks: [control]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   os-tunnel:
     # Túneles SSH hacia las APIs de OpenStack, visibles solo en la red `control`
     # (http://os-tunnel:5000, :8774, :9696, :9292, :6080). No toca g5-tunnels del host.

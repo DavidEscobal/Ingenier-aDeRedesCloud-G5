@@ -1,0 +1,504 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "G5 VM Placement",
+    "description": "Plan de ubicación de VMs por slice completo (BCDP v2). Sin estado; no reserva.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/placements": {
+      "post": {
+        "tags": [
+          "placement"
+        ],
+        "summary": "Placements",
+        "operationId": "placements_v1_placements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlacementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Discarded": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "reason"
+        ],
+        "title": "Discarded"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "const": "vm-placement",
+            "title": "Service",
+            "default": "vm-placement"
+          },
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "title": "Health"
+      },
+      "Host": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+            "title": "Id"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "cpu_cores": {
+            "type": "integer",
+            "maximum": 1024.0,
+            "minimum": 1.0,
+            "title": "Cpu Cores",
+            "description": "CPU físicas del host"
+          },
+          "ram_mb": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ram Mb",
+            "description": "RAM neta (ya descontada la reserva del host)"
+          },
+          "disk_mb": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Disk Mb",
+            "description": "Disco neto"
+          },
+          "vcpus_used": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Vcpus Used",
+            "description": "vCPU ya comprometidas",
+            "default": 0
+          },
+          "cpu_real_cent": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Real Cent",
+            "description": "CPU real en centésimas; null = sin telemetría"
+          },
+          "ram_used_mb": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ram Used Mb",
+            "default": 0
+          },
+          "disk_used_mb": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Disk Used Mb",
+            "default": 0
+          },
+          "occupied": {
+            "type": "boolean",
+            "title": "Occupied",
+            "description": "Ya aloja VMs de otros slices",
+            "default": false
+          },
+          "healthy": {
+            "type": "boolean",
+            "title": "Healthy",
+            "default": true
+          },
+          "age_s": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age S",
+            "description": "Antigüedad de la telemetría"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "cpu_cores",
+          "ram_mb",
+          "disk_mb"
+        ],
+        "title": "Host"
+      },
+      "PlacementRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "linux",
+              "openstack"
+            ],
+            "title": "Provider"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "hosts": {
+            "items": {
+              "$ref": "#/components/schemas/Host"
+            },
+            "type": "array",
+            "maxItems": 256,
+            "title": "Hosts"
+          },
+          "vms": {
+            "items": {
+              "$ref": "#/components/schemas/Vm"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Vms"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/Policy",
+            "default": {
+              "cpu_ratio": 2.0,
+              "cpu_limit": 0.85,
+              "max_age_s": 15.0,
+              "timeout_s": 1.0
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "hosts",
+          "vms"
+        ],
+        "title": "PlacementRequest"
+      },
+      "PlacementResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PLAN_FOUND",
+              "HEURISTIC_NO_PLAN",
+              "PLANNING_TIMEOUT",
+              "INVALID_OR_ERROR"
+            ],
+            "title": "Status"
+          },
+          "algorithm": {
+            "type": "string",
+            "title": "Algorithm"
+          },
+          "plan": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Plan"
+          },
+          "hosts_used": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hosts Used"
+          },
+          "hosts_opened": {
+            "type": "integer",
+            "title": "Hosts Opened",
+            "description": "Z: hosts que no tenían VMs y quedan ocupados"
+          },
+          "discarded_hosts": {
+            "items": {
+              "$ref": "#/components/schemas/Discarded"
+            },
+            "type": "array",
+            "title": "Discarded Hosts"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "elapsed_ms": {
+            "type": "number",
+            "title": "Elapsed Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "algorithm",
+          "plan",
+          "hosts_used",
+          "hosts_opened",
+          "discarded_hosts",
+          "reason",
+          "elapsed_ms"
+        ],
+        "title": "PlacementResponse"
+      },
+      "Policy": {
+        "properties": {
+          "cpu_ratio": {
+            "type": "number",
+            "maximum": 16.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cpu Ratio",
+            "default": 2.0
+          },
+          "cpu_limit": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cpu Limit",
+            "default": 0.85
+          },
+          "max_age_s": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Age S",
+            "default": 15
+          },
+          "timeout_s": {
+            "type": "number",
+            "maximum": 10.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout S",
+            "default": 1.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Policy"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Vm": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+            "title": "Id"
+          },
+          "vcpus": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Vcpus"
+          },
+          "ram_mb": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Ram Mb"
+          },
+          "disk_mb": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Disk Mb"
+          },
+          "cpu_cent": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Cent",
+            "description": "CPU prevista; null = demanda completa"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host",
+            "description": "Servidor fijado por el usuario"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "vcpus",
+          "ram_mb",
+          "disk_mb"
+        ],
+        "title": "Vm"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
