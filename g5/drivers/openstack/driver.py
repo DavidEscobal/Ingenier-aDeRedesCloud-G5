@@ -140,6 +140,29 @@ class OpenStackDriver(ProviderDriver):
             require(not missing, 'Tamaño no disponible en OpenStack (falta su flavor): ' +
                     ', '.join('%d vCPU · %d MB · %d GB' % m for m in missing), 409)
 
+    def hypervisors(self):
+        """Inventario de los workers (monitoreo D-13 y R4-I-01): lo que Nova tiene comprometido por host y su
+        zona de disponibilidad (agregados; si el usuario no puede leerlos, la zona es 'nova')."""
+        zones = {}
+        try:
+            for agg in self.call('GET', 'compute', '/os-aggregates').get('aggregates', []):
+                for h in agg.get('hosts') or []:
+                    if agg.get('availability_zone'):
+                        zones[h] = agg['availability_zone']
+        except OpenStackError:
+            pass
+        rows = []
+        for hv in self.call('GET', 'compute', '/os-hypervisors/detail')['hypervisors']:
+            host = (hv.get('service') or {}).get('host') or hv.get('hypervisor_hostname')
+            rows.append({'node': host, 'hypervisor': hv.get('hypervisor_hostname'), 'zone': zones.get(host, 'nova'),
+                         'state': hv.get('state'), 'status': hv.get('status'),
+                         'vcpus': hv.get('vcpus'), 'vcpus_used': hv.get('vcpus_used'),
+                         'memory_mb': hv.get('memory_mb'), 'memory_mb_used': hv.get('memory_mb_used'),
+                         'local_gb': hv.get('local_gb'), 'local_gb_used': hv.get('local_gb_used'),
+                         'disk_available_least': hv.get('disk_available_least'),
+                         'running_vms': hv.get('running_vms')})
+        return sorted(rows, key=lambda r: r['node'] or '')
+
     def inspect(self, plan, store):
         servers = {}
         for row in store.resources(plan['id']):

@@ -226,6 +226,14 @@ class FakeCloud:
         return 404, {'error': 'neutron'}
 
     def nova(self, method, rest, query, body, project):
+        if rest == ['os-hypervisors', 'detail']:
+            return 200, {'hypervisors': [
+                {'hypervisor_hostname': 'worker%d' % n, 'service': {'host': 'worker%d' % n}, 'state': 'up',
+                 'status': 'enabled', 'vcpus': 4, 'vcpus_used': n, 'memory_mb': 3936, 'memory_mb_used': 512 * (n + 1),
+                 'local_gb': 9, 'local_gb_used': n, 'disk_available_least': 6 - n, 'running_vms': n}
+                for n in (1, 2, 3)]}
+        if rest == ['os-aggregates']:
+            return 200, {'aggregates': [{'name': 'az-a', 'availability_zone': 'zona-a', 'hosts': ['worker1', 'worker2']}]}
         if rest == ['flavors', 'detail']:
             return 200, {'flavors': self.flavors}
         if rest == ['flavors'] and method == 'POST':

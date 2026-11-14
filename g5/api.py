@@ -60,6 +60,35 @@ class Application:
             result.append(report)
         return result
 
+    def metrics(self):
+        """Una muestra de telemetría para el servicio de monitoreo: workers Linux (agente, en paralelo) con su
+        capacidad y lo reservado por G5, y los hipervisores de OpenStack según Nova. Un fallo por nodo no
+        tumba la respuesta: se informa en `error`."""
+        def linux(name):
+            row = {'node': name, 'zone': self.config['workers'][name].get('zone', 'linux'),
+                   'capacity': self.config['workers'][name]['capacity']}
+            rows = self.store.rows('SELECT enabled FROM nodes WHERE id=?', (name,))
+            row['enabled'] = bool(rows[0]['enabled']) if rows else False
+            row['allocated'] = self.store.rows('SELECT COUNT(*) AS vms, COALESCE(SUM(cpu),0) AS vcpus, COALESCE(SUM(mem),0) AS memory_mb, '
+                                               'COALESCE(SUM(disk),0) AS disk_gb FROM allocations WHERE worker=?', (name,))[0]
+            try:
+                row['metrics'] = self.backend.call(name, 'metrics', interval=1.0)
+            except Exception as exc:
+                row['error'] = str(exc)[:300]
+            return row
+        workers = sorted(self.config['workers'])
+        results = [None] * len(workers)
+        threads = [threading.Thread(target=lambda i=i, n=n: results.__setitem__(i, linux(n))) for i, n in enumerate(workers)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        out = {'timestamp': time.time(), 'linux': results, 'openstack': None}
+        if 'openstack' in self.store.drivers and 'openstack' in self.config:
+            try:
+                out['openstack'] = {'hosts': self.store.drivers['openstack'].hypervisors()}
+            except Exception as exc:
+                out['openstack'] = {'hosts': [], 'error': str(exc)[:300]}
+        return out
+
     def route(self, method, path, body, owner, admin, key):
         s = self.store
         if method == 'GET' and path == '/v1/capabilities':
@@ -72,6 +101,9 @@ class Application:
         if method == 'GET' and path == '/v1/nodes':
             require(admin, 'Requiere rol admin/service', 403)
             return 200, self.nodes()
+        if method == 'GET' and path == '/v1/metrics':
+            require(admin, 'Requiere rol admin/service', 403)
+            return 200, self.metrics()
         match = re.fullmatch(r'/v1/nodes/([a-z][a-z0-9-]{0,31})', path)
         if method == 'PATCH' and match:
             require(admin, 'Requiere rol admin/service', 403)

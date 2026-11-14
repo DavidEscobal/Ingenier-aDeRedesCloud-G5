@@ -132,6 +132,34 @@
         }
       }
     },
+    "/v1/metrics": {
+      "get": {
+        "summary": "Muestra de telemetría (Linux por agente, OpenStack por Nova) para el monitoreo; admin/service",
+        "operationId": "get_v1_metrics",
+        "responses": {
+          "200": {
+            "description": "Resultado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generic"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400 validación, 401 identidad, 403 permiso, 404 recurso, 409 conflicto, 413 límite, 503 infraestructura",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/nodes/{node}": {
       "patch": {
         "summary": "Mantenimiento del worker: enabled=false impide nuevas reservas",

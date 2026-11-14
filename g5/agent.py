@@ -306,6 +306,61 @@ class Agent:
                 'disk_free_gb': shutil.disk_usage(str(self.root)).free // 1024**3,
                 'load': list(os.getloadavg())}
 
+    def metrics(self, interval=1.0, **_):
+        """Telemetría de solo lectura (monitoreo D-13): CPU real del host y de cada VM de G5 en centésimas de
+        CPU, medida como incremento de tiempo de CPU durante `interval` s; RAM disponible y disco libre."""
+        ensure(isinstance(interval, (int, float)) and 0.2 <= interval <= 5, 'Intervalo de muestreo inválido')
+        proc = Path(getattr(self, 'proc_root', '/proc'))      # fijo; solo las pruebas lo cambian
+        hz = os.sysconf('SC_CLK_TCK') if hasattr(os, 'sysconf') else 100
+
+        def host_ticks():
+            fields = (proc / 'stat').read_text().splitlines()[0].split()[1:]
+            values = [int(x) for x in fields[:8]]
+            return sum(values), values[3] + values[4]          # total, idle + iowait
+
+        def vm_ticks():
+            out = {}
+            for p in proc.iterdir():
+                if not p.name.isdigit():
+                    continue
+                try:
+                    args = (p / 'cmdline').read_bytes().split(b'\0')
+                    if b'-name' not in args:
+                        continue
+                    name = args[args.index(b'-name') + 1].decode(errors='replace')
+                    m = re.fullmatch(r'g5-([0-9a-f]{32})-(.+)', name)
+                    if not m:
+                        continue
+                    stat = (p / 'stat').read_text()
+                    parts = stat[stat.rindex(')') + 2:].split()
+                    rss = 0
+                    for line in (p / 'status').read_text().splitlines():
+                        if line.startswith('VmRSS:'):
+                            rss = int(line.split()[1]) // 1024
+                    out[int(p.name)] = (m.group(1), m.group(2), int(parts[11]) + int(parts[12]), rss)
+                except (OSError, ValueError, IndexError):
+                    pass
+            return out
+
+        t0, i0 = host_ticks(); v0 = vm_ticks(); start = time.monotonic()
+        time.sleep(interval)
+        t1, i1 = host_ticks(); v1 = vm_ticks(); elapsed = max(time.monotonic() - start, 1e-3)
+        cpus = os.cpu_count() or 1
+        busy = 1 - (i1 - i0) / (t1 - t0) if t1 > t0 else 0.0
+        vms = [{'sid': sid, 'vm': vm, 'pid': pid, 'rss_mb': rss,
+                'cpu_cent': max(0, round(100 * (ticks - v0[pid][2]) / hz / elapsed))}
+               for pid, (sid, vm, ticks, rss) in sorted(v1.items()) if pid in v0]
+        mem = {}
+        for line in (proc / 'meminfo').read_text().splitlines():
+            k, v = line.split(':', 1); mem[k] = int(v.split()[0])
+        disk = shutil.disk_usage(str(self.root))
+        return {'node': self.cfg['name'], 'timestamp': time.time(), 'interval_s': round(elapsed, 3),
+                'cpu_cores': cpus, 'cpu_real_cent': round(100 * cpus * max(0.0, busy)),
+                'memory_total_mb': mem['MemTotal'] // 1024,
+                'memory_available_mb': mem.get('MemAvailable', mem['MemFree']) // 1024,
+                'disk_total_mb': disk.total // 1024**2, 'disk_free_mb': disk.free // 1024**2,
+                'load': list(os.getloadavg()) if hasattr(os, 'getloadavg') else None, 'vms': vms}
+
     def bootstrap(self, **_):
         report = self.doctor()
         ensure(report['ok'], '; '.join(report['problems']))
@@ -1107,7 +1162,7 @@ def main():
     action = request.pop('action')
     actions = ('doctor', 'bootstrap', 'prepare', 'image_status', 'image_receive', 'cache_gc',
                'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete',
-               'diag_datapath', 'diag_capture', 'diag_ovs', 'diag_console')
+               'diag_datapath', 'diag_capture', 'diag_ovs', 'diag_console', 'metrics')
     ensure(action in actions, 'Acción no admitida')
     if action == 'image_receive':
         request['stream'] = sys.stdin.buffer

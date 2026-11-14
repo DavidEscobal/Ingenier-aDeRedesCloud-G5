@@ -291,6 +291,22 @@ class SecurityAndHTTPTests(Fixture):
             self.app.route('GET', '/v1/slices/' + job['slice_id'], {}, 'alumno', False, '')
         self.assertEqual(error.exception.status, 404)
 
+    def test_metrics_for_monitoring(self):
+        job = self.ready()
+        with self.assertRaises(Fault) as error:
+            self.app.route('GET', '/v1/metrics', {}, 'alumno', False, '')
+        self.assertEqual(error.exception.status, 403)
+        data = self.app.route('GET', '/v1/metrics', {}, 'svc', True, '')[1]
+        self.assertEqual([r['node'] for r in data['linux']], sorted(self.cfg['workers']))
+        used = [r for r in data['linux'] if r['allocated']['vms']]
+        self.assertTrue(used)
+        for row in used:
+            self.assertEqual(row['metrics']['cpu_cores'], 4)
+            self.assertEqual({v['sid'] for v in row['metrics']['vms']}, {job['slice_id']})
+        self.backend.failures[('server1', 'metrics')] = 1
+        data = self.app.route('GET', '/v1/metrics', {}, 'svc', True, '')[1]
+        self.assertIn('Fallo inyectado', data['linux'][0]['error'])
+
     def test_user_cannot_administer_nodes(self):
         with self.assertRaises(Fault) as error:
             self.app.route('PATCH', '/v1/nodes/server1', {'enabled': False}, 'alumno', False, '')
@@ -342,6 +358,35 @@ class AgentTests(Fixture):
         cfg = dict(self.cfg['common'], **(self.cfg['gateway'] if role == 'gateway' else self.cfg['workers']['server1']))
         cfg['state_dir'] = self.temp.name + '/node'
         return Agent(cfg)
+
+    def test_metrics_cpu_real_por_host_y_vm(self):
+        agent = self.agent('worker'); proc = Path(self.temp.name) / 'proc'
+        sid = 'a' * 32
+        vm = proc / '4242'; other = proc / '77'
+        for d in (vm, other):
+            d.mkdir(parents=True)
+        (vm / 'cmdline').write_bytes(b'qemu-system-x86_64\0-name\0g5-' + sid.encode() + b'-vm1\0-m\0512\0')
+        (other / 'cmdline').write_bytes(b'sshd\0')
+        (vm / 'status').write_text('Name:\tqemu\nVmRSS:\t  262144 kB\n')
+        (proc / 'meminfo').write_text('MemTotal:  4000000 kB\nMemFree: 100 kB\nMemAvailable: 2048000 kB\n')
+
+        def sample(total_busy, idle, vm_ticks):
+            (proc / 'stat').write_text('cpu  %d 0 0 %d 0 0 0 0 0 0\ncpu0 1 1 1 1\n' % (total_busy, idle))
+            (vm / 'stat').write_text('4242 (qemu system) S ' + ' '.join(['0'] * 10) + ' %d 0 0 0\n' % vm_ticks)
+        sample(1000, 9000, 500)
+        agent.proc_root = str(proc)
+        # En 1 s: 200 ticks ocupados de 400 (50 %) y la VM usa 50 ticks (0,5 CPU con 100 Hz).
+        with mock.patch('g5.agent.time.sleep', side_effect=lambda s: sample(1200, 9200, 550)), \
+                mock.patch('g5.agent.time.monotonic', side_effect=[0.0, 1.0]), \
+                mock.patch('g5.agent.os.cpu_count', return_value=4), \
+                mock.patch('g5.agent.os.sysconf', create=True, return_value=100):
+            m = agent.metrics(interval=1)
+        self.assertEqual(m['cpu_cores'], 4)
+        self.assertEqual(m['cpu_real_cent'], 200)
+        self.assertEqual(m['memory_available_mb'], 2000)
+        self.assertEqual(m['vms'], [{'sid': sid, 'vm': 'vm1', 'pid': 4242, 'rss_mb': 256, 'cpu_cent': 50}])
+        with self.assertRaises(AgentError):
+            agent.metrics(interval=60)
 
     def test_real_qinq_command_builder(self):
         job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']

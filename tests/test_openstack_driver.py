@@ -54,6 +54,15 @@ class OpenStackFixture(unittest.TestCase):
 
 
 class OpenStackDriverTests(OpenStackFixture):
+    def test_hypervisors_inventory_with_zones(self):
+        rows = self.driver.hypervisors()
+        self.assertEqual([r['node'] for r in rows], ['worker1', 'worker2', 'worker3'])
+        self.assertEqual([r['zone'] for r in rows], ['zona-a', 'zona-a', 'nova'])
+        self.assertEqual(rows[2]['vcpus_used'], 3)
+        self.assertEqual(rows[0]['disk_available_least'], 5)
+        metrics = self.app.route('GET', '/v1/metrics', {}, 'svc', True, '')[1]
+        self.assertEqual(len(metrics['openstack']['hosts']), 3)
+
     def test_size_without_flavor_is_rejected_before_admission(self):
         """Sin create_flavors, un tamaño sin flavor se rechaza en el preflight: nada se crea en OpenStack."""
         self.driver.os_cfg['create_flavors'] = False

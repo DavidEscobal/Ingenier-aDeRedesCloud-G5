@@ -35,6 +35,8 @@ class SSHBackend:
         # cortar antes repetía la llamada y duplicaba la espera (452 s en la prueba del 2026-11-13).
         if action == 'guest_setup':
             return int(self.config.get('common', {}).get('guest_boot_timeout', 420)) + 60
+        if action == 'metrics':            # telemetría: una muestra vieja no sirve, mejor fallar rápido
+            return 30
         return 300
 
     def call(self, node, action, **params):
@@ -143,6 +145,14 @@ class MemoryBackend:
             elif action == 'inspect':
                 obj = self.resources.get(key)
                 return {'ok': bool(obj and obj['network']), 'vms': obj['vms'] if obj else {}, 'simulated': True}
+            elif action == 'metrics':
+                vms = [{'sid': sid_, 'vm': v['name'], 'pid': 1000 + n, 'rss_mb': v['memory_mb'] // 2, 'cpu_cent': 5}
+                       for n, ((n_, sid_), obj) in enumerate(sorted(self.resources.items())) if n_ == node
+                       for v in obj['plan']['vms'] if v['worker'] == node]
+                return {'node': node, 'simulated': True, 'timestamp': time.time(), 'interval_s': 1.0, 'cpu_cores': 4,
+                        'cpu_real_cent': 10 + sum(v['cpu_cent'] for v in vms), 'memory_total_mb': 3936,
+                        'memory_available_mb': 3000, 'disk_total_mb': 20000, 'disk_free_mb': 15000,
+                        'load': [0.1, 0.1, 0.1], 'vms': vms}
             elif action == 'cache_gc':
                 pinned = {v['image'] for (n, _), obj in self.resources.items() if n == node for v in obj['plan']['vms'] if v['worker'] == node}
                 removed = [im for n, im in self.images if n == node and im not in pinned] if params.get('all_unused') else []
