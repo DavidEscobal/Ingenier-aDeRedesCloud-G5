@@ -63,6 +63,20 @@ class OpenStackDriverTests(OpenStackFixture):
         metrics = self.app.route('GET', '/v1/metrics', {}, 'svc', True, '')[1]
         self.assertEqual(len(metrics['openstack']['hosts']), 3)
 
+    def test_placement_host_and_zone_force_the_compute(self):
+        spec = copy.deepcopy(LINEAL)
+        spec['vms'][0].update(host='worker2', zone='zona-a')
+        spec['vms'][1].update(host='worker3')
+        slice_ = self.run_job(self.create(spec))
+        self.assertEqual(slice_['status'], 'READY', slice_)
+        zones = {s['name'].rsplit('-', 1)[-1]: (s['availability_zone'], s['host']) for s in self.cloud.servers.values()}
+        self.assertEqual(zones['vm1'], ('zona-a:worker2', 'worker2'))
+        self.assertEqual(zones['vm2'], ('nova:worker3', 'worker3'))
+        self.assertIsNone(zones['vm3'][0])
+        bad = copy.deepcopy(LINEAL); bad['vms'][0]['zone'] = 'zona-a'
+        with self.assertRaises(Fault):
+            validate(bad, self.cfg)
+
     def test_size_without_flavor_is_rejected_before_admission(self):
         """Sin create_flavors, un tamaño sin flavor se rechaza en el preflight: nada se crea en OpenStack."""
         self.driver.os_cfg['create_flavors'] = False

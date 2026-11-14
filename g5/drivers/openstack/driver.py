@@ -77,11 +77,15 @@ def validate_spec(spec, config):
         ranges.append(net)
     ids, addresses = set(), set()
     for vm in vms:
-        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host'),
+        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host', 'zone'),
                ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics'))
         slug(vm['name'])
-        if 'host' in vm:  # compute fijo (paso 3 del Ex2); sin él decide Nova (o, más adelante, el placement)
+        if 'host' in vm:  # compute fijo: elegido a mano (paso 3 del Ex2) o por el VM Placement de G5 (R4)
             slug(vm['host'])
+        if 'zone' in vm:  # zona de disponibilidad del host (agregado de Nova); solo junto con host
+            require('host' in vm, 'zone requiere host')
+            require(isinstance(vm['zone'], str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}', vm['zone']),
+                    'Zona de disponibilidad inválida')
         require(vm['name'] not in ids, 'VM repetida')
         ids.add(vm['name'])
         require(isinstance(vm['image'], str) and 1 <= len(vm['image']) <= 255, 'Nombre de imagen Glance requerido')
@@ -299,8 +303,8 @@ class OpenStackDriver(ProviderDriver):
                                   lambda: self.find('compute', '/servers', 'servers', pid, name='^%s$' % vm['os_name']),
                                   lambda: self.call('POST', 'compute', '/servers', {'server': dict({
                                       'name': vm['os_name'], 'imageRef': image, 'flavorRef': flavor, 'networks': ports},
-                                      # host forzado: zona "nova:<compute>" (requiere rol admin en el proyecto)
-                                      **({'availability_zone': 'nova:' + vm['host']} if vm.get('host') else {}))}, pid)['server'])
+                                      # host forzado: "<zona>:<compute>" (requiere rol admin en el proyecto)
+                                      **({'availability_zone': vm.get('zone', 'nova') + ':' + vm['host']} if vm.get('host') else {}))}, pid)['server'])
             current = self.call('GET', 'compute', '/servers/' + created['id'], project_id=pid)['server']
             if current['status'] == 'SHUTOFF':  # 'start' reutiliza deploy sobre VMs detenidas
                 self.call('POST', 'compute', '/servers/%s/action' % created['id'], {'os-start': None}, pid)

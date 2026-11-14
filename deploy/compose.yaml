@@ -32,10 +32,19 @@ services:
       PLATFORM_TOKEN_FILE: /run/g5/platform.token
       SLICE_DB_PATH: /app/state/slice/slices.db
       IAM_SERVICE_TOKEN_FILE: /run/g5/iam-service.token
+      # R4: Monitoreo -> VM Placement antes de enviar el slice al platform-manager.
+      PLACEMENT_URL: http://vm-placement:8000
+      PLACEMENT_TOKEN_FILE: /run/g5/placement.token
+      MONITORING_URL: http://monitoring:8000
+      MONITORING_TOKEN_FILE: /run/g5/monitoring-read.token
+      PLACEMENT_CPU_RATIO: "2.0"
+      PLACEMENT_CPU_LIMIT: "0.85"
     volumes:
       - slice-data:/app/state/slice
       - ${G5_PLATFORM_CONFIG:-./platform-config}/iam-service.token:/run/g5/iam-service.token:ro
       - ${G5_PLATFORM_CONFIG:-./platform-config}/slice-manager.token:/run/g5/platform.token:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/placement.token:/run/g5/placement.token:ro
+      - ${G5_PLATFORM_CONFIG:-./platform-config}/monitoring-read.token:/run/g5/monitoring-read.token:ro
     depends_on:
       iam:
         condition: service_healthy

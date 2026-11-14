@@ -253,7 +253,10 @@ class FakeCloud:
                 if p['port'] not in self.ports:
                     return 400, {'badRequest': {'message': 'puerto'}}
             s = {'id': self.new('srv'), 'name': b['name'], 'project_id': project, 'status': 'BUILD', 'polls': 0,
-                 'ports': [p['port'] for p in b['networks']], 'host': self.hosts[len(self.servers) % len(self.hosts)]}
+                 'ports': [p['port'] for p in b['networks']], 'host': self.hosts[len(self.servers) % len(self.hosts)],
+                 'availability_zone': b.get('availability_zone')}
+            if ':' in (b.get('availability_zone') or ''):        # host forzado "<zona>:<host>"
+                s['host'] = b['availability_zone'].split(':', 1)[1]
             for p in s['ports']:
                 self.ports[p]['device_id'] = s['id']
             self.servers[s['id']] = s

@@ -518,6 +518,19 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement",
+            "description": "Decisión del VM Placement (R4)"
           }
         },
         "type": "object",
@@ -709,6 +722,20 @@
             "type": "object",
             "title": "Spec",
             "description": "Especificación del slice (formato del platform-manager)"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone",
+            "description": "Zona de disponibilidad (R4-I-04); sin ella, cualquier host del proveedor"
           }
         },
         "additionalProperties": false,
@@ -767,6 +794,18 @@
             "type": "array",
             "title": "Vms",
             "default": []
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement"
           },
           "events": {
             "items": {
@@ -990,6 +1029,17 @@
               }
             ],
             "title": "Disk Gb"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
           },
           "networks": {
             "items": {

@@ -5,6 +5,7 @@ el Slice Manager llama al platform-manager con un token de servicio propio y gua
 slice → dueño/curso. El platform-manager ejecuta y conserva el estado real del slice.
 """
 import hashlib
+import json
 import os
 import sqlite3
 import threading
@@ -19,6 +20,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi import Path as PathParam
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from .placement import Planner
 
 
 class Health(BaseModel):
@@ -49,12 +52,15 @@ class SliceCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
     spec: dict[str, Any] = Field(description="Especificación del slice (formato del platform-manager)")
+    zone: str | None = Field(default=None, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                             description="Zona de disponibilidad (R4-I-04); sin ella, cualquier host del proveedor")
 
 
 class Accepted(BaseModel):
     slice_id: str
     operation_id: str
     status: str
+    placement: dict[str, Any] | None = Field(default=None, description="Decisión del VM Placement (R4)")
 
 
 class SliceView(BaseModel):
@@ -81,11 +87,13 @@ class VmView(BaseModel):
     vcpus: int | None = None
     memory_mb: int | None = None
     disk_gb: int | None = None
+    host: str | None = None
     networks: list[str] = []
 
 
 class SliceDetail(SliceView):
     vms: list[VmView] = []
+    placement: dict[str, Any] | None = None
     events: list[SliceEvent]
     assignable: bool = False
     can_manage: bool = False
@@ -138,12 +146,18 @@ class Registry:
         columns = {r[1] for r in self.db.execute("PRAGMA table_info(slices)")}
         if "iam_registered" not in columns:
             self.db.execute("ALTER TABLE slices ADD COLUMN iam_registered INTEGER NOT NULL DEFAULT 0")
+        if "placement" not in columns:
+            self.db.execute("ALTER TABLE slices ADD COLUMN placement TEXT")
 
     def add(self, sid, user, course_id, spec):
         with self.lock:
             self.db.execute("INSERT OR IGNORE INTO slices(id, owner_id, owner, course_id, name, provider, created_at) "
                             "VALUES(?,?,?,?,?,?,?)", (sid, user.id, user.username, course_id, spec.get("name"),
                                                       spec.get("provider", "linux"), time.time()))
+
+    def set_placement(self, sid, summary):
+        with self.lock:
+            self.db.execute("UPDATE slices SET placement=? WHERE id=?", (json.dumps(summary), sid))
 
     def mark_registered(self, sid):
         with self.lock:
@@ -193,11 +207,31 @@ async def lifespan(app):
         if len(app.state.iam_service_token) < 32:
             raise ValueError("IAM_SERVICE_TOKEN_FILE debe contener un token de servicio")
     timeout = float(os.getenv("PLATFORM_TIMEOUT_SECONDS", "20"))
+    # R4: con PLACEMENT_URL y MONITORING_URL el Slice Manager planifica cada slice; sin ellos se mantiene el
+    # comportamiento anterior (servidor elegido a mano o reparto del adaptador / Nova).
+    placement_url, monitoring_url = os.getenv("PLACEMENT_URL"), os.getenv("MONITORING_URL")
     async with httpx.AsyncClient(base_url=iam_url, timeout=3, trust_env=False, follow_redirects=False) as iam, \
             httpx.AsyncClient(base_url=platform_url or "http://platform.invalid", timeout=timeout,
-                              trust_env=False, follow_redirects=False) as platform:
+                              trust_env=False, follow_redirects=False) as platform, \
+            httpx.AsyncClient(base_url=origin("PLACEMENT_URL", placement_url) if placement_url else "http://placement.invalid",
+                              timeout=5, trust_env=False, follow_redirects=False) as placement, \
+            httpx.AsyncClient(base_url=origin("MONITORING_URL", monitoring_url) if monitoring_url else "http://monitoring.invalid",
+                              timeout=5, trust_env=False, follow_redirects=False) as monitoring:
         app.state.iam = iam
         app.state.platform = platform if platform_url else None
+        app.state.planner = None
+        if placement_url and monitoring_url:
+            tokens = []
+            for name in ("PLACEMENT_TOKEN_FILE", "MONITORING_TOKEN_FILE"):
+                value = Path(os.environ[name]).read_text(encoding="utf-8").strip()
+                if len(value) < 32:
+                    raise ValueError(name + " debe contener un token de servicio")
+                tokens.append(value)
+            policy = {"cpu_ratio": float(os.getenv("PLACEMENT_CPU_RATIO", "2.0")),
+                      "cpu_limit": float(os.getenv("PLACEMENT_CPU_LIMIT", "0.85")),
+                      "max_age_s": float(os.getenv("PLACEMENT_MAX_AGE_S", "15")),
+                      "timeout_s": float(os.getenv("PLACEMENT_TIMEOUT_S", "1.0"))}
+            app.state.planner = Planner(monitoring, placement, tokens[1], tokens[0], policy)
         try:
             yield
         finally:
@@ -423,7 +457,8 @@ async def ready(request: Request) -> Health:
 @app.get("/v1/capabilities", response_model=Capabilities, tags=["platform"], dependencies=[Depends(authorize_platform)])
 def capabilities(request: Request) -> Capabilities:
     on = request.app.state.platform is not None
-    return Capabilities(features=Features(slice_lifecycle=on, persistence=on, queue=on, openstack=on, linux_r2=on))
+    return Capabilities(features=Features(slice_lifecycle=on, persistence=on, queue=on, openstack=on, linux_r2=on,
+                                          placement=request.app.state.planner is not None))
 
 
 @app.post("/v1/slices", response_model=Accepted, status_code=202, tags=["slices"])
@@ -432,12 +467,22 @@ async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey,
     platform_ready(request)
     if not await allowed(request, token, "slice.create", course_id=body.course_id):
         raise HTTPException(403, "not_authorized")
-    job = await platform_call(request, "POST", "/v1/slices", body.spec, platform_key(user, key))
+    submit = lambda spec: platform_call(request, "POST", "/v1/slices", spec, platform_key(user, key))
+    planner, summary = request.app.state.planner, None
+    vms = body.spec.get("vms")
+    if planner and isinstance(vms, list) and vms and not any(isinstance(v, dict) and "worker" in v for v in vms):
+        job, summary = await planner.admit(body.spec, body.zone, submit)
+    else:
+        if body.zone:
+            raise HTTPException(409, "La zona de disponibilidad requiere el VM Placement activo")
+        job = await submit(body.spec)
     try:
-        accepted = Accepted(slice_id=job["slice_id"], operation_id=job["id"], status=job["status"])
+        accepted = Accepted(slice_id=job["slice_id"], operation_id=job["id"], status=job["status"], placement=summary)
     except (KeyError, TypeError, ValidationError):
         raise HTTPException(502, "platform_bad_response") from None
     request.app.state.registry.add(accepted.slice_id, user, body.course_id, body.spec)
+    if summary:
+        request.app.state.registry.set_placement(accepted.slice_id, summary)
     await register_in_iam(request, accepted.slice_id, user, dict(body.spec, __course=body.course_id))
     return accepted
 
@@ -470,12 +515,13 @@ async def get_slice(slice_id: SliceId, request: Request, token=Depends(credentia
               for e in reversed(events[:50])] if isinstance(events, list) else []
     spec = state.get("spec") if isinstance(state.get("spec"), dict) else {}
     vms = [VmView(name=v["name"], image=v.get("image"), vcpus=v.get("vcpus"), memory_mb=v.get("memory_mb"),
-                  disk_gb=v.get("disk_gb"), networks=[n.get("network") for n in v.get("nics", []) if n.get("network")])
+                  disk_gb=v.get("disk_gb"), host=v.get("host") or v.get("worker"), networks=[n.get("network") for n in v.get("nics", []) if n.get("network")])
            for v in spec.get("vms", []) if isinstance(v, dict) and v.get("name")]
     await retire_if_deleted(request, row, state.get("status"))
     manage = user.role == "admin" or row["owner_id"] == user.id
     return SliceDetail(**view(row, state.get("status", "UNKNOWN")).model_dump(), vms=vms, events=recent,
-                       assignable=bool(row["iam_registered"]) and manage, can_manage=manage)
+                       assignable=bool(row["iam_registered"]) and manage, can_manage=manage,
+                       placement=json.loads(row["placement"]) if row.get("placement") else None)
 
 
 @app.delete("/v1/slices/{slice_id}", response_model=Accepted, status_code=202, tags=["slices"])
