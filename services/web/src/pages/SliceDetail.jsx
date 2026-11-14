@@ -110,11 +110,11 @@ export default function SliceDetail({ user }) {
         <>
           <h2>Máquinas virtuales</h2>
           <table className="table compact">
-            <thead><tr><th>VM</th><th>Imagen</th><th>vCPU</th><th>RAM</th><th>Disco</th><th>Redes</th><th></th></tr></thead>
+            <thead><tr><th>VM</th><th>Servidor</th><th>Imagen</th><th>vCPU</th><th>RAM</th><th>Disco</th><th>Redes</th><th></th></tr></thead>
             <tbody>
               {slice.vms.map((vm) => (
                 <tr key={vm.name}>
-                  <td><strong>{vm.name}</strong></td><td>{vm.image}</td><td>{vm.vcpus}</td><td>{vm.memory_mb} MB</td>
+                  <td><strong>{vm.name}</strong></td><td>{vm.host || <span className="muted">—</span>}</td><td>{vm.image}</td><td>{vm.vcpus}</td><td>{vm.memory_mb} MB</td>
                   <td>{vm.disk_gb} GB</td><td className="mono small">{vm.networks.join(' · ')}</td>
                   <td className="actions">
                     {slice.status === 'READY' && (slice.provider === 'openstack' || slice.provider === 'linux')
@@ -126,6 +126,13 @@ export default function SliceDetail({ user }) {
               ))}
             </tbody>
           </table>
+          {slice.placement && (
+            <p className="muted small">
+              VM Placement: {slice.placement.algorithm} · {slice.placement.status} · servidores nuevos ocupados (Z):{' '}
+              {slice.placement.hosts_opened}{slice.placement.zone ? ' · zona ' + slice.placement.zone : ''} ·{' '}
+              {slice.placement.elapsed_ms} ms{slice.placement.attempts > 1 ? ` · ${slice.placement.attempts} intentos` : ''}
+            </p>
+          )}
           {slice.status === 'READY' && <p className="hint">La consola se abre en otra pestaña. {slice.provider === 'linux'
             ? 'En Linux el enlace dura 10 minutos (CirrOS: usuario cirros, contraseña gocubsgo).'
             : 'El enlace de Nova caduca en pocos minutos.'} Si expira, vuelve a pulsar Consola.</p>}

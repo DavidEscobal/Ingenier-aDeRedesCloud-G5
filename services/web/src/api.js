@@ -66,7 +66,10 @@ export const Api = {
   capabilities: () => api('/v1/platform/capabilities'),
   slices: () => api('/v1/slices'),
   slice: (id) => api('/v1/slices/' + id),
-  createSlice: (courseId, spec) => api('/v1/slices', { method: 'POST', body: { course_id: courseId, spec }, idempotent: true }),
+  createSlice: (courseId, spec, zone) => api('/v1/slices', { method: 'POST', body: zone ? { course_id: courseId, spec, zone } : { course_id: courseId, spec }, idempotent: true }),
+  // Monitoreo (D-13) y recursos (R4-I-01)
+  monitoringState: (provider) => api('/v1/monitoring/state' + (provider ? '?provider=' + provider : '')),
+  monitoringHistory: (host, minutes = 60) => api(`/v1/monitoring/history?host=${encodeURIComponent(host)}&minutes=${minutes}`),
   deleteSlice: (id) => api('/v1/slices/' + id, { method: 'DELETE', idempotent: true }),
   console: (id, vm) => api(`/v1/slices/${id}/vms/${vm}/console`, { method: 'POST' }),
   assignments: (id) => api(`/v1/slices/${id}/assignments`),

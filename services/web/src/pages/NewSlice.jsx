@@ -21,6 +21,8 @@ export default function NewSlice() {
   const [image, setImage] = useState('')
   const [size, setSize] = useState('small')
   const [provider, setProvider] = useState('openstack')
+  const [zone, setZone] = useState('')
+  const [zones, setZones] = useState([])
   const [name, setName] = useState(fromEditor?.name || 'lineal-3')
   const [topology, setTopology] = useState(fromEditor)
   const [preview, setPreview] = useState(null)
@@ -57,6 +59,16 @@ export default function NewSlice() {
     return () => { cancelled = true }
   }, [catalog, source, n, image, size]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Zonas de disponibilidad del proveedor según el monitoreo (R4-I-04). Sin monitoreo: solo "cualquiera".
+  useEffect(() => {
+    let cancelled = false
+    setZone('')
+    Api.monitoringState(provider)
+      .then((st) => { if (!cancelled) setZones([...new Set(st.hosts.map((h) => h.zone).filter(Boolean))].sort()) })
+      .catch(() => { if (!cancelled) setZones([]) })
+    return () => { cancelled = true }
+  }, [provider])
+
   // Vista previa = la especificación compilada para el proveedor elegido (lo mismo que se enviará).
   useEffect(() => {
     if (!topology) return
@@ -82,7 +94,7 @@ export default function NewSlice() {
     setError('')
     try {
       const spec = await Api.compile(topology, provider, name)
-      const accepted = await Api.createSlice(course, spec)
+      const accepted = await Api.createSlice(course, spec, zone || undefined)
       navigate('/slices/' + accepted.slice_id)
     } catch (err) {
       setError(err.message)
@@ -154,10 +166,17 @@ export default function NewSlice() {
               {(catalog?.providers || ['openstack']).map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p] || p}</option>)}
             </select>
           </label>
-          {provider === 'linux' && (
-            <p className="muted small">Linux: solo imágenes CirrOS; las VMs se reparten por turnos entre server1–3 (provisional,
-              hasta definir el placement).</p>
-          )}
+          <label>Zona de disponibilidad
+            <select value={zone} onChange={(e) => setZone(e.target.value)}>
+              <option value="">Cualquiera (el VM Placement elige el servidor)</option>
+              {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+            </select>
+          </label>
+          <p className="muted small">
+            El VM Placement (BCDP v2) ubica cada VM según los recursos libres; una VM con servidor fijado en el editor se
+            respeta. Si no hay capacidad, el slice se rechaza con el motivo. Ver <Link to="/recursos">Recursos</Link>.
+            {provider === 'linux' && ' Linux: solo imágenes CirrOS.'}
+          </p>
           {error && <p className="error" role="alert">{error}</p>}
           <button type="submit" disabled={busy || !courses?.length || !preview}>{busy ? 'Enviando…' : 'Desplegar slice'}</button>
         </div>
