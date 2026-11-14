@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
-> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-08 (integración `app`, Docker en el app server, D-10).
+> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-14 (R4 placement + monitoreo; antes 2026-11-08: integración `app`, Docker en el app server, D-10).
 
 ## Estado general
 - **F0 (auditoría) y F1 (núcleo de Slice Manager agnóstico + driver OpenStack) terminadas.**
@@ -202,6 +202,23 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
   17 NT por funciones pendientes de F2–F4). El plan está redactado; Slice Manager **no** está completo.
 - Actividad 1: la ejecuta el grupo en el headnode con `docs/pruebas/LAB6_ACTIVIDAD1_GUIA_EJECUCION.md`.
 
+## R4 VM Placement y monitoreo D-13 (2026-11-14, implementado; **sin desplegar ni probar en real**)
+Diseño acordado con el grupo y el JP (`vm-placement_md/`): BCDP v2. Respeta la arquitectura: el **Slice Manager**
+coordina Monitoreo → VM Placement → platform-manager (que reserva de forma atómica).
+- `services/vm-placement` (fc5835e): BCDP v2 de `bcdp2.py` con la misma lógica, validador, VMs fijadas, zona, salud,
+  telemetría vencida (> 15 s), límite de 1 s y motivo de rechazo. Pruebas: control del HLD Z=2, regresión de la guía
+  (Z medio 6,2/15,2/19,1), validador, timeout, determinismo.
+- Agente `metrics` + `GET /v1/metrics` del platform-manager (6c705df): CPU real por host y VM, RAM, disco; OpenStack por
+  la API de Nova (hipervisores + zona de los agregados). Sin CPU real en OpenStack (sin acceso a los workers).
+- `services/monitoring` (76a134d): muestra cada 10 s, 24 h en SQLite, `/v1/monitoring/state` y `/history`; gateway y
+  página Recursos (32cd0d6). Tecnología: microservicio propio; Prometheus/Grafana quedan como extensión de diseño.
+- Slice Manager (86d7c2c): plan antes de enviar, candado por proveedor, registro de planes de los últimos 90 s,
+  reintento si la reserva falló por capacidad, 409 con motivo; zona elegida en la web.
+- **Para activarlo:** tokens y `keys.json` (ver `deploy/README.md`), reinstalar agentes (acción `metrics`), rebuild.
+- **Pendiente:** probar en real (Linux y OpenStack); decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
+  (Linux usa `zone` de `cluster.json`, por defecto `linux`; OpenStack, agregados de Nova); actualizar el HLD
+  (dice BFD; lo acordado es BCDP v2); prueba previa: el app server no respondió por SSH el 2026-11-14 (VPN).
+
 ## Brecha frente a la demo del Ex2 (referencia: `Contexto_md/Ex2_Validacion_de_Implementacion.md`, 2026-11-13)
 El documento es el **Ex2 de 2026-1** (13/07/2026): sirve como referencia de lo que se pedirá; el de 2026-2 puede variar.
 Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
@@ -211,13 +228,13 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | 2 | Zona de disponibilidad con servidores 2–4 (sin server1) | ❌ | Sin concepto de zona; hoy server4 es puerta y server1–3 workers (al revés de lo pedido) |
 | 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | 🟡 | **Servidor por VM en el editor (ce6aafd); host forzado de Nova probado: vm1@worker1 (2026-11-13)**. Falta Ubuntu |
 | 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | Manual por consola; requiere Ubuntu |
-| 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | ❌ | D-13 pausado: **bloqueante** |
+| 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | 🟡 | **Implementado 2026-11-14 (microservicio `monitoring` + página Recursos); sin desplegar ni probar en real** |
 | 6 | Procesos QEMU en workers OpenStack | 🟡 | Manual; confirmar acceso SSH a los workers |
-| 7 | Explicar placement, no fijo | ❌ | Hoy reparto por turnos; falta R4 (BFD/BCDP) con datos del monitoreo |
+| 7 | Explicar placement, no fijo | 🟡 | **BCDP v2 implementado 2026-11-14 (`vm-placement`, llamado por el slice-manager); sin probar en real** |
 | 8 | Crear `Ex2_GXX_test` en el editor sin desplegar | ✅ | Nombres con mayúsculas y `_` (ce6aafd) |
 | 9 | Exportar la topología y explicar parámetros | ✅ | Exportar JSON |
 | 10 | Importar como `Ex2_GXX_test_2` | ✅ | Importar + nombres del examen (ce6aafd) |
-| 11 | Desplegar en OpenStack según placement | ❌ | Depende de R4 |
+| 11 | Desplegar en OpenStack según placement | 🟡 | Implementado (`<zona>:<host>`); sin probar en real |
 | 12 | Horizon (proyecto y VMs por worker) + QEMU | ✅ | Proyecto `g5-…` por slice |
 | 13 | Errores y reintentos | ✅ | Reintentos y compensación |
 | 14 | Enlaces punto a punto en Horizon | ✅ | Una red por enlace |

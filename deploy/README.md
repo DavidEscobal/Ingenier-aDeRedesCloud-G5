@@ -130,6 +130,32 @@ Las políticas `unless-stopped` reinician procesos; los healthchecks detectan
 fallos pero no reinician por sí solos un proceso vivo. Docker debe arrancar
 con el sistema si se espera recuperación tras reinicio del host.
 
+## VM Placement y monitoreo (R4, D-13)
+
+Flujo: el **slice-manager** pide a **monitoring** el estado de los servidores, a **vm-placement** el plan (BCDP v2)
+y envía la spec con `host` por VM al **platform-manager**, que reserva de forma atómica. `monitoring` y
+`platform-manager` van en el perfil `platform`; `vm-placement` en el perfil por defecto.
+
+Tokens nuevos en `platform-config/` (una línea, ≥ 32 caracteres, permisos 600; nunca en Git):
+
+| Archivo | Quién lo presenta | Quién lo acepta |
+|---|---|---|
+| `placement.token` | slice-manager | vm-placement |
+| `monitoring-read.token` | slice-manager | monitoring |
+| `monitoring.token` | monitoring | platform-manager (`keys.json`, rol `service`, para `GET /v1/metrics`) |
+
+```sh
+cd ~/g5-app/deploy/platform-config
+for f in placement monitoring-read monitoring; do
+  [ -e $f.token ] || (umask 077; python3 -c "import secrets; print(secrets.token_urlsafe(32))" > $f.token)
+done
+python3 -c "import hashlib; print(hashlib.sha256(open('monitoring.token').read().strip().encode()).hexdigest())"
+```
+
+El hash se agrega a `keys.json` como `{"subject": "monitoring", "role": "service", "sha256": "<hash>"}` y se
+reinicia el platform-manager. Los agentes Linux deben tener la acción `metrics` (reinstalar el agente).
+Sin `PLACEMENT_URL`/`MONITORING_URL` el slice-manager mantiene el comportamiento anterior.
+
 ## Pruebas y contratos
 
 ```powershell
