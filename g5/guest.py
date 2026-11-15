@@ -35,8 +35,27 @@ def is_ubuntu(image):
     return isinstance(image, str) and 'ubuntu' in image.lower()
 
 
-def cloud_config(guest, hostname):
-    """`#cloud-config` para OpenStack (la red la configura cloud-init desde el config drive de Nova)."""
+MAC = re.compile(r'[0-9a-f]{2}(?::[0-9a-f]{2}){5}')
+
+
+def mtu_commands(mac, mtu):
+    """Fija el MTU de la NIC con esa MAC ahora y en los siguientes arranques (netplan, sin usar el MTU del DHCP).
+
+    La red provider `external` anuncia 1500, pero el camino hacia Internet no deja pasar tramas tan grandes: la
+    conexión TCP se abre y las respuestas grandes se pierden (apt queda en «Waiting for headers»)."""
+    require(MAC.fullmatch(mac) and isinstance(mtu, int) and 576 <= mtu <= 9000, 'MTU o MAC inválidos')
+    script = ('for d in /sys/class/net/*; do [ "$(cat $d/address)" = "%s" ] || continue; n=${d##*/}; '
+              'ip link set dev "$n" mtu %d; '
+              'printf "network:\\n  version: 2\\n  ethernets:\\n    %%s:\\n      mtu: %d\\n'
+              '      dhcp4: true\\n      dhcp4-overrides:\\n        use-mtu: false\\n" "$n" > /etc/netplan/90-g5-mtu.yaml; '
+              'chmod 600 /etc/netplan/90-g5-mtu.yaml; done') % (mac, mtu, mtu)
+    return ['sh', '-c', script]
+
+
+def cloud_config(guest, hostname, mtu=None):
+    """`#cloud-config` para OpenStack (la red la configura cloud-init desde el config drive de Nova).
+
+    `mtu`: (MAC, MTU) de la NIC de salida a Internet, si la VM la tiene."""
     user = {'name': guest['username'], 'shell': '/bin/bash', 'groups': ['sudo'], 'sudo': 'ALL=(ALL) NOPASSWD:ALL',
             'lock_passwd': False, 'passwd': guest['password_hash'],
             'ssh_authorized_keys': guest['ssh_authorized_keys']}
@@ -44,11 +63,13 @@ def cloud_config(guest, hostname):
             # Sin clave SSH, la contraseña es la única forma de entrar por SSH desde otras VMs del slice.
             'ssh_pwauth': not guest['ssh_authorized_keys'], 'disable_root': True, 'chpasswd': {'expire': False},
             'package_update': False, 'package_upgrade': False}
+    if mtu:
+        data['bootcmd'] = [mtu_commands(*mtu)]
     return '#cloud-config\n' + json.dumps(data, indent=2) + '\n'
 
 
-def user_data(guest, hostname):
-    text = cloud_config(guest, hostname)
+def user_data(guest, hostname, mtu=None):
+    text = cloud_config(guest, hostname, mtu)
     if len(text.encode()) > 48 * 1024:
         raise Fault('user_data demasiado grande para Nova')
     return base64.b64encode(text.encode()).decode()

@@ -39,4 +39,9 @@ Comando: `python3 scripts/smoke_gateway_slices.py --user admin123 --template tem
   - `stress-ng --cpu 1 --cpu-load 80 --vm 1 --vm-bytes 80% --timeout 180s --metrics-brief`: terminó con
     «successful run completed».
 - **Página Recursos:** el usuario confirmó que la CPU y la RAM de worker1 subieron mientras corría `stress-ng`.
-- **Pendiente:** adjuntar la captura de Recursos y confirmar si hizo falta bajar el MTU de ens3 a 1400 para apt.
+- **MTU:** apt solo descargó tras `sudo ip link set ens3 mtu 1400` (la red `external` anuncia 1500 y el camino a
+  Internet no lo soporta: la conexión se abre y las respuestas grandes se pierden, «Waiting for headers»).
+  Corrección en el orquestador: la NIC de salida recibe MTU 1400 por cloud-init (`bootcmd` que la ubica por MAC y
+  deja `/etc/netplan/90-g5-mtu.yaml` para los siguientes arranques; configurable con `external_mtu`). Probado con
+  tests; falta verificarlo en el clúster.
+- **Pendiente:** adjuntar la captura de Recursos al repositorio.

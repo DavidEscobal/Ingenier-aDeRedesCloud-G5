@@ -133,6 +133,24 @@ class OpenStackDriverTests(OpenStackFixture):
         self.assertEqual([p for p in self.cloud.ports.values() if p['network_id'] == 'net-ext'], [])
         self.assertIn('net-ext', self.cloud.networks, 'la red provider compartida no se toca')
 
+    def test_internet_nic_gets_lower_mtu_by_cloud_init(self):
+        # La red provider anuncia 1500 y el camino a Internet no lo soporta (apt: «Waiting for headers»).
+        self.cloud.add_external()
+        spec = copy.deepcopy(LINEAL)
+        spec['vms'][0]['internet'] = True
+        spec['guest'] = {'username': 'alumno', 'password_hash': '$6$testsalt$' + 'b' * 86}
+        slice_ = self.run_job(self.create(spec, 'os-internet-mtu'))
+        self.assertEqual(slice_['status'], 'READY', slice_)
+        servers = {s['name'].rsplit('-', 1)[-1]: s for s in self.cloud.servers.values()}
+        data = {n: json.loads(base64.b64decode(s['user_data']).decode().split('\n', 1)[1]) for n, s in servers.items()}
+        [command] = data['vm1']['bootcmd']
+        mac = self.cloud.ports[servers['vm1']['ports'][0]]['mac_address']
+        self.assertEqual(command[:2], ['sh', '-c'])
+        self.assertIn('"%s"' % mac, command[2])
+        self.assertIn('mtu 1400', command[2])
+        self.assertIn('use-mtu: false', command[2])
+        self.assertNotIn('bootcmd', data['vm2'], 'sin NIC de salida no se toca el MTU')
+
     def test_size_without_flavor_is_rejected_before_admission(self):
         """Sin create_flavors, un tamaño sin flavor se rechaza en el preflight: nada se crea en OpenStack."""
         self.driver.os_cfg['create_flavors'] = False

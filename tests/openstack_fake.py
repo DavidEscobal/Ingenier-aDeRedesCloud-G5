@@ -224,6 +224,7 @@ class FakeCloud:
                 else:
                     item['fixed_ips'] = []
                 item['device_id'] = ''
+                item['mac_address'] = 'fa:16:3e:00:%02x:%02x' % divmod(len(self.ports) + 1, 256)
             table[item['id']] = item
             return 201, {kind: item}
         if method == 'DELETE':

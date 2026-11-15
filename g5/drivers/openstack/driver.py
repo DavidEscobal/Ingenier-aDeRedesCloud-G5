@@ -311,7 +311,7 @@ class OpenStackDriver(ProviderDriver):
                            else (None, None))
 
         def server(vm):
-            ports = []
+            ports, inet_mtu = [], None
             if vm.get('internet'):  # primera NIC: DHCP de la red provider, ruta por defecto y acceso por la VPN
                 port = self.ensure(ctx, 'port', '%s.%s' % (vm['name'], EXTERNAL_NIC),
                                    lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=vm['inet_os_name'], network_id=external),
@@ -319,6 +319,8 @@ class OpenStackDriver(ProviderDriver):
                                        'name': vm['inet_os_name'], 'network_id': external, 'port_security_enabled': True,
                                        'security_groups': [group]}}, pid)['port'])
                 ports.append({'port': port['id']})
+                if self.os_cfg.get('external_mtu', 1400) and port.get('mac_address'):
+                    inet_mtu = (port['mac_address'].lower(), int(self.os_cfg.get('external_mtu', 1400)))
             for nic in vm['nics']:
                 net_id, subnet_id = subnets[nic['network']]
                 body = {'port': {'name': nic['os_name'], 'network_id': net_id, 'port_security_enabled': False}}
@@ -331,7 +333,9 @@ class OpenStackDriver(ProviderDriver):
             image, flavor = self.image(vm['image']), self.flavor(vm)
             # Con credenciales: cloud-init crea el usuario y, desde el config drive, configura todas las NICs
             # (sin router no hay servicio de metadatos; la IP fija del puerto llega en network_data.json).
-            boot = {'user_data': user_data(plan['guest'], vm['name']), 'config_drive': True} if plan.get('guest') else {}
+            # La NIC de salida usa un MTU menor que el anunciado por la red provider (ver guest.mtu_commands).
+            boot = ({'user_data': user_data(plan['guest'], vm['name'], inet_mtu), 'config_drive': True}
+                    if plan.get('guest') else {})
             created = self.ensure(ctx, 'server', vm['name'],
                                   lambda: self.find('compute', '/servers', 'servers', pid, name='^%s$' % vm['os_name']),
                                   lambda: self.call('POST', 'compute', '/servers', {'server': dict({
