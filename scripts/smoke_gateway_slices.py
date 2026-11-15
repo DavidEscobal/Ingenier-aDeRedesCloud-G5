@@ -99,6 +99,10 @@ def main():
         print('FAIL login HTTP %s' % status)
         return 1
     token = body['access_token']
+    ttl = int(body.get('expires_in') or 900)
+    if args.hold > ttl - 180:   # el token debe seguir vigente para borrar al final
+        print('     --hold %d s supera la vida del token (%d s); se usa %d s' % (args.hold, ttl, ttl - 180))
+        args.hold = ttl - 180
     results = []
 
     def check(name, ok, detail=''):
