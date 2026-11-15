@@ -78,6 +78,8 @@ nuestro clúster: 3 servidores Linux de 4 CPU / 3,8 GB de RAM / ~9,7 GB de disco
    motivo legible (p. ej. «RAM insuficiente: se piden 3072 y quedan 2048 libres»).
 4. **Respeto de VMs fijadas** por el usuario (paso 3 del Ex2: «2 VMs en server2»), que se descuentan primero.
 5. **Validación** independiente de todo plan antes de responder.
+6. **Elección de la plataforma** cuando el usuario pide modo automático: se planifica en Linux y en OpenStack y se
+   despliega donde ocupe menos servidores nuevos (ver 4 b).
 
 **Ventajas de un módulo unificado para Linux y OpenStack:**
 
@@ -250,13 +252,21 @@ cpu_cores, vcpus_max, ram_mb, disk_mb, vcpus_used, ram_used_mb, disk_used_mb, cp
   3. filtrar hosts (zona, salud, telemetría) y descontar las VMs fijadas;
   4. BCDP v2 + validador;
   5. reserva atómica en el platform-manager.
-- **¿Dónde se decide el backend?** **[Implementado]** Hoy lo elige el usuario en la web (Linux u OpenStack) y viaja
-  en la especificación del slice; el placement se ejecuta sobre los hosts de ese proveedor.
-  **[Diseño] Modo automático** (`provider: "auto"`): el Slice Manager pide un plan para cada proveedor habilitado
-  con la misma zona y elige por este orden: (1) proveedores con `PLAN_FOUND` y con la imagen disponible;
-  (2) menor número de hosts nuevos ocupados (`hosts_opened`, la función objetivo); (3) mayor holgura mínima
-  restante en la dimensión más escasa; (4) desempate fijo: Linux. Si ninguno tiene plan, se rechaza con el motivo
-  de cada uno.
+- **¿Dónde se decide el backend?** **[Implementado]** El usuario elige en la web Linux, OpenStack o
+  **Automático**, y el valor viaja en la especificación del slice (`provider`). Con un proveedor concreto, el
+  placement se ejecuta sobre los hosts de ese proveedor.
+  **[Implementado] Modo automático** (`provider: "auto"`, `Planner.admit_auto` en
+  `services/slice-manager/src/g5_slice_manager/placement.py`): el Slice Manager toma los candados de ambos
+  proveedores en orden fijo, pide un plan para cada uno con la misma zona y ordena así:
+  1. solo proveedores con `PLAN_FOUND`;
+  2. menor número de hosts nuevos ocupados (`hosts_opened`, la función objetivo Z);
+  3. menor número de hosts usados;
+  4. desempate fijo: Linux y luego OpenStack.
+  Envía el mejor al platform-manager. Si este lo rechaza por una causa que no es capacidad (imagen o red no
+  admitidas, flavor ausente), prueba el siguiente; si lo rechaza por capacidad (otro slice ganó el hueco), vuelve a
+  planificar. Si ninguno puede, responde 409 con el motivo de cada proveedor. La respuesta indica la plataforma
+  elegida, los candidatos con su Z y los descartados, y la web lo muestra en el detalle del slice.
+  Una VM fijada a un servidor determina la plataforma, porque ese servidor solo es candidato en su proveedor.
 
 ### c) Interfaz del módulo: entrada y salida
 
@@ -426,15 +436,20 @@ cada integración). Todas usan inventarios sintéticos y deterministas, sin toca
 `availability_zone="zona-a:worker2"` y queda en ese host, y que pedir zona sin host se rechaza;
 `test_hypervisors_inventory_with_zones` comprueba que las zonas se leen de los agregados.
 
-**[Diseño] Selección automática de plataforma** (caso sugerido por la guía; no implementado):
+**Selección automática de plataforma** (`tests/app/test_slice_placement.py`, clase `AutoProvider`)
+**[Implementado, en verde]**
 
-| # | Entrada (`provider: "auto"`) | Esperado |
-|---|---|---|
-| A1 | Linux sin capacidad, OpenStack con capacidad | Elige OpenStack |
-| A2 | Ambos con plan; Linux abre 1 host nuevo y OpenStack 2 | Elige Linux (menor Z) |
-| A3 | Ambos con el mismo Z | Desempate por holgura y luego Linux |
-| A4 | Ninguno con plan | 409 con el motivo de cada proveedor |
-| A5 | Imagen solo disponible en un proveedor | Elige ese proveedor |
+| # | Entrada (`provider: "auto"`) | Esperado | Test |
+|---|---|---|---|
+| A1 | Linux sin RAM libre; OpenStack con capacidad | Elige OpenStack; cada VM con `host` worker y `zone`; Linux en `rejected` | `test_a1_elige_el_unico_proveedor_con_capacidad` |
+| A2 | Linux tendría que ocupar un servidor vacío (Z = 1); OpenStack tiene uno ya ocupado con hueco (Z = 0) | Elige OpenStack, `hosts_opened` = 0; candidatos `{openstack: 0, linux: 1}` | `test_a2_elige_el_que_abre_menos_hosts_nuevos` |
+| A3 | Ambos con el mismo Z | Desempate: Linux (sin `zone` de Nova en la spec) | `test_a3_empate_prefiere_linux` |
+| A4 | Ninguno con plan | 409 con el motivo de `linux:` y de `openstack:` | `test_a4_ninguno_puede_rechaza_con_el_motivo_de_cada_uno` |
+| A5 | El platform-manager rechaza la spec en Linux (imagen no admitida) | Prueba OpenStack y lo despliega allí; el motivo queda en `rejected` | `test_a5_si_la_plataforma_rechaza_la_spec_prueba_la_siguiente` |
+| A6 | Una VM fijada en `worker1`; y una reserva que pierde la carrera | Elige OpenStack; con la carrera perdida vuelve a planificar (`attempts` = 2) | `test_vm_fijada_decide_la_plataforma_y_carrera_perdida_replanifica` |
+
+El compilador de topologías acepta `auto` y valida las VMs fijadas contra los servidores de ambos clústeres
+(`tests/app/test_topology.py`).
 
 **Demostración en ambos entornos [Probado en el clúster, MS-17]:**
 
@@ -451,7 +466,7 @@ coincide con el plan en ambos backends; ningún slice sin plan deja recursos cre
 ## Limitaciones y pendientes declarados
 
 - Zonas reales: el clúster tiene solo `nova` (OpenStack) y `linux`; crear agregados con zona requiere al JP.
-- Selección automática de plataforma: diseño (4 b, A1–A5).
+- Selección automática de plataforma: implementada y probada con tests (A1–A6); falta probarla en el clúster real.
 - Perfil P99 de CPU por tipo de VM: diseño; hoy demanda completa sin perfil.
 - Disco en Linux: con reserva completa, una VM Ubuntu de 4 GB no cabe en servidores con ≈ 6,5 GB libres; se
   evalúa aprovisionamiento delgado o ampliar disco (consulta al JP).
