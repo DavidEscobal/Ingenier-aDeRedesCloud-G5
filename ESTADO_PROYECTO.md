@@ -280,6 +280,9 @@ pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
      topology-manager y web reconstruidos; 10 contenedores healthy); flavor público `g5-1c-1g-4g` (1/1024/4) creado en
      Nova; el de 512 MB · 4 GB ya existía (`512MBRAM_1VCPUs_4GBRoot`). Agentes Linux sin reinstalar: con la versión
      anterior una VM Ubuntu sin llave SSH arranca y entra por VNC, pero no acepta SSH con contraseña.
+   - **Límite de importación** subido de 1024 a 2048 MB (b71e467, desplegado 2026-11-15: web e image-catalog): la
+     web rechazaba la 24.04 del curso (1,5 GB) antes de enviarla. Imágenes locales en `Proyecto/Images/`
+     (24.04 minimal 1,5 GB; `focal-server-cloudimg-amd64.img` 942 MB = 20.04). App server con 5 GB libres.
    - **Falta:** importar la 24.04 minimal del curso (en `Downloads`, 1,5 GB, disco virtual 3,5 GiB) y la 20.04 (descargarla del Drive del
      curso); probar una VM Ubuntu por proveedor (VNC, red, `stress-ng`, `tcpdump`).
    - **Contradicción para el JP:** el Anexo pide 2,5 GB de disco y la imagen ocupa 3,5 GiB virtuales (Nova y el driver
