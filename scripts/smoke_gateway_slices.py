@@ -87,6 +87,9 @@ def main():
         if vm_password != getpass.getpass('Repítela: '):
             print('FAIL las contraseñas de las VMs no coinciden')
             return 1
+        if not 8 <= len(vm_password) <= 72:
+            print('FAIL la contraseña de las VMs debe tener entre 8 y 72 caracteres')
+            return 1
         guest = {'username': args.guest_user, 'password': vm_password}
     args.guest = guest
     password = getpass.getpass('Contraseña de %s: ' % args.user)
