@@ -43,7 +43,7 @@ def call(base, method, path, token=None, body=None, key=None):
             return exc.code, None
 
 
-def wait(base, token, sid, timeout=600):
+def wait(base, token, sid, timeout=600, final=FINAL):
     start, last = time.time(), None
     while time.time() - start < timeout:
         status, body = call(base, 'GET', '/v1/slices/' + sid, token)
@@ -51,7 +51,7 @@ def wait(base, token, sid, timeout=600):
         if state != last:
             print('     t=%5.1fs estado=%s' % (time.time() - start, state))
             last = state
-        if state in FINAL:
+        if state in final:
             return state, body
         time.sleep(5)
     return 'TIMEOUT', None
@@ -66,6 +66,7 @@ def main():
     parser.add_argument('--provider', action='append', choices=['linux', 'openstack'])
     parser.add_argument('--zone')
     parser.add_argument('--hold', type=int, default=0)
+    parser.add_argument('--delete', metavar='SLICE_ID', help='solo borrar ese slice y esperar DELETED')
     args = parser.parse_args()
     base_spec = json.load(open(args.template))
     password = getpass.getpass('Contraseña de %s: ' % args.user)
@@ -89,6 +90,12 @@ def main():
             check('2. curso %s creado en IAM' % args.course, status == 201, 'HTTP %s' % status)
         else:
             check('2. curso %s existe en IAM' % args.course, True)
+        if args.delete:                       # solo borrar un slice que quedó vivo (p. ej., borrado pedido en DEPLOYING)
+            status, _ = call(args.url, 'DELETE', '/v1/slices/' + args.delete, token, key=uuid.uuid4().hex)
+            check('7. borrar por el gateway', status == 202, 'HTTP %s' % status)
+            state, _ = wait(args.url, token, args.delete, final=FINAL - {'READY'})
+            check('8. el slice llega a DELETED', state == 'DELETED', state)
+            return 0 if all(results) else 1
         for provider in args.provider or [base_spec.get('provider', 'openstack')]:
             spec = dict(base_spec, provider=provider)
             print('\n== %s: %s (%d VMs)' % (provider, spec['name'], len(spec['vms'])))
@@ -142,7 +149,7 @@ def run_slice(args, token, spec, check):
         if sid:
             status, _ = call(args.url, 'DELETE', '/v1/slices/' + sid, token, key=uuid.uuid4().hex)
             check('7. borrar por el gateway', status == 202, 'HTTP %s' % status)
-            state, _ = wait(args.url, token, sid)
+            state, _ = wait(args.url, token, sid, final=FINAL - {'READY'})
             check('8. el slice llega a DELETED', state == 'DELETED', state)
 
 
