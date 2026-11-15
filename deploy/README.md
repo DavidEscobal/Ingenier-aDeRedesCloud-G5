@@ -136,7 +136,8 @@ Flujo: el **slice-manager** pide a **monitoring** el estado de los servidores, a
 y envía la spec con `host` por VM al **platform-manager**, que reserva de forma atómica. `monitoring` y
 `platform-manager` van en el perfil `platform`; `vm-placement` en el perfil por defecto.
 
-Tokens nuevos en `platform-config/` (una línea, ≥ 32 caracteres, permisos 600; nunca en Git):
+Tokens nuevos en `platform-config/` (una línea, ≥ 32 caracteres, permisos 644 como los demás tokens: los contenedores corren como uid 10001 y deben
+poder leerlos; `platform-config/` sigue siendo privado del usuario `ubuntu`; nunca en Git):
 
 | Archivo | Quién lo presenta | Quién lo acepta |
 |---|---|---|
@@ -147,7 +148,7 @@ Tokens nuevos en `platform-config/` (una línea, ≥ 32 caracteres, permisos 600
 ```sh
 cd ~/g5-app/deploy/platform-config
 for f in placement monitoring-read monitoring; do
-  [ -e $f.token ] || (umask 077; python3 -c "import secrets; print(secrets.token_urlsafe(32))" > $f.token)
+  [ -e $f.token ] || (umask 022; python3 -c "import secrets; print(secrets.token_urlsafe(32))" > $f.token)
 done
 python3 -c "import hashlib; print(hashlib.sha256(open('monitoring.token').read().strip().encode()).hexdigest())"
 ```
