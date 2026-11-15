@@ -19,7 +19,7 @@
   IP en OpenStack (15b); (6) SSH a los workers OpenStack (paso 6).
 - **Siguiente (sin depender del JP), en este orden:** el usuario importa la Ubuntu 20.04
   (`Proyecto/Images/focal-server-cloudimg-amd64.img`, 942 MB, nombre con «ubuntu»); repetir DNS en vm1
-  (`ping google.com`, `resolvectl status ens3`); ~~paso 4 `stress-ng`~~ hecho (MS-20; modo automático probado en el clúster); pasos 15b–e
+  (`ping google.com`, `resolvectl status ens3`); paso 4 `stress-ng` ejecutado (MS-20; falta ver el uso real en Recursos para OpenStack; modo automático probado en el clúster); pasos 15b–e
   en OpenStack con Ubuntu (VM4 con OVS, IPs 10.100.10.x, tcpdump); reinstalar agentes Linux (sudo del usuario).
 - **Docs pendientes:** HLD (BCDP v2 en vez de BFD; R5 dice «self-service» y la rúbrica pide no usarlo →
   contradicción a corregir), REPORTE_CUMPLIMIENTO_EX2 (R5 OpenStack, Ubuntu), informe del plan de pruebas
@@ -279,7 +279,7 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 |---|---|---|---|
 | 2 | Zona de disponibilidad con servidores 2–4 (sin server1) | ❌ | Sin concepto de zona; hoy server4 es puerta y server1–3 workers (al revés de lo pedido) |
 | 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | 🟡 | **Servidor por VM en el editor (ce6aafd); host forzado de Nova probado: vm1@worker1 (2026-11-13)**. Falta Ubuntu |
-| 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | **OpenStack: `stress-ng` 80 % CPU/RAM en vm1 Ubuntu, «successful run completed», Recursos mostró la subida en worker1 (MS-20, 2026-11-15)**; falta adjuntar captura. Linux bloqueado por disco |
+| 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | **OpenStack: `stress-ng` 80 % CPU/RAM en vm1 Ubuntu, «successful run completed» (MS-20, 2026-11-15)**. Recursos solo mostró lo asignado (2 vCPU, 2560 MB): la CPU real de OpenStack sale «sin dato», así que la carga no se ve; falta fuente de uso real (diagnósticos de Nova o SSH a workers). Linux bloqueado por disco |
 | 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | ✅ | Microservicio `monitoring` + página Recursos, desplegado y verificado (2026-11-15) |
 | 6 | Procesos QEMU en workers OpenStack | 🟡 | Manual; confirmar acceso SSH a los workers |
 | 7 | Explicar placement, no fijo | ✅ | BCDP v2 (`vm-placement`) desde el slice-manager; probado en Linux y OpenStack (MS-17) |

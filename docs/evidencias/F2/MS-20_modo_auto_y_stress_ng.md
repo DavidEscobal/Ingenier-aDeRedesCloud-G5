@@ -38,10 +38,16 @@ Comando: `python3 scripts/smoke_gateway_slices.py --user admin123 --template tem
     terminó con «stress-ng is already the newest version», es decir, la instalación sí se completó.
   - `stress-ng --cpu 1 --cpu-load 80 --vm 1 --vm-bytes 80% --timeout 180s --metrics-brief`: terminó con
     «successful run completed».
-- **Página Recursos:** el usuario confirmó que la CPU y la RAM de worker1 subieron mientras corría `stress-ng`.
+- **Página Recursos (worker1, según lo anotado por el usuario):** con el slice activo, vCPU comprometida 2/8,
+  RAM 2560/3935 MB, disco 8.0/90 GB, 2 VMs, **CPU real: «sin dato»**; tras borrar el slice volvió a 0 VMs y 512 MB.
+  **Corrección:** lo que subió es la capacidad **asignada** al crear el slice, no el uso que provoca `stress-ng`.
+  En OpenStack el monitoreo no mide la CPU real de los computes (sin acceso a los workers,
+  `services/monitoring/src/g5_monitoring/normalize.py` deja `cpu_real_cent` en `None`), así que la carga de
+  `stress-ng` no se ve en Recursos. Para el paso 4/5 («asignado y usado») falta una fuente de uso real en OpenStack
+  (p. ej. diagnósticos de Nova por servidor, o el acceso SSH a los workers que está pedido al JP).
 - **MTU:** apt solo descargó tras `sudo ip link set ens3 mtu 1400` (la red `external` anuncia 1500 y el camino a
   Internet no lo soporta: la conexión se abre y las respuestas grandes se pierden, «Waiting for headers»).
   Corrección en el orquestador: la NIC de salida recibe MTU 1400 por cloud-init (`bootcmd` que la ubica por MAC y
   deja `/etc/netplan/90-g5-mtu.yaml` para los siguientes arranques; configurable con `external_mtu`). Probado con
   tests; falta verificarlo en el clúster.
-- **Pendiente:** adjuntar la captura de Recursos al repositorio.
+- **Pendiente:** captura de Recursos (no se adjuntó); uso real de CPU/RAM en OpenStack.
