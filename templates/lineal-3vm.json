@@ -7,10 +7,10 @@
   ],
   "vms": [
     {"name": "vm1", "image": "cirros", "vcpus": 1, "memory_mb": 512, "disk_gb": 1,
-     "nics": [{"network": "link12", "ip": "192.168.11.2"}]},
+     "nics": [{"network": "link12", "ip": "192.168.11.10"}]},
     {"name": "vm2", "image": "cirros", "vcpus": 1, "memory_mb": 512, "disk_gb": 1,
-     "nics": [{"network": "link12", "ip": "192.168.11.3"}, {"network": "link23", "ip": "192.168.12.2"}]},
+     "nics": [{"network": "link12", "ip": "192.168.11.11"}, {"network": "link23", "ip": "192.168.12.10"}]},
     {"name": "vm3", "image": "cirros", "vcpus": 1, "memory_mb": 512, "disk_gb": 1,
-     "nics": [{"network": "link23", "ip": "192.168.12.3"}]}
+     "nics": [{"network": "link23", "ip": "192.168.12.11"}]}
   ]
 }
