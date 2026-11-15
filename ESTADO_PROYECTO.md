@@ -266,8 +266,8 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | 15a | VNC a todas las VMs | ✅ | Consola web en Linux y OpenStack |
 | 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» (ce6aafd). **Linux probado (2026-11-13, agente 93cbd00f):** `to-sw` UP sin IPv4 en ambas VMs, la puerta no se conecta a ese enlace, el enlace con IP hace ping 3/3. **OpenStack (2026-11-13): Nova rechaza puertos sin IP** (`Port … requires a FixedIP`; slice FAILED_CLEANED, compensación correcta). Opción propuesta, en espera de consultar al JP: subred sin DHCP ni gateway en un rango reservado (p. ej. 10.255.k.0/24); CirrOS queda sin IP, Ubuntu podría tomarla de los metadatos (flush manual). Falta OVS con Ubuntu |
 | 15c–e | IPs manuales 10.100.10.x, tcpdump, ping | 🟡 | Depende de 15b y de Ubuntu (CirrOS no trae tcpdump/OVS) |
-| 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack: **código hecho (e022c9c, sin desplegar)**: NIC en la red provider `external` (10.60.10.0/24) con DHCP, sin routers |
-| 17 | SSH desde fuera a VM4 y VM5 | 🟡 | OpenStack: el mismo puerto en 10.60.10.0/24 (accesible por la VPN) con grupo de seguridad (solo SSH e ICMP de entrada); falta probar por la VPN. Linux: depende del rango 10.60.9.0/24 (consulta al JP) |
+| 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack **probado (MS-19, 0efd775)**: NIC en la red provider `external` (10.60.10.229 por DHCP, ruta a 10.60.10.1), `apt update` ✅; repetir `ping google.com` (falló la resolución en una prueba) |
+| 17 | SSH desde fuera a VM4 y VM5 | 🟡 | OpenStack: el mismo puerto en 10.60.10.0/24 (accesible por la VPN) con grupo de seguridad (solo SSH e ICMP de entrada); **SSH por la VPN: timeout (MS-19): la VPN no publica 10.60.10.0/24** (sí 10.60.9.0/24) → consulta al JP. Linux: depende del rango 10.60.9.0/24 |
 | 18 | Borrar y mostrar QEMU | ✅ | — |
 
 **Anexo 1** (6 VMs: anillo VM1–VM2–VM3–VM4 + VM4–VM5–VM6; Internet en VM4 y VM5): la forma se dibuja en el editor ✅;
