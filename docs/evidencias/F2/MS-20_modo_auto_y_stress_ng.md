@@ -51,3 +51,27 @@ Comando: `python3 scripts/smoke_gateway_slices.py --user admin123 --template tem
   deja `/etc/netplan/90-g5-mtu.yaml` para los siguientes arranques; configurable con `external_mtu`). Probado con
   tests; falta verificarlo en el clúster.
 - **Pendiente:** captura de Recursos (no se adjuntó); uso real de CPU/RAM en OpenStack.
+
+## 3. Uso medido en OpenStack (mismo día, más tarde)
+
+- **Código:** 039761c y 1345564, desplegados (platform-manager, monitoring, web). El platform-manager pide a Nova los
+  diagnósticos de cada VM de G5 (`GET /servers/{id}/diagnostics`, formato de libvirt: `cpuN_time` en ns y memoria en
+  KiB) y la carga de cada compute (`/os-hypervisors/{id}/uptime`). CPU de la VM = incremento del tiempo de CPU entre
+  muestras; RAM usada = `memory-available − memory-usable` (vista del invitado). El formato estándar 2.48 se descartó:
+  da la RAM en GiB enteros. La CPU real del compute completo sigue sin dato (compartido); el VM Placement no cambia.
+- **Prueba:** slice `8a59a8db…` (`ubuntu-2vm`, vm1 con Internet, ambas en worker1). Por SSH desde `g5-gw` con la clave
+  de diagnóstico: MTU 1400 de fábrica, `apt-get install stress-ng` sin intervención y
+  `stress-ng --cpu 1 --cpu-load 80 --vm 1 --vm-bytes 80% --timeout 300s` (21:59:56–22:04:56 UTC).
+- **Muestras del servicio de monitoreo (worker1; CPU en centésimas, RAM usada / total en MB):**
+
+| Hora UTC | Carga 1 min | vm1 CPU | vm1 RAM | vm2 CPU | vm2 RAM |
+|---|---|---|---|---|---|
+| 22:03:25 | 1,07 | 99 | 537 / 1024 | 0 | 281 / 1024 |
+| 22:03:35 | 1,06 | 100 | 371 / 1024 | 1 | 281 / 1024 |
+| 22:04:55 | 1,01 | 99 | 572 / 1024 | 0 | 281 / 1024 |
+| 22:05:06 | 0,86 | 9 | 313 / 1024 | 1 | 281 / 1024 |
+| 22:05:16 | 0,80 | 1 | 263 / 1024 | 0 | 281 / 1024 |
+
+- **Lectura:** con `stress-ng` vm1 marca 1 CPU completa (80 % de carga más el trabajador de memoria) y su RAM oscila
+  por el trabajador `--vm`; al terminar baja a ≈ 0. vm2, sin carga, se mantiene en 0. La página Recursos muestra
+  «VMs G5: X CPU» y la carga en la columna CPU real, la curva en el historial y el detalle por VM (solo admin).

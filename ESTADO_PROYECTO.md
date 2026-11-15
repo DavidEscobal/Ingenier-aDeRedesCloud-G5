@@ -279,7 +279,7 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 |---|---|---|---|
 | 2 | Zona de disponibilidad con servidores 2–4 (sin server1) | ❌ | Sin concepto de zona; hoy server4 es puerta y server1–3 workers (al revés de lo pedido) |
 | 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | 🟡 | **Servidor por VM en el editor (ce6aafd); host forzado de Nova probado: vm1@worker1 (2026-11-13)**. Falta Ubuntu |
-| 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | **OpenStack: `stress-ng` 80 % CPU/RAM en vm1 Ubuntu, «successful run completed» (MS-20, 2026-11-15)**. Recursos solo mostró lo asignado (2 vCPU, 2560 MB): la CPU real de OpenStack sale «sin dato», así que la carga no se ve; falta fuente de uso real (diagnósticos de Nova o SSH a workers). Linux bloqueado por disco |
+| 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | **OpenStack: `stress-ng` 80 % CPU/RAM en vm1 Ubuntu, «successful run completed» (MS-20, 2026-11-15)**. **Uso medido en OpenStack (MS-20 §3, 1345564):** CPU y RAM de cada VM de G5 por diagnósticos de Nova + carga del compute; con `stress-ng` vm1 = 1,00 CPU y baja a 0 al terminar. Linux bloqueado por disco |
 | 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | ✅ | Microservicio `monitoring` + página Recursos, desplegado y verificado (2026-11-15) |
 | 6 | Procesos QEMU en workers OpenStack | 🟡 | Manual; confirmar acceso SSH a los workers |
 | 7 | Explicar placement, no fijo | ✅ | BCDP v2 (`vm-placement`) desde el slice-manager; probado en Linux y OpenStack (MS-17) |
