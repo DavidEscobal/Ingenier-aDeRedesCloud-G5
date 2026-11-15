@@ -247,11 +247,15 @@ class LinuxDriver(ProviderDriver):
         ctx.event('NETWORK_READY', 'QinQ, DHCP y política IPv4 aplicados')
 
         def start(node):
-            for vm in plan['vms']:
-                if vm['worker'] == node:
-                    self.retry(node, 'vm_ensure', ctx, sid=sid, vm_name=vm['name'])
-                    if vm.get('guest', {}).get('os') == 'cirros':
-                        self.retry(node, 'guest_setup', ctx, sid=sid, vm_name=vm['name'])
+            # Primero se encienden todas las VMs del worker y después se configura cada invitado: así arrancan a la
+            # vez y solo la primera espera el arranque completo (el agente serializa las acciones de un slice; antes
+            # cada VM esperaba su arranque antes de encender la siguiente: ~200 s por VM con CirrOS 0.4, MS-17).
+            local = [vm for vm in plan['vms'] if vm['worker'] == node]
+            for vm in local:
+                self.retry(node, 'vm_ensure', ctx, sid=sid, vm_name=vm['name'])
+            for vm in local:
+                if vm.get('guest', {}).get('os') == 'cirros':
+                    self.retry(node, 'guest_setup', ctx, sid=sid, vm_name=vm['name'])
         self.parallel([lambda node=node: start(node) for node in sorted({v['worker'] for v in plan['vms']})])
         for node in nodes:
             result = self.retry(node, 'inspect', ctx, sid=sid)

@@ -111,6 +111,22 @@ class EX1Tests(unittest.TestCase):
         spec=copy.deepcopy(self.spec);spec['publications']=[]
         with self.assertRaises(Fault):self.create(spec,'second-full-ex1')
         self.assertEqual(len(self.store.rows('SELECT * FROM allocations')),6)
+    def test_worker_powers_on_all_vms_before_guest_setup(self):
+        # MS-17: con varias CirrOS en un worker, encender todas antes de configurar evita esperar un arranque por VM.
+        spec=copy.deepcopy(self.spec)
+        cirros=[vm for vm in spec['vms'] if vm['guest']['os']=='cirros']
+        self.assertGreaterEqual(len(cirros),2)
+        node=cirros[0]['worker']
+        displaced=[vm for vm in spec['vms'] if vm['worker']==node and vm['guest']['os']!='cirros']
+        for vm in displaced: vm['worker']=cirros[1]['worker']   # intercambio: cada worker admite 2 vCPU
+        for vm in cirros: vm['worker']=node
+        job=self.create(spec,'same-worker-cirros');self.app.engine.process_one()
+        self.assertEqual(self.store.get_slice(job['slice_id'])['status'],'READY')
+        order=[(action,params.get('vm_name')) for n,action,params in self.backend.calls if n==node and action in ('vm_ensure','guest_setup')]
+        last_on=max(i for i,(a,_) in enumerate(order) if a=='vm_ensure')
+        first_setup=min(i for i,(a,_) in enumerate(order) if a=='guest_setup')
+        self.assertLess(last_on,first_setup,order)
+        self.assertEqual(sorted(v for a,v in order if a=='guest_setup'),sorted(vm['name'] for vm in cirros))
     def test_retries_guest_setup_transient_failure(self):
         self.backend.failures[('server3','guest_setup')]=1
         job=self.create();self.app.engine.process_one()
