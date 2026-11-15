@@ -51,7 +51,7 @@ class CombineRequest(Model):
 
 class CompileRequest(Model):
     topology: Topology
-    provider: Literal["openstack", "linux"] = "openstack"
+    provider: Literal["openstack", "linux", "auto"] = "openstack"
     name: str | None = Field(default=None, pattern=NAME)
 
 

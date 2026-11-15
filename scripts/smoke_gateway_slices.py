@@ -64,7 +64,7 @@ def main():
     parser.add_argument('--user', default='admin123')
     parser.add_argument('--course', default='TEL141')
     parser.add_argument('--template', default='templates/os-lineal-1g.json')
-    parser.add_argument('--provider', action='append', choices=['linux', 'openstack'])
+    parser.add_argument('--provider', action='append', choices=['linux', 'openstack', 'auto'])
     parser.add_argument('--zone')
     parser.add_argument('--hold', type=int, default=0)
     parser.add_argument('--image', help='imagen del catálogo para todas las VMs (reemplaza la de la plantilla)')

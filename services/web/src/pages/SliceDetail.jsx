@@ -131,6 +131,11 @@ export default function SliceDetail({ user }) {
               VM Placement: {slice.placement.algorithm} · {slice.placement.status} · servidores nuevos ocupados (Z):{' '}
               {slice.placement.hosts_opened}{slice.placement.zone ? ' · zona ' + slice.placement.zone : ''} ·{' '}
               {slice.placement.elapsed_ms} ms{slice.placement.attempts > 1 ? ` · ${slice.placement.attempts} intentos` : ''}
+              {slice.placement.mode === 'auto' && (
+                <> · plataforma elegida automáticamente: <strong>{slice.placement.provider}</strong>
+                  {' '}({(slice.placement.candidates || []).map((c) => `${c.provider} Z=${c.hosts_opened}`).join(', ')}
+                  {(slice.placement.rejected || []).map((r) => `; ${r.provider} descartado`).join('')})</>
+              )}
             </p>
           )}
           {slice.status === 'READY' && <p className="hint">La consola se abre en otra pestaña. {slice.provider === 'linux'

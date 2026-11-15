@@ -482,7 +482,14 @@ async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey,
     planner, summary = request.app.state.planner, None
     spec = with_guest(body.spec, body.guest, user.id + ":" + key)   # contraseña -> hash; el texto plano no sigue
     vms = spec.get("vms")
-    if planner and isinstance(vms, list) and vms and not any(isinstance(v, dict) and "worker" in v for v in vms):
+    if spec.get("provider") == "auto":   # el VM Placement elige también la plataforma (LAB7, modo automático)
+        if not planner:
+            raise HTTPException(409, "El modo automático de plataforma requiere el VM Placement activo")
+        if not isinstance(vms, list) or not vms or any(isinstance(v, dict) and "worker" in v for v in vms):
+            raise HTTPException(422, "invalid_spec: el modo automático necesita VMs sin worker asignado")
+        job, summary = await planner.admit_auto(spec, body.zone, submit)
+        spec = dict(spec, provider=summary["provider"])
+    elif planner and isinstance(vms, list) and vms and not any(isinstance(v, dict) and "worker" in v for v in vms):
         job, summary = await planner.admit(spec, body.zone, submit)
     else:
         if body.zone:
@@ -492,10 +499,10 @@ async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey,
         accepted = Accepted(slice_id=job["slice_id"], operation_id=job["id"], status=job["status"], placement=summary)
     except (KeyError, TypeError, ValidationError):
         raise HTTPException(502, "platform_bad_response") from None
-    request.app.state.registry.add(accepted.slice_id, user, body.course_id, body.spec)
+    request.app.state.registry.add(accepted.slice_id, user, body.course_id, spec)
     if summary:
         request.app.state.registry.set_placement(accepted.slice_id, summary)
-    await register_in_iam(request, accepted.slice_id, user, dict(body.spec, __course=body.course_id))
+    await register_in_iam(request, accepted.slice_id, user, dict(spec, __course=body.course_id))
     return accepted
 
 

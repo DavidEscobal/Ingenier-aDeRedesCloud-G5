@@ -5,7 +5,7 @@ import { NAME } from '../topology.js'
 
 // Nuevo slice = elegir una topología (predefinida o guardada en el editor), el proveedor, el nombre y el curso.
 // El catálogo (formas, tamaños, imágenes, proveedores) lo da el topology-manager: nada fijo en este código.
-const PROVIDER_LABEL = { openstack: 'OpenStack', linux: 'Linux (clúster server1–3)' }
+const PROVIDER_LABEL = { openstack: 'OpenStack', linux: 'Linux (clúster server1–3)', auto: 'Automático (el VM Placement elige)' }
 const GUEST_USER = /^[a-z][a-z0-9_-]{0,30}$/
 
 export default function NewSlice() {
@@ -69,7 +69,7 @@ export default function NewSlice() {
   useEffect(() => {
     let cancelled = false
     setZone('')
-    Api.monitoringState(provider)
+    Api.monitoringState(provider === 'auto' ? undefined : provider) // auto: zonas de ambos clústeres
       .then((st) => { if (!cancelled) setZones([...new Set(st.hosts.map((h) => h.zone).filter(Boolean))].sort()) })
       .catch(() => { if (!cancelled) setZones([]) })
     return () => { cancelled = true }
@@ -191,6 +191,7 @@ export default function NewSlice() {
             El VM Placement (BCDP v2) ubica cada VM según los recursos libres; una VM con servidor fijado en el editor se
             respeta. Si no hay capacidad, el slice se rechaza con el motivo. Ver <Link to="/recursos">Recursos</Link>.
             {provider === 'linux' && ' Linux: imágenes CirrOS o Ubuntu.'}
+            {provider === 'auto' && ' Automático: se planifica en Linux y en OpenStack y se despliega donde ocupe menos servidores nuevos.'}
           </p>
           {needsGuest && (
             <fieldset className="panel-inner">

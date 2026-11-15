@@ -17,6 +17,7 @@ import httpx
 from fastapi import HTTPException
 
 LEDGER_TTL_S = 90
+PROVIDERS = ("linux", "openstack")   # orden fijo: candados y desempate del modo automático
 
 
 class Ledger:
@@ -133,3 +134,49 @@ class Planner:
                 self.ledger.add(provider, placed)
                 summary["attempts"] = attempt + 1
                 return job, summary
+
+    async def admit_auto(self, spec, zone, submit, attempts=3, wait=2.0):
+        """`provider: "auto"`: planifica el slice en cada proveedor y despliega en el mejor.
+
+        Criterio (la misma función objetivo del placement): 1) proveedores con PLAN_FOUND; 2) menos hosts nuevos
+        ocupados (Z); 3) menos hosts usados; 4) desempate fijo Linux, luego OpenStack. Si el platform-manager rechaza
+        el elegido por otra causa (imagen o red no admitidas, flavor ausente), se prueba el siguiente; si lo rechaza
+        por capacidad (otro slice ganó el hueco), se vuelve a planificar. Los candados se toman en orden fijo."""
+        locks = [self.locks.setdefault(p, asyncio.Lock()) for p in PROVIDERS]
+        async with locks[0], locks[1]:
+            for attempt in range(attempts):
+                options, rejected = [], []
+                for p in PROVIDERS:
+                    try:
+                        placed, summary = await self.plan(dict(spec, provider=p), zone)
+                    except HTTPException as exc:
+                        if exc.status_code not in (409, 503):
+                            raise
+                        rejected.append({"provider": p, "reason": str(exc.detail)[:300]})
+                        continue
+                    options.append(((summary["hosts_opened"], len(set(summary["plan"].values())), PROVIDERS.index(p)),
+                                    p, placed, summary))
+                options.sort(key=lambda o: o[0])
+                lost_race = False
+                for rank, p, placed, summary in options:
+                    try:
+                        job = await submit(placed)
+                    except HTTPException as exc:
+                        if exc.status_code == 409 and "apacidad" in str(exc.detail):
+                            lost_race = True
+                            break
+                        if exc.status_code in (409, 422):
+                            rejected.append({"provider": p, "reason": str(exc.detail)[:300]})
+                            continue
+                        raise
+                    self.ledger.add(p, placed)
+                    summary.update(provider=p, attempts=attempt + 1, mode="auto",
+                                   candidates=[{"provider": q, "hosts_opened": s["hosts_opened"],
+                                                "hosts_used": len(set(s["plan"].values()))} for _, q, _, s in options],
+                                   rejected=rejected)
+                    return job, summary
+                if lost_race and attempt + 1 < attempts:
+                    await asyncio.sleep(wait)
+                    continue
+                reasons = "; ".join("%s: %s" % (r["provider"], r["reason"]) for r in rejected) or "sin plan"
+                raise HTTPException(409, ("Ningún proveedor puede alojar el slice (modo automático): " + reasons)[:500])

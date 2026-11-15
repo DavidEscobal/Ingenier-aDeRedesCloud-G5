@@ -35,7 +35,8 @@ class Env:
 
     def monitoring(self, request):
         assert request.headers["Authorization"] == "Bearer " + TOKEN_M
-        return httpx.Response(200, json={"collected_at": 0, "age_s": 3, "hosts": self.hosts})
+        hosts = self.hosts[request.url.params["provider"]] if isinstance(self.hosts, dict) else self.hosts
+        return httpx.Response(200, json={"collected_at": 0, "age_s": 3, "hosts": hosts})
 
     def placement(self, request):
         body = json.loads(request.content)
@@ -139,6 +140,85 @@ class SlicePlacement(unittest.TestCase):
         with self.assertRaises(HTTPException) as e:
             run(env.planner().plan({"provider": "linux", "vms": [{"name": "x"}]}))
         self.assertEqual(e.exception.status_code, 422)
+
+
+def linux(name, **kw):
+    return host(name, "linux", provider="linux", **kw)
+
+
+AUTO = dict(SPEC, provider="auto")
+
+
+class AutoProvider(unittest.TestCase):
+    """LAB7: el módulo decide la plataforma cuando la entrada pide modo automático (casos A1–A5 del informe)."""
+
+    def tearDown(self):
+        placement_main._tokens.clear()
+
+    def admit(self, hosts, submit=None, spec=AUTO):
+        sent = []
+
+        async def accept(s):
+            sent.append(s)
+            return {"id": "j", "slice_id": "s", "status": "PENDING"}
+        job, summary = run(Env(hosts).planner().admit_auto(spec, None, submit or accept, wait=0))
+        return summary, sent
+
+    def test_a1_elige_el_unico_proveedor_con_capacidad(self):
+        summary, sent = self.admit({"linux": [linux("server1", ram_used_mb=3800)],
+                                    "openstack": [host("worker1"), host("worker2")]})
+        self.assertEqual((summary["provider"], summary["mode"]), ("openstack", "auto"))
+        self.assertEqual(sent[0]["provider"], "openstack")
+        self.assertTrue(all(v["host"].startswith("worker") and v["zone"] == "nova" for v in sent[0]["vms"]))
+        self.assertEqual([r["provider"] for r in summary["rejected"]], ["linux"])
+
+    def test_a2_elige_el_que_abre_menos_hosts_nuevos(self):
+        # Linux tendría que encender un servidor vacío; OpenStack tiene uno ya ocupado con hueco (Z = 0).
+        summary, sent = self.admit({"linux": [linux("server1"), linux("server2")],
+                                    "openstack": [host("worker1", occupied=True, vcpus_used=1, ram_used_mb=512, cpu_real_cent=0)]})
+        self.assertEqual(summary["provider"], "openstack")
+        self.assertEqual(summary["hosts_opened"], 0)
+        self.assertEqual({c["provider"]: c["hosts_opened"] for c in summary["candidates"]}, {"openstack": 0, "linux": 1})
+
+    def test_a3_empate_prefiere_linux(self):
+        summary, sent = self.admit({"linux": [linux("server1")], "openstack": [host("worker1")]})
+        self.assertEqual(summary["provider"], "linux")
+        self.assertNotIn("zone", sent[0]["vms"][0], "la zona de Nova solo se escribe en OpenStack")
+        self.assertEqual({v["host"] for v in sent[0]["vms"]}, {"server1"})
+
+    def test_a4_ninguno_puede_rechaza_con_el_motivo_de_cada_uno(self):
+        with self.assertRaises(HTTPException) as e:
+            self.admit({"linux": [linux("server1", ram_used_mb=3800)], "openstack": [host("worker1", healthy=False)]})
+        self.assertEqual(e.exception.status_code, 409)
+        self.assertIn("linux:", e.exception.detail)
+        self.assertIn("openstack:", e.exception.detail)
+
+    def test_a5_si_la_plataforma_rechaza_la_spec_prueba_la_siguiente(self):
+        calls = []
+
+        async def submit(s):
+            calls.append(s["provider"])
+            if s["provider"] == "linux":
+                raise HTTPException(409, "Linux admite imágenes CirrOS o Ubuntu (debian-12)")
+            return {"id": "j", "slice_id": "s", "status": "PENDING"}
+        summary, _ = self.admit({"linux": [linux("server1")], "openstack": [host("worker1")]}, submit)
+        self.assertEqual(calls, ["linux", "openstack"])
+        self.assertEqual(summary["provider"], "openstack")
+        self.assertIn("debian-12", summary["rejected"][0]["reason"])
+
+    def test_vm_fijada_decide_la_plataforma_y_carrera_perdida_replanifica(self):
+        spec = json.loads(json.dumps(AUTO)); spec["vms"][0]["host"] = "worker1"
+        summary, sent = self.admit({"linux": [linux("server1")], "openstack": [host("worker1")]}, spec=spec)
+        self.assertEqual((summary["provider"], sent[0]["vms"][0]["host"]), ("openstack", "worker1"))
+        calls = []
+
+        async def submit(s):
+            calls.append(s["provider"])
+            if len(calls) == 1:
+                raise HTTPException(409, "Capacidad reservable insuficiente en server1")
+            return {"id": "j", "slice_id": "s", "status": "PENDING"}
+        summary, _ = self.admit({"linux": [linux("server1")], "openstack": [host("worker1")]}, submit)
+        self.assertEqual(summary["attempts"], 2)
 
 
 if __name__ == "__main__":

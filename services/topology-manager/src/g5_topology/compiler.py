@@ -9,7 +9,8 @@ de gestión 192.168.201.0/24 y 192.168.202.0/24.
 from .model import Topology, hosts
 
 MAX_SEGMENTS = 200
-PROVIDERS = ("openstack", "linux")  # Linux: el platform-manager completa workers, C-VLAN e imagen.
+PROVIDERS = ("openstack", "linux", "auto")  # Linux: el platform-manager completa workers, C-VLAN e imagen.
+# "auto": la misma especificación sirve a ambos; el Slice Manager elige la plataforma con el VM Placement.
 
 
 class CompileError(ValueError):
@@ -27,7 +28,8 @@ def compile_spec(topology: Topology, provider: str, name: str | None = None):
         problems.append("La topología necesita al menos un enlace o bus")
     if len(topology.segments) > MAX_SEGMENTS:
         problems.append(f"Demasiados segmentos (máximo {MAX_SEGMENTS}, direccionamiento 192.168.k.0/24)")
-    wrong = [f"{n.id}→{n.host}" for n in topology.nodes if n.host and n.host not in hosts().get(provider, [])]
+    allowed = sorted({h for hs in hosts().values() for h in hs}) if provider == "auto" else hosts().get(provider, [])
+    wrong = [f"{n.id}→{n.host}" for n in topology.nodes if n.host and n.host not in allowed]
     if wrong:
         problems.append(f"Servidores que no son de {provider}: " + ", ".join(wrong))
     if problems:

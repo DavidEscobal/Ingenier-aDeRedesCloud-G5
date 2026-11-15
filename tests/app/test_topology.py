@@ -105,6 +105,10 @@ class GeneratorTests(unittest.TestCase):
         self.assertTrue(compile_spec(online, "linux")["vms"][0]["internet"])
         self.assertNotIn("internet", compile_spec(online, "linux")["vms"][1])
         self.assertTrue(compile_spec(online, "openstack")["vms"][0]["internet"])  # R5: red provider external
+        auto = compile_spec(pinned_ok := generate("lineal", 2), "auto")             # LAB7: modo automático
+        self.assertEqual(auto["provider"], "auto")
+        pinned_ok.nodes[0].host = "worker1"; pinned_ok.nodes[1].host = "server2"
+        self.assertEqual([v["host"] for v in compile_spec(pinned_ok, "auto")["vms"]], ["worker1", "server2"])
 
     def test_combining_renames_collisions_and_links_both_parts(self):
         merged = combine(generate("anillo", 3), generate("estrella", 4), connect=("n1", "n1"))
