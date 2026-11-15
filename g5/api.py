@@ -35,6 +35,8 @@ class Application:
         self.consoles = Consoles(self.store, self.backend)
         self.keys = keys
         self.image_lock = threading.RLock()
+        # Copias de Glance al almacén Linux en curso: nombre -> estado (una sola descarga por nombre).
+        self.pulls, self.pulls_lock = {}, threading.Lock()
         (self.store.directory / 'images').mkdir(exist_ok=True)
 
     def identity(self, bearer):
@@ -148,7 +150,7 @@ class Application:
                 if needs_adapter(body):
                     workers = [r['id'] for r in s.rows('SELECT id FROM nodes WHERE enabled=1 ORDER BY id')
                                if r['id'] in self.config.get('workers', {})]
-                    body = adapt(body, workers, self.linux_image)
+                    body = adapt(body, workers, self.linux_image_ready)
                 spec = validate(body, self.config)
                 # La misma petición ya aceptada conserva respuesta incluso si un nodo cayó después.
                 with s.tx() as db:
@@ -201,35 +203,78 @@ class Application:
             return 200, self.backend.call(vm['worker'], 'guest_probe', sid=row['id'], vm_name=vm['name'], **body)
         raise Fault('Ruta o método inexistente', 404)
 
-    def linux_image(self, name):
-        """Copia local (almacén Linux) de una imagen del catálogo, traída de Glance si falta. Devuelve su SHA-256."""
-        with self.image_lock:
-            row = self.store.rows('SELECT id FROM images WHERE name=? ORDER BY created DESC', (name,))
-            if row and (self.store.directory / 'images' / (row[0]['id'] + '.qcow2')).exists():
-                return row[0]['id']
-            require('openstack' in self.store.drivers and 'openstack' in self.config,
-                    'Imagen %s ausente del almacén Linux y sin Glance para traerla' % name, 409)
-            limit = self.config['max_image_gb'] * 1024**3
-            tmp = self.store.directory / 'images' / ('pull-' + os.urandom(8).hex() + '.part')
-            h = hashlib.sha256()
-            try:
-                with tmp.open('wb') as target:
-                    def sink(chunk):
-                        target.write(chunk); h.update(chunk)
-                    got = self.store.drivers['openstack'].download_image(name, sink, limit)
-                    target.flush(); os.fsync(target.fileno())
-                require(got['size'] > 0, 'Imagen vacía en Glance', 502)
-                image = h.hexdigest()
-                info = inspect_image(tmp)
-                path = self.store.directory / 'images' / (image + '.qcow2')
+    def cached_linux_image(self, name):
+        row = self.store.rows('SELECT id FROM images WHERE name=? ORDER BY created DESC', (name,))
+        if row and (self.store.directory / 'images' / (row[0]['id'] + '.qcow2')).exists():
+            return row[0]['id']
+        return None
+
+    def linux_image(self, name, progress=None):
+        """Copia local (almacén Linux) de una imagen del catálogo, traída de Glance si falta. Devuelve su SHA-256.
+
+        La descarga (minutos para una Ubuntu de 1,5 GB) va fuera de `image_lock`: solo el alta final lo toma, así que
+        crear o borrar slices no espera a una copia en curso."""
+        cached = self.cached_linux_image(name)
+        if cached:
+            return cached
+        require('openstack' in self.store.drivers and 'openstack' in self.config,
+                'Imagen %s ausente del almacén Linux y sin Glance para traerla' % name, 409)
+        limit = self.config['max_image_gb'] * 1024**3
+        tmp = self.store.directory / 'images' / ('pull-' + os.urandom(8).hex() + '.part')
+        h = hashlib.sha256()
+        try:
+            with tmp.open('wb') as target:
+                def sink(chunk):
+                    target.write(chunk); h.update(chunk)
+                    if progress is not None:
+                        progress['bytes'] = progress.get('bytes', 0) + len(chunk)
+                got = self.store.drivers['openstack'].download_image(name, sink, limit)
+                target.flush(); os.fsync(target.fileno())
+            require(got['size'] > 0, 'Imagen vacía en Glance', 502)
+            image = h.hexdigest()
+            info = inspect_image(tmp)
+            path = self.store.directory / 'images' / (image + '.qcow2')
+            with self.image_lock:
                 os.chmod(str(tmp), 0o444)
                 os.replace(str(tmp), str(path))
                 with self.store.tx() as db:
                     db.execute('INSERT OR IGNORE INTO images VALUES(?,?,?,?,?)', (image, name, got['size'], info['virtual-size'], time.time()))
-                return image
-            finally:
-                if tmp.exists():
-                    tmp.unlink()
+            return image
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+
+    def prefetch_linux_image(self, name):
+        """Inicia (una sola vez por nombre) la copia de Glance al almacén Linux en segundo plano; devuelve su estado."""
+        with self.pulls_lock:
+            state = self.pulls.get(name)
+            if state and state['status'] == 'PULLING':
+                return state
+            state = self.pulls[name] = {'status': 'PULLING', 'bytes': 0, 'started': time.time()}
+
+        def run():
+            try:
+                self.linux_image(name, state)
+                state['status'] = 'READY'
+            except Exception as exc:  # el error se informa en el siguiente intento de crear el slice
+                state.update(status='FAILED', error=str(exc)[:300])
+        threading.Thread(target=run, name='pull-' + name, daemon=True).start()
+        return state
+
+    def linux_image_ready(self, name):
+        """Para el adaptador Linux: SHA-256 si la imagen ya está en el almacén; si no, la precarga y rechaza con 409."""
+        cached = self.cached_linux_image(name)
+        if cached:
+            return cached
+        previous = self.pulls.get(name)
+        if previous and previous['status'] == 'FAILED':
+            error = previous.get('error', '')
+            self.prefetch_linux_image(name)  # reintento
+            raise Fault('No se pudo copiar %s al clúster Linux (%s); se reintenta la copia, pruebe de nuevo en unos minutos'
+                        % (name, error), 409)
+        state = self.prefetch_linux_image(name)
+        raise Fault('La imagen %s se está copiando al clúster Linux desde Glance (%d MB copiados); '
+                    'vuelva a desplegar en unos minutos' % (name, state.get('bytes', 0) // 1024**2), 409)
 
     def upload(self, image, name, size, stream):
         digest(image)
@@ -316,7 +361,10 @@ class Handler(BaseHTTPRequestHandler):
                 require(0 < length <= app.config.get('max_image_gb', 4) * 1024**3, 'Tamaño de imagen fuera del límite', 413)
                 require('openstack' in app.store.drivers and 'openstack' in app.config, 'OpenStack no configurado', 409)
                 fmt = (parse_qs(urlsplit(self.path).query).get('disk_format') or ['qcow2'])[0]
-                return self.reply(201, app.store.drivers['openstack'].import_image(provider_image.group(1), fmt, length, self.rfile))
+                imported = app.store.drivers['openstack'].import_image(provider_image.group(1), fmt, length, self.rfile)
+                if app.config.get('workers'):  # Linux la tendrá lista al desplegar (sin esperar la descarga)
+                    app.prefetch_linux_image(provider_image.group(1))
+                return self.reply(201, imported)
             upload = re.fullmatch(r'/v1/images/([0-9a-f]{64})', path)
             if self.command == 'PUT' and upload:
                 require(admin, 'Requiere rol admin/service', 403)

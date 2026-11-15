@@ -2,6 +2,7 @@
 import hashlib
 import http.client
 import io
+import time
 import json
 import unittest
 
@@ -55,6 +56,45 @@ class LinuxMaterializationTests(OpenStackFixture):
         self.assertEqual(inspect.call_count, 1, 'la segunda vez se reutiliza la copia local')
         self.assertEqual((self.store.directory / 'images' / (first + '.qcow2')).read_bytes(), QCOW2)
         self.assertEqual(self.store.rows('SELECT name FROM images WHERE id=?', (first,))[0]['name'], 'cirros-test')
+
+    def test_missing_image_is_prefetched_in_background_and_create_is_rejected_meanwhile(self):
+        # MS-18: la primera descarga (1,5 GB) no puede ocurrir dentro de la petición de crear (timeout de 20 s).
+        import threading
+        from unittest import mock
+        self.driver.import_image('ubuntu-test', 'qcow2', len(QCOW2), io.BytesIO(QCOW2))
+        gate, calls = threading.Event(), []
+        real = self.driver.download_image
+
+        def slow(name, sink, limit):
+            calls.append(name); gate.wait(5); return real(name, sink, limit)
+        with mock.patch.object(self.driver, 'download_image', side_effect=slow),                 mock.patch('g5.api.inspect_image', return_value={'virtual-size': 117440512}):
+            with self.assertRaisesRegex(Fault, 'se está copiando') as first:
+                self.app.linux_image_ready('ubuntu-test')
+            self.assertEqual(first.exception.status, 409)
+            with self.assertRaisesRegex(Fault, 'se está copiando'):
+                self.app.linux_image_ready('ubuntu-test')
+            with self.app.image_lock:  # la copia en curso no retiene el candado global
+                pass
+            gate.set()
+            for _ in range(100):
+                if self.app.pulls['ubuntu-test']['status'] != 'PULLING':
+                    break
+                time.sleep(0.05)
+            self.assertEqual(self.app.pulls['ubuntu-test']['status'], 'READY')
+            self.assertEqual(self.app.linux_image_ready('ubuntu-test'), hashlib.sha256(QCOW2).hexdigest())
+        self.assertEqual(calls, ['ubuntu-test'], 'una sola descarga aunque se reintente')
+
+    def test_failed_prefetch_is_reported_and_retried(self):
+        from unittest import mock
+        with mock.patch.object(self.driver, 'download_image', side_effect=Fault('Glance caído', 503)):
+            with self.assertRaisesRegex(Fault, 'se está copiando'):
+                self.app.linux_image_ready('no-existe')
+            for _ in range(100):
+                if self.app.pulls['no-existe']['status'] != 'PULLING':
+                    break
+                time.sleep(0.05)
+            with self.assertRaisesRegex(Fault, 'No se pudo copiar no-existe.*Glance caído'):
+                self.app.linux_image_ready('no-existe')
 
     def test_unknown_or_unsafe_image_leaves_nothing(self):
         from unittest import mock
