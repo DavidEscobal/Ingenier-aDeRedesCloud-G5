@@ -25,6 +25,8 @@ from .session import OpenStackError, Session
 
 PRIVATE = [ipaddress.ip_network(x) for x in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')]
 NOVA_CONSOLE = {'OpenStack-API-Version': 'compute 2.6', 'X-OpenStack-Nova-API-Version': '2.6'}
+NOVA_DIAGNOSTICS = {'OpenStack-API-Version': 'compute 2.48', 'X-OpenStack-Nova-API-Version': '2.48'}  # formato estándar
+LOAD = re.compile(r'load average:\s*([0-9.]+),\s*([0-9.]+),\s*([0-9.]+)')
 DELETE_ORDER = ('server', 'port', 'security_group', 'subnet', 'network', 'project')
 EXTERNAL_NIC = 'inet'       # nombre de la NIC de salida (puerto g5-<slice>-<vm>-inet)
 INGRESS = (('tcp', 22), ('icmp', None))
@@ -181,16 +183,60 @@ class OpenStackDriver(ProviderDriver):
         except OpenStackError:
             pass
         rows = []
+        try:
+            usage = self.vm_usage()
+        except OpenStackError:
+            usage = []
+        by_host = {}
+        for row in usage:
+            by_host.setdefault(row.pop('host'), []).append(row)
         for hv in self.call('GET', 'compute', '/os-hypervisors/detail')['hypervisors']:
             host = (hv.get('service') or {}).get('host') or hv.get('hypervisor_hostname')
+            load = None
+            try:   # carga del compute completo (incluye VMs ajenas a G5); Nova la saca de `uptime`
+                match = LOAD.search(self.call('GET', 'compute', '/os-hypervisors/%s/uptime' % hv['id'])['hypervisor'].get('uptime') or '')
+                load = [float(x) for x in match.groups()] if match else None
+            except (OpenStackError, KeyError, TypeError):
+                pass
             rows.append({'node': host, 'hypervisor': hv.get('hypervisor_hostname'), 'zone': zones.get(host, 'nova'),
                          'state': hv.get('state'), 'status': hv.get('status'),
                          'vcpus': hv.get('vcpus'), 'vcpus_used': hv.get('vcpus_used'),
                          'memory_mb': hv.get('memory_mb'), 'memory_mb_used': hv.get('memory_mb_used'),
                          'local_gb': hv.get('local_gb'), 'local_gb_used': hv.get('local_gb_used'),
                          'disk_available_least': hv.get('disk_available_least'),
-                         'running_vms': hv.get('running_vms')})
+                         'running_vms': hv.get('running_vms'), 'load': load,
+                         'vm_usage': by_host.get(host, [])})
         return sorted(rows, key=lambda r: r['node'] or '')
+
+    def vm_usage(self):
+        """Uso medido de las VMs de G5 con los diagnósticos de Nova (monitoreo, Ex2 pasos 4–5): CPU real en centésimas
+        de CPU, como incremento del tiempo de CPU entre dos muestras, y RAM usada por el invitado (balloon).
+
+        Solo VMs de G5 (nombre g5-<slice>-<vm>): el compute es compartido con otros grupos. La primera muestra de cada
+        VM no tiene CPU (falta el punto anterior)."""
+        now = time.monotonic()
+        previous, current, rows = getattr(self, '_cpu_samples', {}), {}, []
+        servers = self.call('GET', 'compute', '/servers/detail?' + urllib.parse.urlencode(
+            {'all_tenants': 1, 'name': '^g5-[0-9a-f]{8}-', 'status': 'ACTIVE'}))['servers']
+        for server in servers:
+            match = re.fullmatch(r'g5-([0-9a-f]{8})-(.+)', server.get('name') or '')
+            if not match or server.get('status') != 'ACTIVE':
+                continue
+            try:
+                diag = self.call('GET', 'compute', '/servers/%s/diagnostics' % server['id'], headers=NOVA_DIAGNOSTICS)
+            except OpenStackError:
+                continue
+            cpu_ns = sum(int(c.get('time') or 0) for c in diag.get('cpu_details') or [])
+            memory = diag.get('memory_details') or {}
+            current[server['id']] = (cpu_ns, now)
+            cent, before = None, previous.get(server['id'])
+            if before and now > before[1] and cpu_ns >= before[0]:
+                cent = round(100 * (cpu_ns - before[0]) / 1e9 / (now - before[1]))
+            rows.append({'host': server.get('OS-EXT-SRV-ATTR:host'), 'sid': match.group(1), 'vm': match.group(2),
+                         'pid': server['id'], 'cpu_cent': cent, 'rss_mb': memory.get('used'),
+                         'memory_mb': memory.get('maximum')})
+        self._cpu_samples = current
+        return rows
 
     def inspect(self, plan, store):
         servers = {}

@@ -191,7 +191,10 @@ def history(request: Request, host: str = Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9
             points.append({"t": sample["timestamp"], "cpu_real_cent": h["cpu_real_cent"],
                            "vcpus_used": h["vcpus_used"], "ram_used_mb": h["ram_used_mb"],
                            "memory_available_mb": h["memory_available_mb"], "disk_used_mb": h["disk_used_mb"],
-                           "vms": h["vms"]})
+                           "vms": h["vms"],
+                           # OpenStack: CPU medida de las VMs de G5 (diagnósticos de Nova) y carga del compute
+                           "vms_cpu_cent": sum(v.get("cpu_cent") or 0 for v in h.get("vm_usage") or []),
+                           "load1": (h.get("load") or [None])[0]})
     if not points:
         raise HTTPException(404, "Sin datos para " + host)
     return {"host": host, "minutes": minutes, "points": points}

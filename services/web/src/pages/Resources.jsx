@@ -28,8 +28,22 @@ function Health({ host }) {
   return <span className="badge badge-bad" title={host.error || ''}>{host.error ? 'No disponible' : 'Sin datos'}</span>
 }
 
+// OpenStack: sin CPU real del compute; se muestra la CPU medida de las VMs de G5 y la carga del compute.
+function VmsCpu({ host }) {
+  const measured = (host.vm_usage || []).filter((v) => v.cpu_cent != null)
+  const load = host.load?.[0]
+  if (!measured.length && load == null) return <span className="muted small">sin dato</span>
+  const total = measured.reduce((s, v) => s + v.cpu_cent, 0)
+  return (
+    <span className="small" title="CPU medida de las VMs de G5 (diagnósticos de Nova); carga = load average del compute">
+      {measured.length ? `VMs G5: ${(total / 100).toFixed(2)} CPU` : 'VMs G5: —'}
+      {load != null && <div className="muted">carga {load.toFixed(2)}</div>}
+    </span>
+  )
+}
+
 function Sparkline({ points }) {
-  const values = points.map((p) => p.cpu_real_cent ?? 0)
+  const values = points.map((p) => p.cpu_real_cent ?? p.vms_cpu_cent ?? 0)
   const max = Math.max(100, ...values)
   const w = 520, h = 90
   const xy = values.map((v, i) => `${(i / Math.max(1, values.length - 1)) * w},${h - (v / max) * (h - 8) - 4}`)
@@ -59,19 +73,20 @@ function History({ host, onClose }) {
         <>
           <p className="muted small">
             CPU real (centésimas de CPU), {data.points.length} muestras.
-            {last && host.provider === 'openstack' && ' En OpenStack no hay CPU real (sin acceso a los workers): se usa la demanda completa.'}
+            {last && host.provider === 'openstack' && ' En OpenStack la curva es la CPU medida de las VMs de G5 (diagnósticos de Nova); la del compute completo no está disponible y el placement usa la demanda completa.'}
           </p>
           <Sparkline points={data.points} />
         </>
       )}
       {host.vm_usage?.length > 0 && (
         <table className="table compact" style={{ marginTop: 12 }}>
-          <thead><tr><th>Slice</th><th>VM</th><th>CPU real</th><th>RAM residente</th></tr></thead>
+          <thead><tr><th>Slice</th><th>VM</th><th>CPU real</th><th>RAM {host.provider === 'openstack' ? 'usada' : 'residente'}</th></tr></thead>
           <tbody>
             {host.vm_usage.map((v) => (
               <tr key={v.pid}>
                 <td className="mono small">{v.sid.slice(0, 8)}</td><td>{v.vm}</td>
-                <td>{(v.cpu_cent / 100).toFixed(2)} CPU</td><td>{v.rss_mb} MB</td>
+                <td>{v.cpu_cent == null ? '…' : (v.cpu_cent / 100).toFixed(2) + ' CPU'}</td>
+                <td>{v.rss_mb == null ? '—' : v.rss_mb + ' MB'}{v.memory_mb ? ' / ' + v.memory_mb + ' MB' : ''}</td>
               </tr>
             ))}
           </tbody>
@@ -139,7 +154,7 @@ export default function Resources() {
                       <td>{h.zone}</td>
                       <td><Health host={h} /></td>
                       <td><Meter used={h.vcpus_used} total={vcpuCap} /></td>
-                      <td>{h.cpu_real_cent == null ? <span className="muted small">sin dato</span>
+                      <td>{h.cpu_real_cent == null ? <VmsCpu host={h} />
                         : <Meter used={(h.cpu_real_cent / 100).toFixed(1)} total={h.cpu_cores} unit="CPU" limit={85} />}</td>
                       <td><Meter used={h.ram_used_mb} total={h.ram_mb} /></td>
                       <td><Meter used={gb(h.disk_used_mb)} total={gb(h.disk_mb)} /></td>

@@ -36,7 +36,8 @@ def sample(ts, cpu=120):
         "openstack": {"hosts": [
             {"node": "worker1", "zone": "zona-a", "state": "up", "status": "enabled", "vcpus": 4, "vcpus_used": 2,
              "memory_mb": 3936, "memory_mb_used": 1536, "local_gb": 9, "local_gb_used": 2,
-             "disk_available_least": 1, "running_vms": 2},
+             "disk_available_least": 1, "running_vms": 2, "load": [0.8, 0.5, 0.3],
+             "vm_usage": [{"sid": "abcd1234", "vm": "vm1", "pid": "srv-1", "cpu_cent": 80, "rss_mb": 410, "memory_mb": 512}]},
             {"node": "worker2", "zone": "nova", "state": "down", "status": "enabled", "vcpus": 4, "vcpus_used": 0,
              "memory_mb": 3936, "memory_mb_used": 512, "local_gb": 9, "local_gb_used": 0,
              "disk_available_least": None, "running_vms": 0}]}}
@@ -57,8 +58,9 @@ class Normalize(unittest.TestCase):
         self.assertEqual(w1["zone"], "zona-a")
         self.assertEqual(w1["disk_used_mb"], 2 * 1024)       # manda lo comprometido en Nova (local_gb_used)
         self.assertEqual(w1["disk_free_mb"], 1024)           # disk_available_least solo se informa
-        self.assertIsNone(w1["cpu_real_cent"])
-        self.assertFalse(w2["healthy"])
+        self.assertIsNone(w1["cpu_real_cent"])              # el compute completo sigue sin dato (placement)
+        self.assertEqual((w1["load"], w1["vm_usage"][0]["cpu_cent"]), ([0.8, 0.5, 0.3], 80))   # Nova: VMs de G5
+        self.assertFalse(w2["healthy"]); self.assertEqual(w2["vm_usage"], [])
 
 
 class Api(unittest.TestCase):

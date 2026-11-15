@@ -1,4 +1,5 @@
 """OpenStack falso en un hilo (Keystone + rutas configurables) para probar sin el clúster real."""
+import re
 import json
 import threading
 import time
@@ -124,6 +125,7 @@ class FakeCloud:
         self.projects = {'p-cloud-admin': {'id': 'p-cloud-admin', 'name': 'cloud_admin', 'domain_id': 'd-cloud'}}
         self.assignments = set()
         self.networks, self.subnets, self.ports, self.servers = {}, {}, {}, {}
+        self.cpu_ns = {}
         self.security_groups, self.security_group_rules = {}, {}
         self.flavors = [{'id': 'f-lab5', 'name': '512MBRAM_1VCPUs_4GBRoot', 'vcpus': 1, 'ram': 512, 'disk': 4}]
         self.images = [{'id': 'img-cirros', 'name': 'cirros', 'status': 'active'}]
@@ -248,10 +250,23 @@ class FakeCloud:
     def nova(self, method, rest, query, body, project):
         if rest == ['os-hypervisors', 'detail']:
             return 200, {'hypervisors': [
-                {'hypervisor_hostname': 'worker%d' % n, 'service': {'host': 'worker%d' % n}, 'state': 'up',
+                {'id': 'hv%d' % n, 'hypervisor_hostname': 'worker%d' % n, 'service': {'host': 'worker%d' % n}, 'state': 'up',
                  'status': 'enabled', 'vcpus': 4, 'vcpus_used': n, 'memory_mb': 3936, 'memory_mb_used': 512 * (n + 1),
                  'local_gb': 9, 'local_gb_used': n, 'disk_available_least': 6 - n, 'running_vms': n}
                 for n in (1, 2, 3)]}
+        if len(rest) == 3 and rest[0] == 'os-hypervisors' and rest[2] == 'uptime':
+            n = rest[1][2:]
+            return 200, {'hypervisor': {'id': rest[1], 'uptime': ' 10:00:00 up 3 days,  1 user,  load average: 0.%s0, 0.20, 0.10' % n}}
+        if rest == ['servers', 'detail'] and method == 'GET':   # listado de administrador (todos los proyectos)
+            pattern = re.compile(query.get('name', ''))
+            return 200, {'servers': [{'id': s['id'], 'name': s['name'], 'status': s['status'],
+                                      'OS-EXT-SRV-ATTR:host': s['host']}
+                                     for s in self.servers.values() if pattern.search(s['name'])
+                                     and query.get('status') in (None, s['status'])]}
+        if len(rest) == 3 and rest[0] == 'servers' and rest[2] == 'diagnostics' and rest[1] in self.servers:
+            used = self.cpu_ns[rest[1]] = self.cpu_ns.get(rest[1], 0) + 500_000_000   # medio segundo por consulta
+            return 200, {'cpu_details': [{'id': 0, 'time': used, 'utilisation': None}],
+                         'memory_details': {'maximum': 512, 'used': 300}}
         if rest == ['os-aggregates']:
             return 200, {'aggregates': [{'name': 'az-a', 'availability_zone': 'zona-a', 'hosts': ['worker1', 'worker2']}]}
         if rest == ['flavors', 'detail']:

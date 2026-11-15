@@ -52,10 +52,12 @@ def openstack_hosts(block, measured_at, now):
             "vcpus_used": int(r.get("vcpus_used") or 0), "ram_used_mb": int(r.get("memory_mb_used") or 0),
             "disk_used_mb": max(0, used_disk), "vms": int(r.get("running_vms") or 0),
             "occupied": int(r.get("running_vms") or 0) > 0,
-            "cpu_real_cent": None,                              # sin acceso a los workers: demanda completa
+            # CPU real del compute: sin dato (es compartido y no hay acceso a los workers); el placement usa la
+            # demanda completa. Sí hay uso medido de cada VM de G5 (diagnósticos de Nova) y la carga del compute.
+            "cpu_real_cent": None,
             "memory_total_mb": None, "memory_available_mb": None,
-            "disk_free_mb": None if least is None else int(least * GIB), "load": None,
-            "vm_usage": [], "measured_at": measured_at,
+            "disk_free_mb": None if least is None else int(least * GIB), "load": r.get("load"),
+            "vm_usage": r.get("vm_usage") or [], "measured_at": measured_at,
             "age_s": round(max(0.0, now - measured_at), 1) if measured_at else None,
             "healthy": up, "error": None if up else "hipervisor %s/%s" % (r.get("state"), r.get("status")),
         })

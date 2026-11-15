@@ -66,6 +66,25 @@ class OpenStackDriverTests(OpenStackFixture):
         metrics = self.app.route('GET', '/v1/metrics', {}, 'svc', True, '')[1]
         self.assertEqual(len(metrics['openstack']['hosts']), 3)
 
+    def test_vm_usage_from_nova_diagnostics_and_compute_load(self):
+        # Ex2 pasos 4–5 en OpenStack: CPU real de cada VM de G5 (incremento del tiempo de CPU) y carga del compute.
+        row = self.run_job(self.create())
+        self.assertEqual(row['status'], 'READY', row)
+        first = {r['node']: r for r in self.driver.hypervisors()}
+        self.assertEqual(first['worker2']['load'], [0.2, 0.2, 0.1])
+        vms = [v for r in first.values() for v in r['vm_usage']]
+        self.assertEqual(sorted(v['vm'] for v in vms), ['vm1', 'vm2', 'vm3'])
+        self.assertTrue(all(v['cpu_cent'] is None and v['rss_mb'] == 300 for v in vms), 'la primera muestra no tiene CPU')
+        for server in self.cloud.servers.values():
+            self.cloud.cpu_ns[server['id']] += 2_000_000_000            # la VM gastó 2 s más de CPU
+        self.driver._cpu_samples = {k: (ns, t - 10) for k, (ns, t) in self.driver._cpu_samples.items()}
+        again = [v for r in self.driver.hypervisors() for v in r['vm_usage']]
+        self.assertTrue(all(24 <= v['cpu_cent'] <= 26 for v in again), again)   # 2,5 s en 10 s = 0,25 CPU
+        hosts = {r['node']: {v['vm'] for v in r['vm_usage']} for r in self.driver.hypervisors()}
+        placed = {s['host']: s['name'].rsplit('-', 1)[-1] for s in self.cloud.servers.values()}
+        for host, vm in placed.items():
+            self.assertIn(vm, hosts[host], 'cada VM se informa en su compute')
+
     def test_placement_host_and_zone_force_the_compute(self):
         spec = copy.deepcopy(LINEAL)
         spec['vms'][0].update(host='worker2', zone='zona-a')
