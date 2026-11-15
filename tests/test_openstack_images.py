@@ -95,6 +95,11 @@ class LinuxMaterializationTests(OpenStackFixture):
                 time.sleep(0.05)
             with self.assertRaisesRegex(Fault, 'No se pudo copiar no-existe.*Glance caído'):
                 self.app.linux_image_ready('no-existe')
+            for _ in range(100):  # el reintento corre en otro hilo: esperar a que termine antes de borrar el directorio
+                if self.app.pulls['no-existe']['status'] != 'PULLING':
+                    break
+                time.sleep(0.05)
+            self.assertEqual(self.app.pulls['no-existe']['status'], 'FAILED')
 
     def test_unknown_or_unsafe_image_leaves_nothing(self):
         from unittest import mock
