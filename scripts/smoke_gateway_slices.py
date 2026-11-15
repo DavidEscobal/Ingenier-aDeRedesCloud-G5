@@ -67,6 +67,8 @@ def main():
     parser.add_argument('--provider', action='append', choices=['linux', 'openstack', 'auto'])
     parser.add_argument('--zone')
     parser.add_argument('--hold', type=int, default=0)
+    parser.add_argument('--ssh-key', action='append', default=[], metavar='ARCHIVO.pub',
+                        help='clave SSH pública para las VMs Ubuntu (repetible; solo con --guest-user)')
     parser.add_argument('--keep', action='store_true',
                         help='no borrar el slice al final (pruebas manuales largas); luego usar --delete SLICE_ID')
     parser.add_argument('--image', help='imagen del catálogo para todas las VMs (reemplaza la de la plantilla)')
@@ -96,7 +98,8 @@ def main():
         if not 8 <= len(vm_password) <= 72:
             print('FAIL la contraseña de las VMs debe tener entre 8 y 72 caracteres')
             return 1
-        guest = {'username': args.guest_user, 'password': vm_password}
+        guest = {'username': args.guest_user, 'password': vm_password,
+                 'ssh_authorized_keys': [open(f).read().strip() for f in args.ssh_key]}
     args.guest = guest
     password = getpass.getpass('Contraseña de %s: ' % args.user)
     status, body = call(args.url, 'POST', '/v1/auth/login', body={'username': args.user, 'password': password})
