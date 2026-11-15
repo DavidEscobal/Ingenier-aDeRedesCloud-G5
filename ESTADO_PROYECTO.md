@@ -1,33 +1,33 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
-> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-15 (R4 placement + monitoreo desplegados; antes 2026-11-08: integración `app`, Docker en el app server, D-10).
+> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-15 tarde (OpenStack: modo auto, stress-ng con uso real, MTU, enlaces sin IP, 15b–e).
 
-## Punto de reanudación (2026-11-15, cierre de sesión) — LEER PRIMERO
-- **Rama `fase2` en GitHub = eb172a4** (push hecho). App server `~/g5-app` en **0efd775** (10 contenedores healthy;
-  solo cambian docs después). Suite: 131 núcleo + 59 microservicios OK; `bash scripts/verificar.sh` en verde.
-- **Nube limpia:** sin slices G5 vivos, sin puertos/grupos en Neutron, 0 reservas Linux. Glance: `cirros`,
-  `cirros-062`, `ubuntu-24.04-minimal-cloudimg-amd64` (íntegra). Almacén Linux del app server: la 24.04 ya copiada.
-  Flavors: `g5-1c-512m-1g`, `512MBRAM_1VCPUs_4GBRoot`, `g5-1c-1g-4g` (creado hoy).
-- **Hecho en la sesión 2026-11-14/15:** placement R4 + monitoreo desplegados y probados (MS-17); Ubuntu con
-  credenciales en Linux/OpenStack (hash SHA-512 crypt, cloud-init; MS-18: OpenStack ✅); límite de importación
-  2048 MB; precarga en segundo plano de imágenes al almacén Linux; gateway muestra el campo que falla en 422;
-  **R5 OpenStack** por la red provider `external` 10.60.10.0/24 con grupo de seguridad (MS-19: salida ✅).
-- **Bloqueado por el JP** (mensaje preparado en la sesión): (1) disco de los servidores Linux: una Ubuntu de 4 GB
-  necesita ≈ 8 GB reservables y hay ≈ 6,5 GB → ampliar disco o aceptar aprovisionamiento delgado; (2) la VPN no
-  publica 10.60.10.0/24 (sí 10.60.9.0/24) → sin SSH desde fuera en OpenStack; (3) 2,5 GB del Anexo vs 3,5 GiB de la
-  imagen (usamos 4 GB) y el paso 3 + Anexo no caben a la vez en OpenStack; (4) zona/rol de server4; (5) enlaces sin
-  IP en OpenStack (15b); (6) SSH a los workers OpenStack (paso 6).
-- **Siguiente (sin depender del JP), en este orden:** el usuario importa la Ubuntu 20.04
-  (`Proyecto/Images/focal-server-cloudimg-amd64.img`, 942 MB, nombre con «ubuntu»); repetir DNS en vm1
-  (`ping google.com`, `resolvectl status ens3`); paso 4 `stress-ng` ejecutado (MS-20; falta ver el uso real en Recursos para OpenStack; modo automático probado en el clúster); pasos 15b–e
-  en OpenStack con Ubuntu (VM4 con OVS, IPs 10.100.10.x, tcpdump); reinstalar agentes Linux (sudo del usuario).
-- **Docs pendientes:** HLD (BCDP v2 en vez de BFD; R5 dice «self-service» y la rúbrica pide no usarlo →
-  contradicción a corregir), REPORTE_CUMPLIMIENTO_EX2 (R5 OpenStack, Ubuntu), informe del plan de pruebas
-  (MS-17..19), rutas de las guías en CLAUDE.md (`Laboratorio_md/LAB5/`, `LAB6/`); cambios locales del usuario sin
-  commitear (guías movidas, `Contexto_md/`, etc.). R5-I-06 (switch físico para broadcasts) sin empezar.
+## Punto de reanudación (2026-11-15, cierre de sesión tarde) — LEER PRIMERO
+- **Rama `fase2` en GitHub = 5f8c098** (push hecho, `bash scripts/verificar.sh` en verde). App server `~/g5-app`:
+  platform-manager en **1345564**, monitoring y web en **039761c**, slice/topology-manager en db92390.
+- **Nube limpia:** slices de prueba borrados. Flavors G5: `g5-1c-512m-1g`, `g5-1c-1g-4g`, `g5-1c-512m-4g`
+  (0,5 GB, como el Anexo). Glance: `cirros`, `cirros-062`, `ubuntu-24.04-minimal-cloudimg-amd64`.
+- **Hecho hoy (MS-20, MS-21):** modo de proveedor automático probado en el clúster (Linux rechaza la red RFC1918 →
+  OpenStack); paso 4 `stress-ng` en OpenStack con **uso real medido** en Recursos (diagnósticos de Nova + carga de
+  cada compute; vm1 a 1,00 CPU bajo carga); MTU 1400 automático en la NIC de Internet (cloud-init `bootcmd`);
+  enlaces «sin IP» en OpenStack con subredes de relleno 10.255.x.0/28 que se quitan del netplan; pasos **15b–d ✅**
+  en OpenStack. **15e ❌**: el unicast se pierde entre worker2 y worker1 (probable aprendizaje de MAC compartido
+  entre VLANs en el tramo físico); mitigación en un solo compute imposible (9 GB de disco = 2 Ubuntu por compute).
+- **Acceso de diagnóstico a VMs:** clave `~/.ssh/g5_vm_ed25519` en `g5-gw` (la privada no sale de ahí; la pública
+  en el app server `/home/ubuntu/.ssh/g5_vm_ed25519.pub`), helper `~/g5vm.sh` en g5-gw; desde fuera:
+  `ssh -J g5-gw alumno@<ip external>`. Smoke con `--ssh-key ARCHIVO.pub` y `--keep`.
+- **Bloqueado por el JP** (mensaje por redactar): (1) tramo físico entre computes que aprenda MACs por VLAN (15e);
+  (2) más disco en computes OpenStack (9 GB) o arranque desde volumen; (3) ruta VPN a 10.60.10.0/24 (SSH directo,
+  paso 17); (4) disco de los servidores Linux (Ubuntu 4 GB ≈ 8 GB reservables, hay ≈ 6,5 GB); (5) 2,5 GB del Anexo
+  vs 3,5 GiB de la imagen; (6) zona/rol de server4; (7) SSH a los workers (paso 6); (8) aceptar la subred de relleno.
+- **Siguiente (sin depender del JP):** redactar el mensaje al JP con MS-20/MS-21; docs: HLD (BCDP v2 en vez de BFD;
+  R5 «self-service» vs rúbrica → contradicción), REPORTE_CUMPLIMIENTO_EX2, informe del plan de pruebas (MS-17..21),
+  rutas de guías en CLAUDE.md (`Laboratorio_md/LAB5/`, `LAB6/`); reinstalar agentes Linux (sudo del usuario);
+  importar Ubuntu 20.04 (`Proyecto/Images/focal-server-cloudimg-amd64.img`); decidir los archivos locales sin
+  commitear del usuario (`Contexto_md/`, `Laboratorio_md/LAB5-7`, notebooks, etc.); R5-I-06 sin empezar.
 - **Prueba de humo:** `python3 scripts/smoke_gateway_slices.py --user admin123 --template templates/ubuntu-2vm.json
-  --provider openstack --guest-user alumno [--internet vm1] --hold 600` (el usuario escribe las contraseñas en una
-  pestaña nueva; contraseña de VM 8..72 caracteres; `--hold` se limita a la vida del token).
+  --provider openstack --guest-user alumno [--internet vm1] [--ssh-key K.pub] [--keep] --hold 600` (el usuario
+  escribe las contraseñas en una pestaña nueva; contraseña de VM 8..72 caracteres).
 
 ## Estado general
 - **F0 (auditoría) y F1 (núcleo de Slice Manager agnóstico + driver OpenStack) terminadas.**
