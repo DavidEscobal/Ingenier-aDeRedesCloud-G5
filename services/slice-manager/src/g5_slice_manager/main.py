@@ -18,9 +18,12 @@ from urllib.parse import urlsplit
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi import Path as PathParam
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from .guest import GuestAccess, with_guest
 from .placement import Planner
 
 
@@ -54,6 +57,7 @@ class SliceCreate(BaseModel):
     spec: dict[str, Any] = Field(description="Especificación del slice (formato del platform-manager)")
     zone: str | None = Field(default=None, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
                              description="Zona de disponibilidad (R4-I-04); sin ella, cualquier host del proveedor")
+    guest: GuestAccess | None = Field(default=None, description="Acceso a las VMs Ubuntu (Ex2); solo viaja el hash")
 
 
 class Accepted(BaseModel):
@@ -441,6 +445,13 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, exc):
+    # Sin el campo "input": el cuerpo puede traer la contraseña de las VMs y no se devuelve ni se registra.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(e["loc"]), "type": e["type"], "msg": e["msg"]} for e in exc.errors()]})
+
+
 @app.get("/healthz", response_model=Health, tags=["health"])
 def health() -> Health:
     return Health()
@@ -469,13 +480,14 @@ async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey,
         raise HTTPException(403, "not_authorized")
     submit = lambda spec: platform_call(request, "POST", "/v1/slices", spec, platform_key(user, key))
     planner, summary = request.app.state.planner, None
-    vms = body.spec.get("vms")
+    spec = with_guest(body.spec, body.guest, user.id + ":" + key)   # contraseña -> hash; el texto plano no sigue
+    vms = spec.get("vms")
     if planner and isinstance(vms, list) and vms and not any(isinstance(v, dict) and "worker" in v for v in vms):
-        job, summary = await planner.admit(body.spec, body.zone, submit)
+        job, summary = await planner.admit(spec, body.zone, submit)
     else:
         if body.zone:
             raise HTTPException(409, "La zona de disponibilidad requiere el VM Placement activo")
-        job = await submit(body.spec)
+        job = await submit(spec)
     try:
         accepted = Accepted(slice_id=job["slice_id"], operation_id=job["id"], status=job["status"], placement=summary)
     except (KeyError, TypeError, ValidationError):

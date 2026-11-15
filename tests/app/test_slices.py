@@ -165,6 +165,34 @@ class SliceFlowTests(unittest.TestCase):
         self.assertEqual((status, deleted["slice_id"]), (202, sid))
         self.assertEqual(request(self.gw + "/v1/slices/" + sid, token=self.prof)[1]["status"], "DELETING")
 
+    def test_guest_password_reaches_platform_only_as_sha512_hash(self):
+        from g5_slice_manager.guest import sha512_crypt
+        secret = "Clave-de-prueba-" + secrets.token_hex(4)
+        key = uuid.uuid4().hex
+        body = {"course_id": "TEL141", "spec": SPEC,
+                "guest": {"username": "alumno", "password": secret, "ssh_authorized_keys": ["", "  "]}}
+        status, accepted = request(self.gw + "/v1/slices", "POST", self.prof, body, headers={"Idempotency-Key": key})
+        self.assertEqual(status, 202, accepted)
+        sent = self.platform.calls[-1]["body"]
+        self.assertNotIn(secret, json.dumps(sent), "la contraseña en claro no sale del slice-manager")
+        guest = sent["guest"]
+        self.assertEqual((guest["username"], guest["ssh_authorized_keys"]), ("alumno", []))
+        salt = guest["password_hash"].split("$")[2]
+        self.assertEqual(guest["password_hash"], sha512_crypt(secret, salt))
+        self.assertEqual({k: v for k, v in sent.items() if k != "guest"}, SPEC)
+        # Reintento con la misma Idempotency-Key: misma especificación (sal estable), mismo slice.
+        status, again = request(self.gw + "/v1/slices", "POST", self.prof, body, headers={"Idempotency-Key": key})
+        self.assertEqual((status, again["slice_id"]), (202, accepted["slice_id"]))
+        self.assertEqual(self.platform.calls[-1]["body"]["guest"], guest)
+        status, detail = request(self.gw + "/v1/slices/" + accepted["slice_id"], token=self.prof)
+        self.assertNotIn("password_hash", json.dumps(detail), "el detalle no expone el hash")
+        for bad in ({"username": "root", "password": secret}, {"username": "alumno", "password": "corta"},
+                    {"username": "alumno", "password": secret, "ssh_authorized_keys": ["no-es-llave"]}):
+            status, error = request(self.gw + "/v1/slices", "POST", self.prof, dict(body, guest=bad),
+                                    headers={"Idempotency-Key": uuid.uuid4().hex})
+            self.assertEqual(status, 422, error)
+            self.assertNotIn(secret, json.dumps(error), "el error no devuelve la contraseña")
+
     def test_isolation_between_users_and_admin_scope(self):
         status, accepted = self.create(self.prof)
         sid = accepted["slice_id"]

@@ -27,6 +27,9 @@ DEFAULT_SIZES = [
     {"id": "medium", "label": "Mediana · 1 vCPU · 1 GB · 2 GB", "vcpus": 1, "memory_mb": 1024, "disk_gb": 2},
     {"id": "large", "label": "Grande · 2 vCPU · 1 GB · 2 GB", "vcpus": 2, "memory_mb": 1024, "disk_gb": 2},
     {"id": "xlarge", "label": "Extra grande · 2 vCPU · 2 GB · 4 GB", "vcpus": 2, "memory_mb": 2048, "disk_gb": 4},
+    # Ex2 paso 3: Ubuntu 24.04 minimal con 1 GB de RAM. Su disco virtual es de 3,5 GiB: no cabe en 2 GB (flavor
+    # g5-1c-1g-4g en Nova, se crea con autorización).
+    {"id": "ubuntu", "label": "Ubuntu · 1 vCPU · 1 GB · 4 GB", "vcpus": 1, "memory_mb": 1024, "disk_gb": 4},
 ]
 DEFAULT_IMAGES = ["cirros"]
 

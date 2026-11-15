@@ -654,6 +654,40 @@
         "type": "object",
         "title": "Features"
       },
+      "GuestAccess": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,30}$",
+            "title": "Username",
+            "description": "Usuario que se crea en cada VM Ubuntu"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8,
+            "format": "password",
+            "title": "Password",
+            "description": "Contraseña de consola; no se guarda",
+            "writeOnly": true
+          },
+          "ssh_authorized_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Ssh Authorized Keys"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "GuestAccess"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -736,6 +770,17 @@
             ],
             "title": "Zone",
             "description": "Zona de disponibilidad (R4-I-04); sin ella, cualquier host del proveedor"
+          },
+          "guest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuestAccess"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Acceso a las VMs Ubuntu (Ex2); solo viaja el hash"
           }
         },
         "additionalProperties": false,

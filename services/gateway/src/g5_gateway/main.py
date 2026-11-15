@@ -179,6 +179,8 @@ class SliceCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
     spec: dict[str, Any]
+    zone: str | None = Field(default=None, max_length=64)
+    guest: dict[str, Any] | None = Field(default=None, description="Acceso a VMs Ubuntu; lo valida el slice-manager")
 
 
 async def upstream_call(client, name: str, method: str, path: str, access_token: str, body=None, key=None):
@@ -222,7 +224,7 @@ async def topology_call(request: Request, method: str, path: str, access_token: 
 
 @app.post("/v1/slices", status_code=202, tags=["slices"], responses=ERROR_RESPONSES)
 async def create_slice(body: SliceCreate, request: Request, key: IdempotencyKey, access_token=Depends(token)):
-    return await slice_call(request, "POST", "/v1/slices", access_token, body.model_dump(), key)
+    return await slice_call(request, "POST", "/v1/slices", access_token, body.model_dump(exclude_none=True), key)
 
 
 @app.get("/v1/slices", tags=["slices"], responses=ERROR_RESPONSES)

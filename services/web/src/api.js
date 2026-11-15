@@ -66,7 +66,11 @@ export const Api = {
   capabilities: () => api('/v1/platform/capabilities'),
   slices: () => api('/v1/slices'),
   slice: (id) => api('/v1/slices/' + id),
-  createSlice: (courseId, spec, zone) => api('/v1/slices', { method: 'POST', body: zone ? { course_id: courseId, spec, zone } : { course_id: courseId, spec }, idempotent: true }),
+  // guest: { username, password, ssh_authorized_keys } para VMs Ubuntu; el slice-manager guarda solo el hash.
+  createSlice: (courseId, spec, zone, guest) => api('/v1/slices', {
+    method: 'POST', idempotent: true,
+    body: { course_id: courseId, spec, ...(zone ? { zone } : {}), ...(guest ? { guest } : {}) },
+  }),
   // Monitoreo (D-13) y recursos (R4-I-01)
   monitoringState: (provider) => api('/v1/monitoring/state' + (provider ? '?provider=' + provider : '')),
   monitoringHistory: (host, minutes = 60) => api(`/v1/monitoring/history?host=${encodeURIComponent(host)}&minutes=${minutes}`),

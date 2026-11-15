@@ -2573,6 +2573,31 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Spec"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "guest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest",
+            "description": "Acceso a VMs Ubuntu; lo valida el slice-manager"
           }
         },
         "additionalProperties": false,

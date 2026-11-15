@@ -6,6 +6,7 @@ import { NAME } from '../topology.js'
 // Nuevo slice = elegir una topología (predefinida o guardada en el editor), el proveedor, el nombre y el curso.
 // El catálogo (formas, tamaños, imágenes, proveedores) lo da el topology-manager: nada fijo en este código.
 const PROVIDER_LABEL = { openstack: 'OpenStack', linux: 'Linux (clúster server1–3)' }
+const GUEST_USER = /^[a-z][a-z0-9_-]{0,30}$/
 
 export default function NewSlice() {
   const navigate = useNavigate()
@@ -29,6 +30,11 @@ export default function NewSlice() {
   const [imageNames, setImageNames] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Acceso a las VMs Ubuntu (cloud-init). La contraseña solo vive en este formulario hasta enviarse.
+  const [guestUser, setGuestUser] = useState('ubuntu')
+  const [guestPassword, setGuestPassword] = useState('')
+  const [guestConfirm, setGuestConfirm] = useState('')
+  const [guestKey, setGuestKey] = useState('')
 
   useEffect(() => {
     Promise.all([Api.courses(), Api.catalog(), Api.drafts()])
@@ -90,11 +96,19 @@ export default function NewSlice() {
     if (!course) return setError('Elige un curso.')
     if (!NAME.test(name)) return setError('Nombre: empieza con letra; letras, números, _ o - (máx. 64). Ej.: Ex2_G5_test')
     if (!topology) return setError('Elige una topología válida.')
+    let guest
+    if (needsGuest) {
+      if (!GUEST_USER.test(guestUser) || guestUser === 'root') return setError('Usuario de las VMs: minúsculas, números, _ o - (no root).')
+      if (guestPassword.length < 8) return setError('La contraseña de las VMs debe tener al menos 8 caracteres.')
+      if (guestPassword !== guestConfirm) return setError('Las contraseñas de las VMs no coinciden.')
+      guest = { username: guestUser, password: guestPassword, ssh_authorized_keys: guestKey.split('\n').map((k) => k.trim()).filter(Boolean) }
+    }
     setBusy(true)
     setError('')
     try {
       const spec = await Api.compile(topology, provider, name)
-      const accepted = await Api.createSlice(course, spec, zone || undefined)
+      const accepted = await Api.createSlice(course, spec, zone || undefined, guest)
+      setGuestPassword(''); setGuestConfirm('')
       navigate('/slices/' + accepted.slice_id)
     } catch (err) {
       setError(err.message)
@@ -103,6 +117,7 @@ export default function NewSlice() {
   }
 
   const vms = preview?.vms || []
+  const needsGuest = vms.some((vm) => /ubuntu/i.test(vm.image || ''))
   const totals = vms.reduce((a, vm) => ({ vcpus: a.vcpus + vm.vcpus, ram: a.ram + vm.memory_mb, disk: a.disk + vm.disk_gb }),
     { vcpus: 0, ram: 0, disk: 0 })
 
@@ -175,8 +190,32 @@ export default function NewSlice() {
           <p className="muted small">
             El VM Placement (BCDP v2) ubica cada VM según los recursos libres; una VM con servidor fijado en el editor se
             respeta. Si no hay capacidad, el slice se rechaza con el motivo. Ver <Link to="/recursos">Recursos</Link>.
-            {provider === 'linux' && ' Linux: solo imágenes CirrOS.'}
+            {provider === 'linux' && ' Linux: imágenes CirrOS o Ubuntu.'}
           </p>
+          {needsGuest && (
+            <fieldset className="panel-inner">
+              <legend>Acceso a las VMs Ubuntu</legend>
+              <p className="muted small">Se crea este usuario en cada VM Ubuntu (consola VNC y SSH). La contraseña no se
+                guarda: a las plataformas solo llega su hash. La llave SSH es opcional; sin ella se permite SSH con contraseña.</p>
+              <div className="upload-grid">
+                <label>Usuario
+                  <input value={guestUser} autoComplete="off" onChange={(e) => { setGuestUser(e.target.value.trim()); setError('') }} />
+                </label>
+                <label>Contraseña
+                  <input type="password" value={guestPassword} autoComplete="new-password"
+                    onChange={(e) => { setGuestPassword(e.target.value); setError('') }} />
+                </label>
+                <label>Repetir contraseña
+                  <input type="password" value={guestConfirm} autoComplete="new-password"
+                    onChange={(e) => { setGuestConfirm(e.target.value); setError('') }} />
+                </label>
+              </div>
+              <label>Llaves SSH públicas (opcional, una por línea)
+                <textarea rows={2} className="mono small" value={guestKey} placeholder="ssh-ed25519 AAAA… usuario@pc"
+                  onChange={(e) => setGuestKey(e.target.value)} />
+              </label>
+            </fieldset>
+          )}
           {error && <p className="error" role="alert">{error}</p>}
           <button type="submit" disabled={busy || !courses?.length || !preview}>{busy ? 'Enviando…' : 'Desplegar slice'}</button>
         </div>
