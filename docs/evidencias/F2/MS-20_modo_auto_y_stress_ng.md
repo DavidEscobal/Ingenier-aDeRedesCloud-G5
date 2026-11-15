@@ -38,5 +38,5 @@ Comando: `python3 scripts/smoke_gateway_slices.py --user admin123 --template tem
     terminó con «stress-ng is already the newest version», es decir, la instalación sí se completó.
   - `stress-ng --cpu 1 --cpu-load 80 --vm 1 --vm-bytes 80% --timeout 180s --metrics-brief`: terminó con
     «successful run completed».
-- **Pendiente de confirmar por el usuario:** la subida de CPU/RAM de worker1 en la página Recursos (captura) y
-  si fue necesario bajar el MTU de ens3 a 1400 para que apt descargara.
+- **Página Recursos:** el usuario confirmó que la CPU y la RAM de worker1 subieron mientras corría `stress-ng`.
+- **Pendiente:** adjuntar la captura de Recursos y confirmar si hizo falta bajar el MTU de ens3 a 1400 para apt.
