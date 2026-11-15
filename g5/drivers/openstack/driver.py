@@ -28,6 +28,14 @@ NOVA_CONSOLE = {'OpenStack-API-Version': 'compute 2.6', 'X-OpenStack-Nova-API-Ve
 DELETE_ORDER = ('server', 'port', 'security_group', 'subnet', 'network', 'project')
 EXTERNAL_NIC = 'inet'       # nombre de la NIC de salida (puerto g5-<slice>-<vm>-inet)
 INGRESS = (('tcp', 22), ('icmp', None))
+PLACEHOLDER_POOL = '10.255.0.0/16'   # subredes de relleno para enlaces «sin IP» (Nova exige IP fija por puerto)
+
+
+def placeholder_cidrs(networks, pool=PLACEHOLDER_POOL):
+    """Un /28 del pool por cada red sin CIDR del slice, sin solaparse con las subredes del propio slice."""
+    used = [ipaddress.ip_network(n['cidr']) for n in networks if 'cidr' in n]
+    free = (c for c in ipaddress.ip_network(pool).subnets(new_prefix=28) if not any(c.overlaps(u) for u in used))
+    return {n['name']: str(next(free)) for n in networks if 'cidr' not in n}
 IMAGE_NAME = re.compile(r'[a-z0-9][a-z0-9._-]{0,62}')
 DISK_FORMATS = {'qcow2': b'QFI\xfb', 'raw': None}
 
@@ -291,27 +299,29 @@ class OpenStackDriver(ProviderDriver):
         self.call('PUT', 'identity', '/projects/%s/users/%s/roles/%s' % (pid, admin['id'], role['id']))
         ctx.event('OS_PROJECT', plan['project_name'])
 
-        subnets = {}
+        subnets, filler = {}, placeholder_cidrs(plan['networks'], self.os_cfg.get('placeholder_pool', PLACEHOLDER_POOL))
         for net in plan['networks']:
             n = self.ensure(ctx, 'network', net['name'],
                             lambda: self.find('network', '/v2.0/networks', 'networks', pid, name=net['os_name'], project_id=pid),
                             lambda: self.call('POST', 'network', '/v2.0/networks', {'network': {
                                 'name': net['os_name'], 'port_security_enabled': False}}, pid)['network'])
-            if 'cidr' not in net:  # red sin subred
-                subnets[net['name']] = (n['id'], None)
-                continue
+            # Red «sin IP» (Ex2 15b): Nova rechaza puertos sin IP fija, así que lleva una subred de relleno sin DHCP
+            # ni gateway; CirrOS queda sin IP y en Ubuntu cloud-init la borra al arrancar (guest.flush_commands).
+            cidr = net.get('cidr', filler.get(net['name']))
             s = self.ensure(ctx, 'subnet', net['name'],
                             lambda: self.find('network', '/v2.0/subnets', 'subnets', pid, name=net['os_name'], network_id=n['id']),
                             lambda: self.call('POST', 'network', '/v2.0/subnets', {'subnet': {
-                                'name': net['os_name'], 'network_id': n['id'], 'ip_version': 4, 'cidr': net['cidr'],
+                                'name': net['os_name'], 'network_id': n['id'], 'ip_version': 4, 'cidr': cidr,
                                 'gateway_ip': None, 'enable_dhcp': net['dhcp']}}, pid)['subnet'])
             subnets[net['name']] = (n['id'], s['id'])
         ctx.event('OS_NETWORKS', ', '.join(sorted(subnets)))
+        if filler:
+            ctx.event('OS_UNADDRESSED', ', '.join('%s (relleno %s)' % kv for kv in sorted(filler.items())))
         external, group = (self.external_access(ctx, plan, pid) if any(v.get('internet') for v in plan['vms'])
                            else (None, None))
 
         def server(vm):
-            ports, inet_mtu = [], None
+            ports, inet_mtu, unaddressed = [], None, []
             if vm.get('internet'):  # primera NIC: DHCP de la red provider, ruta por defecto y acceso por la VPN
                 port = self.ensure(ctx, 'port', '%s.%s' % (vm['name'], EXTERNAL_NIC),
                                    lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=vm['inet_os_name'], network_id=external),
@@ -330,11 +340,13 @@ class OpenStackDriver(ProviderDriver):
                                    lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=nic['os_name'], network_id=net_id),
                                    lambda: self.call('POST', 'network', '/v2.0/ports', body, pid)['port'])
                 ports.append({'port': port['id']})
+                if nic['network'] in filler and port.get('mac_address'):
+                    unaddressed.append(port['mac_address'].lower())
             image, flavor = self.image(vm['image']), self.flavor(vm)
             # Con credenciales: cloud-init crea el usuario y, desde el config drive, configura todas las NICs
             # (sin router no hay servicio de metadatos; la IP fija del puerto llega en network_data.json).
             # La NIC de salida usa un MTU menor que el anunciado por la red provider (ver guest.mtu_commands).
-            boot = ({'user_data': user_data(plan['guest'], vm['name'], inet_mtu), 'config_drive': True}
+            boot = ({'user_data': user_data(plan['guest'], vm['name'], inet_mtu, unaddressed), 'config_drive': True}
                     if plan.get('guest') else {})
             created = self.ensure(ctx, 'server', vm['name'],
                                   lambda: self.find('compute', '/servers', 'servers', pid, name='^%s$' % vm['os_name']),

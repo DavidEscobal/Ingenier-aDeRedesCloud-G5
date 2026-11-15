@@ -52,10 +52,22 @@ def mtu_commands(mac, mtu):
     return ['sh', '-c', script]
 
 
-def cloud_config(guest, hostname, mtu=None):
+def flush_commands(macs):
+    """Deja sin IPv4 las NICs de enlaces «sin IP» (VM que hará de switch, Ex2 15b), en cada arranque.
+
+    En OpenStack esos puertos llevan una IP de relleno (Nova no acepta puertos sin IP fija) que cloud-init configura
+    desde network_data.json; aquí se borra después de que la red está arriba."""
+    for mac in macs:
+        require(MAC.fullmatch(mac), 'MAC inválida')
+    script = ('for d in /sys/class/net/*; do case " %s " in *" $(cat $d/address) "*) '
+              'ip -4 addr flush dev "${d##*/}";; esac; done') % ' '.join(macs)
+    return ['sh', '-c', script]
+
+
+def cloud_config(guest, hostname, mtu=None, unaddressed=()):
     """`#cloud-config` para OpenStack (la red la configura cloud-init desde el config drive de Nova).
 
-    `mtu`: (MAC, MTU) de la NIC de salida a Internet, si la VM la tiene."""
+    `mtu`: (MAC, MTU) de la NIC de salida a Internet, si la VM la tiene; `unaddressed`: MACs que quedan sin IPv4."""
     user = {'name': guest['username'], 'shell': '/bin/bash', 'groups': ['sudo'], 'sudo': 'ALL=(ALL) NOPASSWD:ALL',
             'lock_passwd': False, 'passwd': guest['password_hash'],
             'ssh_authorized_keys': guest['ssh_authorized_keys']}
@@ -63,13 +75,14 @@ def cloud_config(guest, hostname, mtu=None):
             # Sin clave SSH, la contraseña es la única forma de entrar por SSH desde otras VMs del slice.
             'ssh_pwauth': not guest['ssh_authorized_keys'], 'disable_root': True, 'chpasswd': {'expire': False},
             'package_update': False, 'package_upgrade': False}
-    if mtu:
-        data['bootcmd'] = [mtu_commands(*mtu)]
+    commands = ([mtu_commands(*mtu)] if mtu else []) + ([flush_commands(unaddressed)] if unaddressed else [])
+    if commands:
+        data['bootcmd'] = commands
     return '#cloud-config\n' + json.dumps(data, indent=2) + '\n'
 
 
-def user_data(guest, hostname, mtu=None):
-    text = cloud_config(guest, hostname, mtu)
+def user_data(guest, hostname, mtu=None, unaddressed=()):
+    text = cloud_config(guest, hostname, mtu, unaddressed)
     if len(text.encode()) > 48 * 1024:
         raise Fault('user_data demasiado grande para Nova')
     return base64.b64encode(text.encode()).decode()

@@ -164,18 +164,41 @@ class OpenStackDriverTests(OpenStackFixture):
         self.cloud.flavors.append({'id': 'f-s', 'name': 'g5-1c-512m-1g', 'vcpus': 1, 'ram': 512, 'disk': 1})
         self.driver.preflight(spec)  # con los flavors presentes, se admite
 
-    def test_unaddressed_network_creates_no_subnet_and_ports_without_ip(self):
+    def test_unaddressed_network_gets_placeholder_subnet_and_ubuntu_flushes_it(self):
+        # Ex2 15b: Nova exige IP fija por puerto; la red «sin IP» lleva una subred de relleno sin DHCP ni gateway
+        # y, en Ubuntu, cloud-init borra esa IPv4 al arrancar.
         spec = copy.deepcopy(LINEAL)
         spec['networks'][0] = {'name': spec['networks'][0]['name']}
         for vm in spec['vms']:
             for nic in vm['nics']:
                 if nic['network'] == spec['networks'][0]['name']:
                     nic.pop('ip', None)
+        spec['guest'] = {'username': 'alumno', 'password_hash': '$6$testsalt$' + 'b' * 86}
         job = self.create(spec, key='os-l2-0001'); self.run_job(job)
         self.assertEqual(self.store.get_slice(job['slice_id'])['status'], 'READY')
         l2 = next(n for n in self.cloud.networks.values() if n['name'].endswith('-' + spec['networks'][0]['name']))
-        self.assertFalse([sn for sn in self.cloud.subnets.values() if sn['network_id'] == l2['id']], 'sin subred')
-        self.assertTrue(all(not p.get('fixed_ips') for p in self.cloud.ports.values() if p['network_id'] == l2['id']))
+        [filler] = [sn for sn in self.cloud.subnets.values() if sn['network_id'] == l2['id']]
+        self.assertEqual((filler['cidr'], filler['enable_dhcp'], filler['gateway_ip']), ('10.255.0.0/28', False, None))
+        servers = {s['name'].rsplit('-', 1)[-1]: s for s in self.cloud.servers.values()}
+        for name, flushed in (('vm1', True), ('vm2', True), ('vm3', False)):
+            data = json.loads(base64.b64decode(servers[name]['user_data']).decode().split('\n', 1)[1])
+            macs = [self.cloud.ports[p]['mac_address'] for p in servers[name]['ports']
+                    if self.cloud.ports[p]['network_id'] == l2['id']]
+            commands = ' '.join(c[2] for c in data.get('bootcmd', []))
+            self.assertEqual('ip -4 addr flush' in commands, flushed, name)
+            for mac in macs:
+                self.assertIn(mac, commands)
+            if name == 'vm2':
+                kept = [self.cloud.ports[p]['mac_address'] for p in servers[name]['ports'] if p not in macs
+                        and self.cloud.ports[p]['network_id'] != l2['id']]
+                self.assertTrue(kept and all(mac not in commands for mac in kept), 'la NIC con IP no se toca')
+        [event] = self.store.rows("SELECT detail FROM events WHERE event='OS_UNADDRESSED'")
+        self.assertIn('relleno 10.255.0.0/28', event['detail'])
+
+    def test_placeholder_cidrs_avoid_the_slice_subnets(self):
+        from g5.drivers.openstack.driver import placeholder_cidrs
+        nets = [{'name': 'a'}, {'name': 'b', 'cidr': '10.255.0.16/28'}, {'name': 'c'}]
+        self.assertEqual(placeholder_cidrs(nets), {'a': '10.255.0.0/28', 'c': '10.255.0.32/28'})
 
     def test_validation_is_provider_specific(self):
         spec = validate(LINEAL, self.cfg)
