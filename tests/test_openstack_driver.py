@@ -4,6 +4,7 @@ import copy
 import os
 import hashlib
 import http.client
+import importlib.util
 import json
 import tempfile
 import threading
@@ -196,6 +197,7 @@ class OpenStackDriverTests(OpenStackFixture):
         [event] = self.store.rows("SELECT detail FROM events WHERE event='OS_UNADDRESSED'")
         self.assertIn('relleno 10.255.0.0/28', event['detail'])
 
+    @unittest.skipUnless(importlib.util.find_spec('yaml'), 'PyYAML (viene en las imágenes Ubuntu, no en el núcleo)')
     def test_unaddress_script_removes_placeholder_from_netplan(self):
         # El script de bootcmd quita del netplan la IP, rutas y DNS de relleno, y deja intacta la NIC de salida.
         import tempfile, yaml
