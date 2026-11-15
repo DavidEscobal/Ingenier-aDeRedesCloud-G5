@@ -2,6 +2,33 @@
 
 > **Leer primero en cada sesión nueva.** Última actualización: 2026-11-15 (R4 placement + monitoreo desplegados; antes 2026-11-08: integración `app`, Docker en el app server, D-10).
 
+## Punto de reanudación (2026-11-15, cierre de sesión) — LEER PRIMERO
+- **Rama `fase2` en GitHub = eb172a4** (push hecho). App server `~/g5-app` en **0efd775** (10 contenedores healthy;
+  solo cambian docs después). Suite: 131 núcleo + 59 microservicios OK; `bash scripts/verificar.sh` en verde.
+- **Nube limpia:** sin slices G5 vivos, sin puertos/grupos en Neutron, 0 reservas Linux. Glance: `cirros`,
+  `cirros-062`, `ubuntu-24.04-minimal-cloudimg-amd64` (íntegra). Almacén Linux del app server: la 24.04 ya copiada.
+  Flavors: `g5-1c-512m-1g`, `512MBRAM_1VCPUs_4GBRoot`, `g5-1c-1g-4g` (creado hoy).
+- **Hecho en la sesión 2026-11-14/15:** placement R4 + monitoreo desplegados y probados (MS-17); Ubuntu con
+  credenciales en Linux/OpenStack (hash SHA-512 crypt, cloud-init; MS-18: OpenStack ✅); límite de importación
+  2048 MB; precarga en segundo plano de imágenes al almacén Linux; gateway muestra el campo que falla en 422;
+  **R5 OpenStack** por la red provider `external` 10.60.10.0/24 con grupo de seguridad (MS-19: salida ✅).
+- **Bloqueado por el JP** (mensaje preparado en la sesión): (1) disco de los servidores Linux: una Ubuntu de 4 GB
+  necesita ≈ 8 GB reservables y hay ≈ 6,5 GB → ampliar disco o aceptar aprovisionamiento delgado; (2) la VPN no
+  publica 10.60.10.0/24 (sí 10.60.9.0/24) → sin SSH desde fuera en OpenStack; (3) 2,5 GB del Anexo vs 3,5 GiB de la
+  imagen (usamos 4 GB) y el paso 3 + Anexo no caben a la vez en OpenStack; (4) zona/rol de server4; (5) enlaces sin
+  IP en OpenStack (15b); (6) SSH a los workers OpenStack (paso 6).
+- **Siguiente (sin depender del JP), en este orden:** el usuario importa la Ubuntu 20.04
+  (`Proyecto/Images/focal-server-cloudimg-amd64.img`, 942 MB, nombre con «ubuntu»); repetir DNS en vm1
+  (`ping google.com`, `resolvectl status ens3`); paso 4 `stress-ng` 80 % en OpenStack viendo Recursos; pasos 15b–e
+  en OpenStack con Ubuntu (VM4 con OVS, IPs 10.100.10.x, tcpdump); reinstalar agentes Linux (sudo del usuario).
+- **Docs pendientes:** HLD (BCDP v2 en vez de BFD; R5 dice «self-service» y la rúbrica pide no usarlo →
+  contradicción a corregir), REPORTE_CUMPLIMIENTO_EX2 (R5 OpenStack, Ubuntu), informe del plan de pruebas
+  (MS-17..19), rutas de las guías en CLAUDE.md (`Laboratorio_md/LAB5/`, `LAB6/`); cambios locales del usuario sin
+  commitear (guías movidas, `Contexto_md/`, etc.). R5-I-06 (switch físico para broadcasts) sin empezar.
+- **Prueba de humo:** `python3 scripts/smoke_gateway_slices.py --user admin123 --template templates/ubuntu-2vm.json
+  --provider openstack --guest-user alumno [--internet vm1] --hold 600` (el usuario escribe las contraseñas en una
+  pestaña nueva; contraseña de VM 8..72 caracteres; `--hold` se limita a la vida del token).
+
 ## Estado general
 - **F0 (auditoría) y F1 (núcleo de Slice Manager agnóstico + driver OpenStack) terminadas.**
   Crear, consultar y borrar un slice en OpenStack desde la API G5 funciona y está probado en el clúster real.
