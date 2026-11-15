@@ -283,7 +283,7 @@ export default function TopologyEditor() {
                   <label className="checkbox">
                     <input type="checkbox" checked={!!selectedNode.data.internet}
                       onChange={(e) => updateSelected({ internet: e.target.checked })} />
-                    Salida a Internet <small className="muted">(Linux)</small>
+                    Salida a Internet <small className="muted">(SSH e ICMP desde fuera)</small>
                   </label>
                   <label>Servidor
                     <select value={selectedNode.data.host || ''} onChange={(e) => updateSelected({ host: e.target.value })}>

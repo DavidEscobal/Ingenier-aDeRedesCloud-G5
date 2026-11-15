@@ -103,6 +103,36 @@ class OpenStackDriverTests(OpenStackFixture):
             with self.assertRaises(Fault):
                 validate(dict(LINEAL, guest=bad), self.cfg)
 
+    def test_internet_vm_gets_external_provider_port_with_slice_security_group(self):
+        # R5: salida y acceso por la red provider external (10.60.10.0/24), sin routers; solo SSH e ICMP de entrada.
+        spec = copy.deepcopy(LINEAL)
+        spec['vms'][0]['internet'] = True
+        with self.assertRaisesRegex(Fault, 'red provider external'):
+            self.driver.preflight(validate(spec, self.cfg))
+        self.cloud.add_external()
+        slice_ = self.run_job(self.create(spec, 'os-internet-0001'))
+        self.assertEqual(slice_['status'], 'READY', slice_)
+        servers = {s['name'].rsplit('-', 1)[-1]: s for s in self.cloud.servers.values()}
+        first = self.cloud.ports[servers['vm1']['ports'][0]]
+        self.assertEqual((first['network_id'], first['port_security_enabled']), ('net-ext', True), 'NIC de salida primero')
+        self.assertTrue(first['name'].endswith('-vm1-inet'))
+        self.assertEqual(len(servers['vm1']['ports']), 2)
+        [group] = self.cloud.security_groups.values()
+        self.assertEqual(first['security_groups'], [group['id']])
+        rules = {(r['protocol'], r.get('port_range_min'), r['remote_ip_prefix'], r['direction'])
+                 for r in self.cloud.security_group_rules.values()}
+        self.assertEqual(rules, {('tcp', 22, '0.0.0.0/0', 'ingress'), ('icmp', None, '0.0.0.0/0', 'ingress')})
+        for name in ('vm2', 'vm3'):
+            self.assertTrue(all(self.cloud.ports[p]['network_id'] != 'net-ext' for p in servers[name]['ports']),
+                            'solo la VM marcada sale a Internet')
+            self.assertTrue(all(self.cloud.ports[p]['port_security_enabled'] is False for p in servers[name]['ports']))
+        self.store.mutate(slice_['id'], 'profesor', True, 'os-internet-del', 'delete')
+        self.app.engine.process_one()
+        self.assertEqual(self.store.get_slice(slice_['id'])['status'], 'DELETED')
+        self.assertEqual(self.cloud.security_groups, {})
+        self.assertEqual([p for p in self.cloud.ports.values() if p['network_id'] == 'net-ext'], [])
+        self.assertIn('net-ext', self.cloud.networks, 'la red provider compartida no se toca')
+
     def test_size_without_flavor_is_rejected_before_admission(self):
         """Sin create_flavors, un tamaño sin flavor se rechaza en el preflight: nada se crea en OpenStack."""
         self.driver.os_cfg['create_flavors'] = False

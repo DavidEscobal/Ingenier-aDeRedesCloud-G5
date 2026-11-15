@@ -30,8 +30,6 @@ def compile_spec(topology: Topology, provider: str, name: str | None = None):
     wrong = [f"{n.id}→{n.host}" for n in topology.nodes if n.host and n.host not in hosts().get(provider, [])]
     if wrong:
         problems.append(f"Servidores que no son de {provider}: " + ", ".join(wrong))
-    if provider != "linux" and any(n.internet for n in topology.nodes):
-        problems.append("Salida a Internet desde el editor: por ahora solo en Linux (OpenStack, pendiente de R5)")
     if problems:
         raise CompileError("; ".join(problems))
     index = {n.id: i + 1 for i, n in enumerate(topology.nodes)}

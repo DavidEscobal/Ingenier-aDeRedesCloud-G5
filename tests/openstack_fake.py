@@ -124,10 +124,18 @@ class FakeCloud:
         self.projects = {'p-cloud-admin': {'id': 'p-cloud-admin', 'name': 'cloud_admin', 'domain_id': 'd-cloud'}}
         self.assignments = set()
         self.networks, self.subnets, self.ports, self.servers = {}, {}, {}, {}
+        self.security_groups, self.security_group_rules = {}, {}
         self.flavors = [{'id': 'f-lab5', 'name': '512MBRAM_1VCPUs_4GBRoot', 'vcpus': 1, 'ram': 512, 'disk': 4}]
         self.images = [{'id': 'img-cirros', 'name': 'cirros', 'status': 'active'}]
         self.error_names, self.hosts, self.log = set(), ['worker1', 'worker2', 'worker3'], []
         fake.handler = self.handle
+
+    def add_external(self):
+        """Red provider compartida `external` (flat/physnet0) con la subred 10.60.10.0/24 y DHCP, como en el clúster."""
+        self.networks['net-ext'] = {'id': 'net-ext', 'name': 'external', 'project_id': 'p-cloud-admin', 'shared': True,
+                                    'router:external': True, 'provider:network_type': 'flat', 'status': 'ACTIVE'}
+        self.subnets['sub-ext'] = {'id': 'sub-ext', 'name': 'external_subnet', 'network_id': 'net-ext',
+                                   'project_id': 'p-cloud-admin', 'cidr': '10.60.10.0/24', 'enable_dhcp': True}
 
     @staticmethod
     def new(prefix):
@@ -193,13 +201,19 @@ class FakeCloud:
         return 404, {'error': 'keystone'}
 
     def neutron(self, method, rest, query, body, project):
-        tables = {'networks': self.networks, 'subnets': self.subnets, 'ports': self.ports}
+        tables = {'networks': self.networks, 'subnets': self.subnets, 'ports': self.ports,
+                  'security-groups': self.security_groups, 'security-group-rules': self.security_group_rules}
         table = tables[rest[0]]
-        kind = rest[0][:-1]
+        kind = rest[0][:-1].replace('-', '_')
         if method == 'GET' and len(rest) == 1:
-            return 200, {rest[0]: self.match(list(table.values()), query, ('name', 'project_id', 'network_id'))}
+            key = rest[0].replace('-', '_')
+            return 200, {key: self.match(list(table.values()), query, ('name', 'project_id', 'network_id', 'security_group_id'))}
         if method == 'POST':
             item = dict(body[kind], id=self.new(kind[:3]), project_id=project, status='ACTIVE')
+            if kind == 'security_group_rule' and item['security_group_id'] not in self.security_groups:
+                return 404, {'NeutronError': {'message': 'grupo inexistente'}}
+            if kind == 'port' and item.get('security_groups') and any(g not in self.security_groups for g in item['security_groups']):
+                return 404, {'NeutronError': {'message': 'grupo inexistente'}}
             if kind == 'port':
                 if item.get('fixed_ips'):
                     ip = item['fixed_ips'][0]['ip_address']
@@ -221,6 +235,11 @@ class FakeCloud:
             if kind == 'network':
                 for sid in [s for s, v in self.subnets.items() if v['network_id'] == rid]:
                     del self.subnets[sid]
+            if kind == 'security_group':
+                if any(rid in (p.get('security_groups') or []) for p in self.ports.values()):
+                    return 409, {'NeutronError': {'message': 'grupo en uso'}}
+                for rule in [k for k, v in self.security_group_rules.items() if v['security_group_id'] == rid]:
+                    del self.security_group_rules[rule]
             del table[rid]
             return 204, None
         return 404, {'error': 'neutron'}

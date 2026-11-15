@@ -104,8 +104,7 @@ class GeneratorTests(unittest.TestCase):
         online.nodes[0].internet = True
         self.assertTrue(compile_spec(online, "linux")["vms"][0]["internet"])
         self.assertNotIn("internet", compile_spec(online, "linux")["vms"][1])
-        with self.assertRaisesRegex(CompileError, "solo en Linux"):
-            compile_spec(online, "openstack")
+        self.assertTrue(compile_spec(online, "openstack")["vms"][0]["internet"])  # R5: red provider external
 
     def test_combining_renames_collisions_and_links_both_parts(self):
         merged = combine(generate("anillo", 3), generate("estrella", 4), connect=("n1", "n1"))

@@ -4,6 +4,12 @@ un puerto por NIC y una instancia Nova por VM (secuencia de LAB6 §3.5, automati
 Recuperación: cada recurso se anota PENDING en el diario `resources` antes del POST y se
 busca por nombre antes de crearlo, así un reintento o un reinicio no duplica nada.
 La segmentación la asigna Neutron (tenant_network_types vlan sobre physnet1): sin túneles.
+
+R5 (salida a Internet y acceso desde fuera): una VM con `internet: true` recibe como primera NIC un puerto en la red
+provider compartida `external` (flat/physnet0, 10.60.10.0/24, el rango de G5 accesible por la VPN), con IP por DHCP
+y ruta por defecto hacia 10.60.10.1. No hay routers ni NAT de Neutron (no se usan redes self-service). Ese puerto,
+y solo ese, lleva port security con el grupo de seguridad del slice: entra únicamente SSH e ICMP desde los orígenes
+configurados y sale todo; los enlaces del laboratorio siguen sin filtros.
 """
 import concurrent.futures
 import copy
@@ -19,7 +25,9 @@ from .session import OpenStackError, Session
 
 PRIVATE = [ipaddress.ip_network(x) for x in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')]
 NOVA_CONSOLE = {'OpenStack-API-Version': 'compute 2.6', 'X-OpenStack-Nova-API-Version': '2.6'}
-DELETE_ORDER = ('server', 'port', 'subnet', 'network', 'project')
+DELETE_ORDER = ('server', 'port', 'security_group', 'subnet', 'network', 'project')
+EXTERNAL_NIC = 'inet'       # nombre de la NIC de salida (puerto g5-<slice>-<vm>-inet)
+INGRESS = (('tcp', 22), ('icmp', None))
 IMAGE_NAME = re.compile(r'[a-z0-9][a-z0-9._-]{0,62}')
 DISK_FORMATS = {'qcow2': b'QFI\xfb', 'raw': None}
 
@@ -80,8 +88,10 @@ def validate_spec(spec, config):
         ranges.append(net)
     ids, addresses = set(), set()
     for vm in vms:
-        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host', 'zone'),
+        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host', 'zone', 'internet'),
                ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics'))
+        vm.setdefault('internet', False)
+        require(type(vm['internet']) is bool, 'internet debe ser booleano')
         slug(vm['name'])
         if 'host' in vm:  # compute fijo: elegido a mano (paso 3 del Ex2) o por el VM Placement de G5 (R4)
             slug(vm['host'])
@@ -146,6 +156,10 @@ class OpenStackDriver(ProviderDriver):
             missing = sorted({(v['vcpus'], v['memory_mb'], v['disk_gb']) for v in spec['vms']} - existing)
             require(not missing, 'Tamaño no disponible en OpenStack (falta su flavor): ' +
                     ', '.join('%d vCPU · %d MB · %d GB' % m for m in missing), 409)
+        if any(vm.get('internet') for vm in spec['vms']):
+            name = self.os_cfg.get('external_network', 'external')
+            require(self.find('network', '/v2.0/networks', 'networks', name=name),
+                    'Salida a Internet no disponible: falta la red provider %s en Neutron' % name, 409)
 
     def hypervisors(self):
         """Inventario de los workers (monitoreo D-13 y R4-I-01): lo que Nova tiene comprometido por host y su
@@ -194,6 +208,10 @@ class OpenStackDriver(ProviderDriver):
             vm['os_name'] = 'g5-%s-%s' % (short, vm['name'])
             for nic in vm['nics']:
                 nic['os_name'] = 'g5-%s-%s-%s' % (short, vm['name'], nic['network'])
+            if vm.get('internet'):
+                vm['inet_os_name'] = 'g5-%s-%s-%s' % (short, vm['name'], EXTERNAL_NIC)
+        if any(vm.get('internet') for vm in plan['vms']):
+            plan['security_group'] = 'g5-%s-internet' % short
 
     # ---- utilidades -----------------------------------------------------------------------
     def call(self, method, service, path, body=None, project_id=None, headers=None):
@@ -289,9 +307,18 @@ class OpenStackDriver(ProviderDriver):
                                 'gateway_ip': None, 'enable_dhcp': net['dhcp']}}, pid)['subnet'])
             subnets[net['name']] = (n['id'], s['id'])
         ctx.event('OS_NETWORKS', ', '.join(sorted(subnets)))
+        external, group = (self.external_access(ctx, plan, pid) if any(v.get('internet') for v in plan['vms'])
+                           else (None, None))
 
         def server(vm):
             ports = []
+            if vm.get('internet'):  # primera NIC: DHCP de la red provider, ruta por defecto y acceso por la VPN
+                port = self.ensure(ctx, 'port', '%s.%s' % (vm['name'], EXTERNAL_NIC),
+                                   lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=vm['inet_os_name'], network_id=external),
+                                   lambda: self.call('POST', 'network', '/v2.0/ports', {'port': {
+                                       'name': vm['inet_os_name'], 'network_id': external, 'port_security_enabled': True,
+                                       'security_groups': [group]}}, pid)['port'])
+                ports.append({'port': port['id']})
             for nic in vm['nics']:
                 net_id, subnet_id = subnets[nic['network']]
                 body = {'port': {'name': nic['os_name'], 'network_id': net_id, 'port_security_enabled': False}}
@@ -324,6 +351,35 @@ class OpenStackDriver(ProviderDriver):
         ctx.event('OS_PLACED', detail)
         return 'Instancias ACTIVE en Nova: ' + detail
 
+    def external_access(self, ctx, plan, pid):
+        """Red provider de salida y grupo de seguridad del slice (solo SSH e ICMP de entrada). Devuelve sus IDs."""
+        name = self.os_cfg.get('external_network', 'external')
+        sources = self.os_cfg.get('external_allowed_sources', ['0.0.0.0/0'])
+        network = self.find('network', '/v2.0/networks', 'networks', name=name)
+        require(network, 'No existe la red provider %s para la salida a Internet (R5)' % name, 409)
+        group = self.ensure(ctx, 'security_group', 'internet',
+                            lambda: self.find('network', '/v2.0/security-groups', 'security_groups', pid,
+                                              name=plan['security_group'], project_id=pid),
+                            lambda: self.call('POST', 'network', '/v2.0/security-groups', {'security_group': {
+                                'name': plan['security_group'], 'description': 'G5 slice %s: SSH e ICMP de entrada' % plan['name']}},
+                                pid)['security_group'])
+        rules = self.call('GET', 'network', '/v2.0/security-group-rules?security_group_id=' + group['id'],
+                          project_id=pid)['security_group_rules']
+        present = {(r.get('protocol'), r.get('port_range_min'), r.get('remote_ip_prefix'))
+                   for r in rules if r.get('direction') == 'ingress'}
+        for source in sources:
+            for protocol, port in INGRESS:
+                if (protocol, port, source) in present:
+                    continue
+                rule = {'security_group_id': group['id'], 'direction': 'ingress', 'ethertype': 'IPv4',
+                        'protocol': protocol, 'remote_ip_prefix': source}
+                if port:
+                    rule.update(port_range_min=port, port_range_max=port)
+                self.call('POST', 'network', '/v2.0/security-group-rules', {'security_group_rule': rule}, pid)
+        ctx.event('OS_INTERNET', '%s (%s): entrada SSH e ICMP desde %s' % (
+            name, ', '.join(v['name'] for v in plan['vms'] if v.get('internet')), ', '.join(sources)))
+        return network['id'], group['id']
+
     # ---- borrado ------------------------------------------------------------------------------
     def cleanup(self, plan, ctx):
         journal = {(r['kind'], r['name']): r for r in ctx.store.resources(ctx.sid)}
@@ -342,8 +398,11 @@ class OpenStackDriver(ProviderDriver):
             'port': lambda r: self.find('network', '/v2.0/ports', 'ports', name='g5-%s-%s' % (ctx.sid[:8], r['name'].replace('.', '-')), project_id=pid),
             'subnet': lambda r: self.find('network', '/v2.0/subnets', 'subnets', name='g5-%s-%s' % (ctx.sid[:8], r['name']), project_id=pid),
             'network': lambda r: self.find('network', '/v2.0/networks', 'networks', name='g5-%s-%s' % (ctx.sid[:8], r['name']), project_id=pid),
+            'security_group': lambda r: self.find('network', '/v2.0/security-groups', 'security_groups',
+                                                  name='g5-%s-%s' % (ctx.sid[:8], r['name']), project_id=pid),
         }
         paths = {'server': ('compute', '/servers/'), 'port': ('network', '/v2.0/ports/'),
+                 'security_group': ('network', '/v2.0/security-groups/'),
                  'subnet': ('network', '/v2.0/subnets/'), 'network': ('network', '/v2.0/networks/'),
                  'project': ('identity', '/projects/')}
         for kind in DELETE_ORDER:
