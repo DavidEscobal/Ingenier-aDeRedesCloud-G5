@@ -72,11 +72,15 @@ def main():
     parser.add_argument('--delete', metavar='SLICE_ID', help='solo borrar ese slice y esperar DELETED')
     parser.add_argument('--guest-user', help='usuario de las VMs Ubuntu; pide su contraseña sin mostrarla')
     parser.add_argument('--size', help='vcpus/memory_mb/disk_gb para todas las VMs, p. ej. 1/1024/4')
+    parser.add_argument('--internet', action='append', default=[], metavar='VM', help='VM con salida a Internet (repetible)')
     args = parser.parse_args()
     base_spec = json.load(open(args.template))
     if args.image:
         for vm in base_spec['vms']:
             vm['image'] = args.image
+    for vm in base_spec['vms']:
+        if vm['name'] in args.internet:
+            vm['internet'] = True
     if args.size:
         vcpus, memory_mb, disk_gb = (int(x) for x in args.size.split('/'))
         for vm in base_spec['vms']:
