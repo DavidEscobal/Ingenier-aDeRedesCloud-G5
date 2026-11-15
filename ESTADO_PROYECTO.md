@@ -283,6 +283,11 @@ pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
    - **Límite de importación** subido de 1024 a 2048 MB (b71e467, desplegado 2026-11-15: web e image-catalog): la
      web rechazaba la 24.04 del curso (1,5 GB) antes de enviarla. Imágenes locales en `Proyecto/Images/`
      (24.04 minimal 1,5 GB; `focal-server-cloudimg-amd64.img` 942 MB = 20.04). App server con 5 GB libres.
+   - **Probado (MS-18, 2026-11-15):** OpenStack ✅ (READY 40 s, cloud-init por config drive, IP fija, login VNC,
+     ping, `stress-ng`, `tcpdump`; la imagen trae OVS). Linux ❌ sin recursos creados: (1) la primera descarga de
+     Glance (1,5 GB) excede el timeout de 20 s del slice-manager → 504 y slice no registrado; (2) el agente reserva el
+     disco completo (4 GiB + base 1,5 GB + margen 2 GiB ≈ 8 GB) y los servidores tienen ≈ 6,5 GB libres. **Decisión
+     pendiente:** discos más grandes, aprovisionamiento delgado o margen menor.
    - **Falta:** importar la 24.04 minimal del curso (en `Downloads`, 1,5 GB, disco virtual 3,5 GiB) y la 20.04 (descargarla del Drive del
      curso); probar una VM Ubuntu por proveedor (VNC, red, `stress-ng`, `tcpdump`).
    - **Contradicción para el JP:** el Anexo pide 2,5 GB de disco y la imagen ocupa 3,5 GiB virtuales (Nova y el driver
