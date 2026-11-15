@@ -25,7 +25,6 @@ from .session import OpenStackError, Session
 
 PRIVATE = [ipaddress.ip_network(x) for x in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')]
 NOVA_CONSOLE = {'OpenStack-API-Version': 'compute 2.6', 'X-OpenStack-Nova-API-Version': '2.6'}
-NOVA_DIAGNOSTICS = {'OpenStack-API-Version': 'compute 2.48', 'X-OpenStack-Nova-API-Version': '2.48'}  # formato estándar
 LOAD = re.compile(r'load average:\s*([0-9.]+),\s*([0-9.]+),\s*([0-9.]+)')
 DELETE_ORDER = ('server', 'port', 'security_group', 'subnet', 'network', 'project')
 EXTERNAL_NIC = 'inet'       # nombre de la NIC de salida (puerto g5-<slice>-<vm>-inet)
@@ -222,12 +221,16 @@ class OpenStackDriver(ProviderDriver):
             match = re.fullmatch(r'g5-([0-9a-f]{8})-(.+)', server.get('name') or '')
             if not match or server.get('status') != 'ACTIVE':
                 continue
-            try:
-                diag = self.call('GET', 'compute', '/servers/%s/diagnostics' % server['id'], headers=NOVA_DIAGNOSTICS)
+            try:   # formato clásico de libvirt (KiB): el estándar 2.48 da la RAM en GiB enteros, sin resolución
+                diag = self.call('GET', 'compute', '/servers/%s/diagnostics' % server['id'])
             except OpenStackError:
                 continue
-            cpu_ns = sum(int(c.get('time') or 0) for c in diag.get('cpu_details') or [])
-            memory = diag.get('memory_details') or {}
+            cpu_ns = sum(int(v) for k, v in diag.items() if re.fullmatch(r'cpu\d+_time', k))
+            if 'memory-available' in diag and 'memory-usable' in diag:   # vista del invitado (balloon)
+                used = (diag['memory-available'] - diag['memory-usable']) // 1024
+            else:
+                used = diag['memory-rss'] // 1024 if 'memory-rss' in diag else None
+            memory = {'used': used, 'maximum': diag['memory'] // 1024 if 'memory' in diag else None}
             current[server['id']] = (cpu_ns, now)
             cent, before = None, previous.get(server['id'])
             if before and now > before[1] and cpu_ns >= before[0]:

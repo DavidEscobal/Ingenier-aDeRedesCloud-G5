@@ -265,8 +265,8 @@ class FakeCloud:
                                      and query.get('status') in (None, s['status'])]}
         if len(rest) == 3 and rest[0] == 'servers' and rest[2] == 'diagnostics' and rest[1] in self.servers:
             used = self.cpu_ns[rest[1]] = self.cpu_ns.get(rest[1], 0) + 500_000_000   # medio segundo por consulta
-            return 200, {'cpu_details': [{'id': 0, 'time': used, 'utilisation': None}],
-                         'memory_details': {'maximum': 512, 'used': 300}}
+            return 200, {'cpu0_time': used, 'memory': 524288, 'memory-actual': 524288, 'memory-rss': 600000,
+                         'memory-available': 500000, 'memory-usable': 192800, 'vda_read': 1}   # libvirt, KiB
         if rest == ['os-aggregates']:
             return 200, {'aggregates': [{'name': 'az-a', 'availability_zone': 'zona-a', 'hosts': ['worker1', 'worker2']}]}
         if rest == ['flavors', 'detail']:
