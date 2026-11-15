@@ -88,7 +88,10 @@ Manager / Placement / IAM con login.
 - **Gateway** (`ssh g5-gw`): llave del app server autorizada solo para túneles; respaldo en
   `~/.ssh/authorized_keys.bak-20261103`. No se tocó iptables.
 - **OpenStack** (2026-11-08): ningún recurso `g5-*`. Existen proyectos de laboratorio `lab5` (2 VMs) y `topo1_lab6`
-  (3 VMs, 3 redes) que no son del orquestador: no tocarlos; ocupan capacidad de los workers.
+  (3 VMs, 3 redes) que no son del orquestador. **Borrados el 2026-11-15 por pedido del usuario** (sin uso desde el
+  24/10 y el 5/11: CPU ≈ 0,6 %, solo el tráfico del arranque): 5 VMs, 10 puertos (2 en `external`; la red `external`
+  de admin intacta), 4 subredes, 4 redes, 2 grupos `default` y los 2 proyectos. Sin routers, IPs flotantes ni
+  volúmenes. Libera 5 vCPU, 2,5 GB RAM y 20 GB de disco comprometido. Quedan solo `admin`, `cloud_admin`, `service`.
 - Acceso desde la PC del usuario: alias `g5-app` y `g5-gw` en `~/.ssh/config` con la llave `id_ed25519_g5`.
 
 ## Inventario de fase 2 verificado (2026-11-03, solo lectura)
@@ -263,7 +266,8 @@ pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
 **Pendientes, por prioridad**
 1. **Bloqueantes:** monitoreo (D-13); placement R4 con BFD/BCDP alimentado por el monitoreo; imágenes Ubuntu
    (Linux: habilitar en el adaptador el camino cloud-init de EX1 con usuario/contraseña/llave; OpenStack: **sin disco**,
-   computes con 1–2 GB libres y Ubuntu pide 2,5–3,5 GB → tratar con el JP `lab5`/`topo1_lab6` o más disco).
+   computes con 1–2 GB libres y Ubuntu pide 2,5–3,5 GB; `lab5`/`topo1_lab6` ya borrados el 2026-11-15: ahora
+   5–6 GB reales libres por worker (`disk_available_least`); verificar si alcanza para Ubuntu).
    Verificar con la imagen real que 2,5 GB alcanza (Nova solo admite GB enteros y Ubuntu minimal ronda 3,5 GB virtuales).
 2. **Necesarios:** zona de disponibilidad y roles Linux (server2–4 alojan VMs, puerta en otro nodo, según decida el grupo);
    elegir servidor por VM (incluye host forzado en Nova); nombres con mayúsculas y `_`; enlaces sin IP en el editor;
