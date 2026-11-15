@@ -55,7 +55,8 @@ class Normalize(unittest.TestCase):
         self.assertFalse(s3["healthy"]); self.assertEqual(s3["error"], "en mantenimiento")
         w1, w2 = data["openstack"]
         self.assertEqual(w1["zone"], "zona-a")
-        self.assertEqual(w1["disk_used_mb"], 8 * 1024)       # disco real (disk_available_least) manda
+        self.assertEqual(w1["disk_used_mb"], 2 * 1024)       # manda lo comprometido en Nova (local_gb_used)
+        self.assertEqual(w1["disk_free_mb"], 1024)           # disk_available_least solo se informa
         self.assertIsNone(w1["cpu_real_cent"])
         self.assertFalse(w2["healthy"])
 

@@ -39,9 +39,11 @@ def openstack_hosts(block, measured_at, now):
     hosts = []
     for r in (block or {}).get("hosts", []):
         local = int((r.get("local_gb") or 0) * GIB)
+        # Compromiso como lo cuenta Nova (local_gb_used = suma de los flavors); es lo que su scheduler hace cumplir.
+        # disk_available_least (peor caso si los qcow2 crecieran) solo se informa: en el clúster sale negativo con
+        # 2 VMs y, si mandara, rechazaríamos slices que Nova acepta.
         used_disk = int((r.get("local_gb_used") or 0) * GIB)
-        if r.get("disk_available_least") is not None:       # lo que el disco real permite: conservador
-            used_disk = max(used_disk, local - int(r["disk_available_least"] * GIB))
+        least = r.get("disk_available_least")
         up = r.get("state") == "up" and r.get("status") == "enabled"
         hosts.append({
             "id": r["node"], "provider": "openstack", "zone": r.get("zone") or "nova",
@@ -51,7 +53,8 @@ def openstack_hosts(block, measured_at, now):
             "disk_used_mb": max(0, used_disk), "vms": int(r.get("running_vms") or 0),
             "occupied": int(r.get("running_vms") or 0) > 0,
             "cpu_real_cent": None,                              # sin acceso a los workers: demanda completa
-            "memory_total_mb": None, "memory_available_mb": None, "disk_free_mb": None, "load": None,
+            "memory_total_mb": None, "memory_available_mb": None,
+            "disk_free_mb": None if least is None else int(least * GIB), "load": None,
             "vm_usage": [], "measured_at": measured_at,
             "age_s": round(max(0.0, now - measured_at), 1) if measured_at else None,
             "healthy": up, "error": None if up else "hipervisor %s/%s" % (r.get("state"), r.get("status")),
