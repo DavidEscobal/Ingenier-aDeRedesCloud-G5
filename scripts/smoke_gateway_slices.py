@@ -67,6 +67,8 @@ def main():
     parser.add_argument('--provider', action='append', choices=['linux', 'openstack', 'auto'])
     parser.add_argument('--zone')
     parser.add_argument('--hold', type=int, default=0)
+    parser.add_argument('--keep', action='store_true',
+                        help='no borrar el slice al final (pruebas manuales largas); luego usar --delete SLICE_ID')
     parser.add_argument('--image', help='imagen del catálogo para todas las VMs (reemplaza la de la plantilla)')
     parser.add_argument('--timeout', type=int, default=600, help='segundos de espera por estado final')
     parser.add_argument('--delete', metavar='SLICE_ID', help='solo borrar ese slice y esperar DELETED')
@@ -179,7 +181,9 @@ def run_slice(args, token, spec, check):
         status, missing = call(args.url, 'GET', '/v1/slices/' + '0' * 32, token)
         check('6. slice inexistente → 404', status == 404)
     finally:
-        if sid:
+        if sid and args.keep:
+            print('     slice conservado (--keep); para borrarlo: --delete %s' % sid)
+        elif sid:
             status, _ = call(args.url, 'DELETE', '/v1/slices/' + sid, token, key=uuid.uuid4().hex)
             check('7. borrar por el gateway', status == 202, 'HTTP %s' % status)
             state, _ = wait(args.url, token, sid, args.timeout, FINAL - {'READY'})
