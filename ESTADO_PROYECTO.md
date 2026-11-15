@@ -178,6 +178,9 @@ Evidencia: `docs/evidencias/F0/inventario_openstack_20261103.json` (sin tokens).
   worker2 vacío. El disco es el recurso más escaso.
 - Redes: `link_1` (lab5) **vlan / physnet1 / VLAN 319**, port security desactivado; `external` flat/physnet0
   172.20.15.0/24 compartida. No hay redes VXLAN ni routers.
+  **Actualización 2026-11-15 (solo lectura):** `external` sigue flat/physnet0, compartida y `router:external`, pero su
+  subred ahora es **10.60.10.0/24** (el rango OpenStack de G5), gateway 10.60.10.1, DHCP .10–.250, DNS 8.8.8.8;
+  sin routers ni floating IPs. Base de R5 en OpenStack (e022c9c).
 - Proyectos del dominio `Cloud`: `cloud_admin`, `lab5` (instance_1 en worker1, instance_2 en worker3; no tocar).
 - Flavor `512MBRAM_1VCPUs_4GBRoot`; imagen `cirros` (qcow2, pública).
 - Cuotas `cloud_admin`: 10 instancias, 20 cores, 50 GB RAM; Neutron 100 redes / 500 puertos.
@@ -263,8 +266,8 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | 15a | VNC a todas las VMs | ✅ | Consola web en Linux y OpenStack |
 | 15b | VM4 como OVS con 3 interfaces **sin IP** | 🟡 | Enlaces «Sin IP» (ce6aafd). **Linux probado (2026-11-13, agente 93cbd00f):** `to-sw` UP sin IPv4 en ambas VMs, la puerta no se conecta a ese enlace, el enlace con IP hace ping 3/3. **OpenStack (2026-11-13): Nova rechaza puertos sin IP** (`Port … requires a FixedIP`; slice FAILED_CLEANED, compensación correcta). Opción propuesta, en espera de consultar al JP: subred sin DHCP ni gateway en un rango reservado (p. ej. 10.255.k.0/24); CirrOS queda sin IP, Ubuntu podría tomarla de los metadatos (flush manual). Falta OVS con Ubuntu |
 | 15c–e | IPs manuales 10.100.10.x, tcpdump, ping | 🟡 | Depende de 15b y de Ubuntu (CirrOS no trae tcpdump/OVS) |
-| 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack ❌ (R5) |
-| 17 | SSH desde fuera a VM4 y VM5 | ❌ | Ambos clústeres; depende del rango 10.60.x (consulta al JP) |
+| 16 | Internet en VM4 y VM5 | 🟡 | Linux ✅ (MS-16); OpenStack: **código hecho (e022c9c, sin desplegar)**: NIC en la red provider `external` (10.60.10.0/24) con DHCP, sin routers |
+| 17 | SSH desde fuera a VM4 y VM5 | 🟡 | OpenStack: el mismo puerto en 10.60.10.0/24 (accesible por la VPN) con grupo de seguridad (solo SSH e ICMP de entrada); falta probar por la VPN. Linux: depende del rango 10.60.9.0/24 (consulta al JP) |
 | 18 | Borrar y mostrar QEMU | ✅ | — |
 
 **Anexo 1** (6 VMs: anillo VM1–VM2–VM3–VM4 + VM4–VM5–VM6; Internet en VM4 y VM5): la forma se dibuja en el editor ✅;
