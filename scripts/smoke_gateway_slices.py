@@ -3,6 +3,10 @@
 
 Uso en el app server:
   python3 scripts/smoke_gateway_slices.py --user admin123 [--course TEL141] [--template templates/os-lineal-1g.json]
+      [--provider linux --provider openstack] [--zone ZONA] [--hold 60]
+
+Con --provider (repetible) se prueba la misma topología en cada proveedor con un solo login; se muestra la
+decisión del VM Placement (R4) y el servidor de cada VM. --hold deja el slice READY esos segundos antes de borrarlo.
 
 Pide la contraseña sin mostrarla; nunca imprime contraseña ni token. Crea el curso en IAM si no existe.
 Crea recursos reales en OpenStack y los borra al final (también si se interrumpe tras crearlos).
@@ -59,8 +63,11 @@ def main():
     parser.add_argument('--user', default='admin123')
     parser.add_argument('--course', default='TEL141')
     parser.add_argument('--template', default='templates/os-lineal-1g.json')
+    parser.add_argument('--provider', action='append', choices=['linux', 'openstack'])
+    parser.add_argument('--zone')
+    parser.add_argument('--hold', type=int, default=0)
     args = parser.parse_args()
-    spec = json.load(open(args.template))
+    base_spec = json.load(open(args.template))
     password = getpass.getpass('Contraseña de %s: ' % args.user)
     status, body = call(args.url, 'POST', '/v1/auth/login', body={'username': args.user, 'password': password})
     password = None
@@ -68,7 +75,7 @@ def main():
         print('FAIL login HTTP %s' % status)
         return 1
     token = body['access_token']
-    results, sid = [], None
+    results = []
 
     def check(name, ok, detail=''):
         results.append(ok)
@@ -82,17 +89,49 @@ def main():
             check('2. curso %s creado en IAM' % args.course, status == 201, 'HTTP %s' % status)
         else:
             check('2. curso %s existe en IAM' % args.course, True)
-        status, accepted = call(args.url, 'POST', '/v1/slices', token, {'course_id': args.course, 'spec': spec}, uuid.uuid4().hex)
+        for provider in args.provider or [base_spec.get('provider', 'openstack')]:
+            spec = dict(base_spec, provider=provider)
+            print('\n== %s: %s (%d VMs)' % (provider, spec['name'], len(spec['vms'])))
+            run_slice(args, token, spec, check)
+    finally:
+        call(args.url, 'POST', '/v1/auth/logout', token)
+        token = None
+    print('\nResultado: %d/%d OK' % (sum(results), len(results)))
+    return 0 if all(results) else 1
+
+
+def run_slice(args, token, spec, check):
+    sid = None
+    try:
+        body = {'course_id': args.course, 'spec': spec}
+        if args.zone:
+            body['zone'] = args.zone
+        status, accepted = call(args.url, 'POST', '/v1/slices', token, body, uuid.uuid4().hex)
         check('3. crear slice por el gateway', status == 202, 'HTTP %s %s' % (status, accepted if status != 202 else ''))
         if status != 202:
-            return 1
+            return
         sid = accepted['slice_id']
         print('     slice_id=%s operación=%s' % (sid, accepted['operation_id']))
+        placement = accepted.get('placement')
+        if placement:
+            print('     placement: %s %s, %s host(s) nuevos, %s ms, intento %s' % (
+                placement.get('status'), placement.get('algorithm'), placement.get('hosts_opened'),
+                placement.get('elapsed_ms'), placement.get('attempts')))
+            print('     plan: %s' % json.dumps(placement.get('plan'), sort_keys=True))
+        check('3b. el VM Placement decidió el plan', bool(placement) and placement.get('status') == 'PLAN_FOUND',
+              'sin placement' if not placement else placement.get('status'))
         state, detail = wait(args.url, token, sid)
         check('4. el slice llega a READY', state == 'READY', state)
         if detail:
+            hosts = {v['name']: v.get('host') for v in detail.get('vms', [])}
+            print('     servidor por VM (detalle): %s' % json.dumps(hosts, sort_keys=True))
+            if placement:
+                check('4b. el detalle respeta el plan', hosts == placement.get('plan'))
             for event in detail.get('events', [])[-4:]:
                 print('     evento %s %s: %s' % (event.get('seq'), event.get('event'), (event.get('detail') or '')[:110]))
+        if state == 'READY' and args.hold:
+            print('     en READY %d s antes de borrar…' % args.hold)
+            time.sleep(args.hold)
         status, rows = call(args.url, 'GET', '/v1/slices', token)
         row = next((r for r in rows or [] if r.get('id') == sid), {})
         check('5. aparece en la lista con dueño y curso', status == 200 and row.get('course_id') == args.course,
@@ -105,10 +144,6 @@ def main():
             check('7. borrar por el gateway', status == 202, 'HTTP %s' % status)
             state, _ = wait(args.url, token, sid)
             check('8. el slice llega a DELETED', state == 'DELETED', state)
-        call(args.url, 'POST', '/v1/auth/logout', token)
-        token = None
-    print('\nResultado: %d/%d OK' % (sum(results), len(results)))
-    return 0 if all(results) else 1
 
 
 if __name__ == '__main__':
