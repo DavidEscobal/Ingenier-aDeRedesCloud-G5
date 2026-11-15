@@ -55,13 +55,47 @@ def mtu_commands(mac, mtu):
 def flush_commands(macs):
     """Deja sin IPv4 las NICs de enlaces «sin IP» (VM que hará de switch, Ex2 15b), en cada arranque.
 
-    En OpenStack esos puertos llevan una IP de relleno (Nova no acepta puertos sin IP fija) que cloud-init configura
-    desde network_data.json; aquí se borra después de que la red está arriba."""
+    En OpenStack esos puertos llevan una IP de relleno (Nova no acepta puertos sin IP fija) que cloud-init escribe en
+    el netplan desde network_data.json. Se quita también del netplan (direcciones, rutas y DNS de esas NICs): si solo
+    se borrara la IP, volvería con cualquier `netplan apply`, p. ej. al instalar openvswitch-switch."""
     for mac in macs:
         require(MAC.fullmatch(mac), 'MAC inválida')
-    script = ('for d in /sys/class/net/*; do case " %s " in *" $(cat $d/address) "*) '
-              'ip -4 addr flush dev "${d##*/}";; esac; done') % ' '.join(macs)
-    return ['sh', '-c', script]
+    return ['python3', '-c', UNADDRESS_SCRIPT] + list(macs)
+
+
+UNADDRESS_SCRIPT = '''
+import glob, subprocess, sys, yaml
+macs = set(sys.argv[1:])
+changed = False
+for path in glob.glob('/etc/netplan/*.yaml'):
+    try:
+        with open(path) as f:
+            doc = yaml.safe_load(f) or {}
+    except Exception:
+        continue
+    edited = False
+    for conf in ((doc.get('network') or {}).get('ethernets') or {}).values():
+        if isinstance(conf, dict) and str((conf.get('match') or {}).get('macaddress', '')).lower() in macs:
+            for key in ('addresses', 'routes', 'nameservers', 'gateway4'):
+                edited = conf.pop(key, None) is not None or edited
+            if conf.get('dhcp4'):
+                conf['dhcp4'], edited = False, True
+    if edited:
+        with open(path, 'w') as f:
+            yaml.safe_dump(doc, f, default_flow_style=False)
+        changed = True
+if changed:
+    subprocess.call(['netplan', 'generate'])
+    subprocess.call(['networkctl', 'reload'])
+for d in glob.glob('/sys/class/net/*'):
+    try:
+        with open(d + '/address') as f:
+            mac = f.read().strip()
+    except OSError:
+        continue
+    if mac in macs:
+        subprocess.call(['ip', '-4', 'addr', 'flush', 'dev', d.rsplit('/', 1)[1]])
+'''
 
 
 def cloud_config(guest, hostname, mtu=None, unaddressed=()):

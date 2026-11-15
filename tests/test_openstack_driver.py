@@ -1,6 +1,7 @@
 """Driver OpenStack de punta a punta contra un OpenStack falso con estado."""
 import base64
 import copy
+import os
 import hashlib
 import http.client
 import json
@@ -184,8 +185,8 @@ class OpenStackDriverTests(OpenStackFixture):
             data = json.loads(base64.b64decode(servers[name]['user_data']).decode().split('\n', 1)[1])
             macs = [self.cloud.ports[p]['mac_address'] for p in servers[name]['ports']
                     if self.cloud.ports[p]['network_id'] == l2['id']]
-            commands = ' '.join(c[2] for c in data.get('bootcmd', []))
-            self.assertEqual('ip -4 addr flush' in commands, flushed, name)
+            commands = ' '.join(' '.join(c) for c in data.get('bootcmd', []))
+            self.assertEqual('UNADDRESS' in commands or "'addr', 'flush'" in commands, flushed, name)
             for mac in macs:
                 self.assertIn(mac, commands)
             if name == 'vm2':
@@ -194,6 +195,35 @@ class OpenStackDriverTests(OpenStackFixture):
                 self.assertTrue(kept and all(mac not in commands for mac in kept), 'la NIC con IP no se toca')
         [event] = self.store.rows("SELECT detail FROM events WHERE event='OS_UNADDRESSED'")
         self.assertIn('relleno 10.255.0.0/28', event['detail'])
+
+    def test_unaddress_script_removes_placeholder_from_netplan(self):
+        # El script de bootcmd quita del netplan la IP, rutas y DNS de relleno, y deja intacta la NIC de salida.
+        import tempfile, yaml
+        from unittest import mock
+        from g5.guest import UNADDRESS_SCRIPT, flush_commands
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'netplan')); os.makedirs(os.path.join(tmp, 'net', 'ens4'))
+            with open(os.path.join(tmp, 'net', 'ens4', 'address'), 'w') as f:
+                f.write('fa:16:3e:00:00:02\n')
+            plan = {'network': {'version': 2, 'ethernets': {
+                'ens3': {'match': {'macaddress': 'fa:16:3e:00:00:01'}, 'dhcp4': True, 'set-name': 'ens3'},
+                'ens4': {'match': {'macaddress': 'fa:16:3e:00:00:02'}, 'addresses': ['10.255.0.6/28'], 'set-name': 'ens4',
+                         'nameservers': {'addresses': ['8.8.8.8']}, 'mtu': 1500}}}}
+            path = os.path.join(tmp, 'netplan', '50-cloud-init.yaml')
+            with open(path, 'w') as f:
+                yaml.safe_dump(plan, f)
+            script = UNADDRESS_SCRIPT.replace('/etc/netplan', os.path.join(tmp, 'netplan').replace('\\', '/'))
+            script = script.replace('/sys/class/net', os.path.join(tmp, 'net').replace('\\', '/'))
+            command = flush_commands(['fa:16:3e:00:00:02'])
+            with mock.patch('subprocess.call') as call, mock.patch('sys.argv', ['x'] + command[3:]):
+                exec(compile(script, 'unaddress', 'exec'), {})
+            with open(path) as f:
+                result = yaml.safe_load(f)['network']['ethernets']
+            self.assertEqual(result['ens4'], {'match': {'macaddress': 'fa:16:3e:00:00:02'}, 'set-name': 'ens4', 'mtu': 1500})
+            self.assertEqual(result['ens3'], plan['network']['ethernets']['ens3'])
+            calls = [c.args[0] for c in call.call_args_list]
+            self.assertIn(['netplan', 'generate'], calls)
+            self.assertEqual(calls[-1][:4], ['ip', '-4', 'addr', 'flush'])
 
     def test_placeholder_cidrs_avoid_the_slice_subnets(self):
         from g5.drivers.openstack.driver import placeholder_cidrs
