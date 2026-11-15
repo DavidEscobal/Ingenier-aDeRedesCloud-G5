@@ -271,11 +271,18 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
 
 **Pendientes, por prioridad**
-1. **Bloqueantes:** ~~monitoreo (D-13); placement R4~~ (hechos, MS-17); imágenes Ubuntu
-   (Linux: habilitar en el adaptador el camino cloud-init de EX1 con usuario/contraseña/llave; OpenStack: **sin disco**,
-   computes con 1–2 GB libres y Ubuntu pide 2,5–3,5 GB; `lab5`/`topo1_lab6` ya borrados el 2026-11-15: ahora
-   5–6 GB reales libres por worker (`disk_available_least`); verificar si alcanza para Ubuntu).
-   Verificar con la imagen real que 2,5 GB alcanza (Nova solo admite GB enteros y Ubuntu minimal ronda 3,5 GB virtuales).
+1. **Bloqueantes:** ~~monitoreo (D-13); placement R4~~ (hechos, MS-17); imágenes Ubuntu:
+   - **Código hecho (2026-11-15, 2f0c721 y ac2c856, tests en verde, sin desplegar):** la web pide usuario, contraseña y
+     llaves opcionales al desplegar si alguna VM usa Ubuntu; el slice-manager envía solo el hash SHA-512 crypt; Linux
+     acepta Ubuntu (cloud-init NoCloud de EX1); OpenStack manda `user_data` + `config_drive`; tamaño `ubuntu`
+     (1 vCPU · 1 GB · 4 GB). Sin llave SSH se habilita SSH con contraseña.
+   - **Falta (con autorización):** desplegar en el app server; flavor `1 vCPU · 1 GB · 4 GB` en Nova; importar la
+     24.04 minimal del curso (en `Downloads`, 1,5 GB, disco virtual 3,5 GiB) y la 20.04 (descargarla del Drive del
+     curso); probar una VM Ubuntu por proveedor (VNC, red, `stress-ng`, `tcpdump`).
+   - **Contradicción para el JP:** el Anexo pide 2,5 GB de disco y la imagen ocupa 3,5 GiB virtuales (Nova y el driver
+     Linux rechazan un disco menor) → se usa 4 GB. Con 4 GB, OpenStack (9 GB por worker) admite 6 VMs: el paso 3 (3) y
+     el Anexo (6) no caben a la vez. En Linux la reserva admite 6 GB por servidor: 2 VMs de 4 GB en server2 (paso 3)
+     no caben sin subir el disco reservable de `cluster.json` (decisión del grupo; qcow2 crece según uso).
 2. **Necesarios:** zona de disponibilidad y roles Linux (server2–4 alojan VMs, puerta en otro nodo, según decida el grupo);
    elegir servidor por VM (incluye host forzado en Nova); nombres con mayúsculas y `_`; enlaces sin IP en el editor;
    R5 en OpenStack (Internet y SSH desde fuera) y SSH desde fuera en Linux.
