@@ -250,13 +250,13 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 | 2 | Zona de disponibilidad con servidores 2–4 (sin server1) | ❌ | Sin concepto de zona; hoy server4 es puerta y server1–3 workers (al revés de lo pedido) |
 | 3 | VMs en servidores indicados, Ubuntu 24.04 minimal, 1 GB/1 vCPU | 🟡 | **Servidor por VM en el editor (ce6aafd); host forzado de Nova probado: vm1@worker1 (2026-11-13)**. Falta Ubuntu |
 | 4 | Carga con `stress-ng` (80 % RAM/CPU) | 🟡 | Manual por consola; requiere Ubuntu |
-| 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | 🟡 | **Implementado 2026-11-14 (microservicio `monitoring` + página Recursos); sin desplegar ni probar en real** |
+| 5 | Módulo de monitoreo (asignado y usado) de ambos clústeres | ✅ | Microservicio `monitoring` + página Recursos, desplegado y verificado (2026-11-15) |
 | 6 | Procesos QEMU en workers OpenStack | 🟡 | Manual; confirmar acceso SSH a los workers |
-| 7 | Explicar placement, no fijo | 🟡 | **BCDP v2 implementado 2026-11-14 (`vm-placement`, llamado por el slice-manager); sin probar en real** |
+| 7 | Explicar placement, no fijo | ✅ | BCDP v2 (`vm-placement`) desde el slice-manager; probado en Linux y OpenStack (MS-17) |
 | 8 | Crear `Ex2_GXX_test` en el editor sin desplegar | ✅ | Nombres con mayúsculas y `_` (ce6aafd) |
 | 9 | Exportar la topología y explicar parámetros | ✅ | Exportar JSON |
 | 10 | Importar como `Ex2_GXX_test_2` | ✅ | Importar + nombres del examen (ce6aafd) |
-| 11 | Desplegar en OpenStack según placement | 🟡 | Implementado (`<zona>:<host>`); sin probar en real |
+| 11 | Desplegar en OpenStack según placement | ✅ | Plan → worker1 ×3, confirmado en Nova (MS-17) |
 | 12 | Horizon (proyecto y VMs por worker) + QEMU | ✅ | Proyecto `g5-…` por slice |
 | 13 | Errores y reintentos | ✅ | Reintentos y compensación |
 | 14 | Enlaces punto a punto en Horizon | ✅ | Una red por enlace |
@@ -271,7 +271,7 @@ Estado por paso: ✅ hecho · 🟡 parcial · ❌ falta.
 pide Ubuntu 24.04 minimal y Ubuntu 20.04 con 2,5 GB de disco.
 
 **Pendientes, por prioridad**
-1. **Bloqueantes:** monitoreo (D-13); placement R4 con BFD/BCDP alimentado por el monitoreo; imágenes Ubuntu
+1. **Bloqueantes:** ~~monitoreo (D-13); placement R4~~ (hechos, MS-17); imágenes Ubuntu
    (Linux: habilitar en el adaptador el camino cloud-init de EX1 con usuario/contraseña/llave; OpenStack: **sin disco**,
    computes con 1–2 GB libres y Ubuntu pide 2,5–3,5 GB; `lab5`/`topo1_lab6` ya borrados el 2026-11-15: ahora
    5–6 GB reales libres por worker (`disk_available_least`); verificar si alcanza para Ubuntu).
