@@ -205,7 +205,7 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
   17 NT por funciones pendientes de F2–F4). El plan está redactado; Slice Manager **no** está completo.
 - Actividad 1: la ejecuta el grupo en el headnode con `docs/pruebas/LAB6_ACTIVIDAD1_GUIA_EJECUCION.md`.
 
-## R4 VM Placement y monitoreo D-13 (2026-11-14, implementado; **desplegado 2026-11-15**, sin slice real aún)
+## R4 VM Placement y monitoreo D-13 (2026-11-14, implementado; **desplegado y probado de punta a punta 2026-11-15**)
 Diseño acordado con el grupo y el JP (`vm-placement_md/`): BCDP v2. Respeta la arquitectura: el **Slice Manager**
 coordina Monitoreo → VM Placement → platform-manager (que reserva de forma atómica).
 - `services/vm-placement` (fc5835e): BCDP v2 de `bcdp2.py` con la misma lógica, validador, VMs fijadas, zona, salud,
@@ -230,7 +230,11 @@ coordina Monitoreo → VM Placement → platform-manager (que reserva de forma a
 - **Hallazgo:** Nova da `disk_available_least` negativo en worker1/worker2; el monitoreo ahora usa `local_gb_used`
   (lo que Nova hace cumplir) y el otro dato solo se informa (837020c). OpenStack queda justo de disco (9 GB/worker; hoy
   5 VMs ajenas ocupan 20 GB).
-- **Pendiente:** slice de prueba creado desde la web en Linux y en OpenStack (requiere autorización); decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
+- **MS-17 (2026-11-15): placement de punta a punta** (`docs/evidencias/F2/MS-17_vm_placement_de_punta_a_punta.md`).
+  OpenStack: plan → worker1 para las 3 VMs, confirmado en Nova, READY 25 s, borrado limpio. Linux: plan → server3,
+  reserva y QEMU solo en server3; READY en 10 min 16 s porque CirrOS 0.4 espera ~181 s de entropía por VM y un mismo
+  servidor crea sus VMs en serie (no es del placement). Todo borrado y verificado en ambos proveedores.
+- **Pendiente:** acelerar Linux (CirrOS ≥ 0.5 en el almacén o VMs del mismo servidor en paralelo); decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
   (Linux usa `zone` de `cluster.json`, por defecto `linux`; OpenStack, agregados de Nova); actualizar el HLD
   (dice BFD; lo acordado es BCDP v2); paquetes `g5-install` con LF para que la huella coincida con el commit.
 
