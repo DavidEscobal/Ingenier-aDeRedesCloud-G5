@@ -3,7 +3,7 @@ import { Api, uploadImage } from '../api.js'
 import { formatDate } from '../components.jsx'
 
 const NAME = /^[a-z0-9][a-z0-9._-]{0,62}$/
-const MAX_MB = 1024
+const MAX_MB = 2048  // la Ubuntu 24.04 minimal del curso pesa 1,5 GB
 
 function suggestName(file) {
   return file.name.toLowerCase().replace(/\.(qcow2|img|raw)$/, '').replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 63)

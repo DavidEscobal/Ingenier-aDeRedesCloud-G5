@@ -87,7 +87,7 @@ services:
       PLATFORM_MANAGER_URL: http://platform-manager:8000
       PLATFORM_TOKEN_FILE: /run/g5/platform.token
       IMAGE_DB_PATH: /app/state/images/catalog.db
-      IMAGE_MAX_MB: "1024"
+      IMAGE_MAX_MB: "2048"
     volumes:
       - image-data:/app/state/images
       - ${G5_PLATFORM_CONFIG:-./platform-config}/image-catalog.token:/run/g5/platform.token:ro

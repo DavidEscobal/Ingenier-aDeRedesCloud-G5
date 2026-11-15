@@ -82,7 +82,7 @@ class Catalog:
 @asynccontextmanager
 async def lifespan(app):
     app.state.catalog = Catalog(os.getenv("IMAGE_DB_PATH", "state/images/catalog.db"))
-    app.state.max_bytes = int(os.getenv("IMAGE_MAX_MB", "1024")) * 1024 * 1024
+    app.state.max_bytes = int(os.getenv("IMAGE_MAX_MB", "2048")) * 1024 * 1024
     platform_url = os.getenv("PLATFORM_MANAGER_URL")
     app.state.platform_token = None
     if platform_url:
