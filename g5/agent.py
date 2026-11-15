@@ -172,9 +172,9 @@ def cloud_documents(plan, vm, mtu):
     guest = vm['guest']
     user = {'name': guest['username'], 'shell': '/bin/bash', 'groups': ['sudo'],
             'sudo': 'ALL=(ALL) NOPASSWD:ALL', 'lock_passwd': False,
-            'passwd': guest['password_hash'], 'ssh_authorized_keys': guest['ssh_authorized_keys']}
+            'passwd': guest['password_hash'], 'ssh_authorized_keys': guest.get('ssh_authorized_keys', [])}
     data = {'hostname': vm['name'], 'manage_etc_hosts': True, 'users': [user],
-            'ssh_pwauth': False, 'disable_root': True, 'chpasswd': {'expire': False},
+            'ssh_pwauth': not user['ssh_authorized_keys'],  # sin clave SSH, la contraseña (Ex2) 'disable_root': True, 'chpasswd': {'expire': False},
             'package_update': False, 'package_upgrade': False,
             'write_files': [{'path': '/etc/sysctl.d/99-ex1-no-forward.conf',
                              'content': 'net.ipv4.ip_forward=0\nnet.ipv6.conf.all.forwarding=0\n'}],

@@ -12,6 +12,7 @@ import re
 import ipaddress
 import time
 import urllib.parse
+from ...guest import user_data, validate_access
 from ...model import Fault, require, integer, slug, display_name, fields
 from ..base import ProviderDriver
 from .session import OpenStackError, Session
@@ -47,8 +48,10 @@ class CountingReader:
 
 def validate_spec(spec, config):
     require('openstack' in config, 'El proveedor OpenStack no está configurado en cluster.json')
-    fields(spec, ('name', 'provider', 'networks', 'vms'), ('name', 'provider', 'networks', 'vms'))
+    fields(spec, ('name', 'provider', 'networks', 'vms', 'guest'), ('name', 'provider', 'networks', 'vms'))
     spec = copy.deepcopy(spec)
+    if 'guest' in spec:  # credenciales de las VMs Ubuntu (cloud-init por config drive)
+        spec['guest'] = validate_access(spec['guest'])
     display_name(spec['name'])
     nets, vms = spec['networks'], spec['vms']
     require(isinstance(nets, list) and 1 <= len(nets) <= 64, 'Se requieren 1..64 redes')
@@ -299,10 +302,14 @@ class OpenStackDriver(ProviderDriver):
                                    lambda: self.call('POST', 'network', '/v2.0/ports', body, pid)['port'])
                 ports.append({'port': port['id']})
             image, flavor = self.image(vm['image']), self.flavor(vm)
+            # Con credenciales: cloud-init crea el usuario y, desde el config drive, configura todas las NICs
+            # (sin router no hay servicio de metadatos; la IP fija del puerto llega en network_data.json).
+            boot = {'user_data': user_data(plan['guest'], vm['name']), 'config_drive': True} if plan.get('guest') else {}
             created = self.ensure(ctx, 'server', vm['name'],
                                   lambda: self.find('compute', '/servers', 'servers', pid, name='^%s$' % vm['os_name']),
                                   lambda: self.call('POST', 'compute', '/servers', {'server': dict({
                                       'name': vm['os_name'], 'imageRef': image, 'flavorRef': flavor, 'networks': ports},
+                                      **boot,
                                       # host forzado: "<zona>:<compute>" (requiere rol admin en el proyecto)
                                       **({'availability_zone': vm.get('zone', 'nova') + ':' + vm['host']} if vm.get('host') else {}))}, pid)['server'])
             current = self.call('GET', 'compute', '/servers/' + created['id'], project_id=pid)['server']

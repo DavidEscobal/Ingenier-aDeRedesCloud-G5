@@ -254,7 +254,8 @@ class FakeCloud:
                     return 400, {'badRequest': {'message': 'puerto'}}
             s = {'id': self.new('srv'), 'name': b['name'], 'project_id': project, 'status': 'BUILD', 'polls': 0,
                  'ports': [p['port'] for p in b['networks']], 'host': self.hosts[len(self.servers) % len(self.hosts)],
-                 'availability_zone': b.get('availability_zone')}
+                 'availability_zone': b.get('availability_zone'),
+                 'user_data': b.get('user_data'), 'config_drive': b.get('config_drive')}
             if ':' in (b.get('availability_zone') or ''):        # host forzado "<zona>:<host>"
                 s['host'] = b['availability_zone'].split(':', 1)[1]
             for p in s['ports']:

@@ -10,6 +10,8 @@ from g5.model import Fault
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA = 'a' * 64
+GUEST = {'username': 'alumno', 'password_hash': '$6$testsalt$' + 'a' * 86}
+KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDg5ZXgxZGVtbyBwdWJsaWMga2V5IGZvciB0ZXN0 test'
 
 
 def neutral(n=4, image='cirros-062'):
@@ -99,9 +101,42 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(Fault, 'DHCP'):
             validate_spec(net, self.cfg)
 
-    def test_rejects_non_cirros_and_no_workers(self):
-        with self.assertRaisesRegex(Fault, 'CirrOS'):
-            adapt(neutral(image='ubuntu-22'), ['server1'], self.resolve)
+    def test_ubuntu_uses_slice_credentials_and_passes_driver_validation(self):
+        spec = neutral(3, image='ubuntu-24.04-minimal')
+        spec['vms'][1]['image'] = 'cirros'
+        spec['guest'] = dict(GUEST)
+        out = adapt(spec, ['server1', 'server2', 'server3'], self.resolve)
+        self.assertNotIn('guest', out, 'el bloque del slice se reparte por VM')
+        self.assertEqual(out['vms'][0]['guest'], dict(GUEST, os='ubuntu', ssh_authorized_keys=[]))
+        self.assertEqual(out['vms'][1]['guest'], {'os': 'cirros'})
+        validate_spec(out, self.cfg)  # 0 claves SSH: solo contraseña (consola VNC del Ex2)
+        with_key = dict(GUEST, ssh_authorized_keys=[KEY])
+        out = adapt(dict(spec, guest=with_key), ['server1'], self.resolve)
+        self.assertEqual(out['vms'][2]['guest']['ssh_authorized_keys'], [KEY])
+        validate_spec(out, self.cfg)
+
+    def test_ubuntu_without_or_with_bad_credentials_is_rejected(self):
+        with self.assertRaisesRegex(Fault, 'usuario y contraseña'):
+            adapt(neutral(image='ubuntu-24.04-minimal'), ['server1'], self.resolve)
+        for bad in (dict(GUEST, password_hash='secreta123'), dict(GUEST, username='root'),
+                    dict(GUEST, ssh_authorized_keys=['ssh-ed25519 AAAA\ncommand']), dict(GUEST, extra=1)):
+            with self.assertRaises(Fault):
+                adapt(dict(neutral(image='ubuntu-24.04-minimal'), guest=bad), ['server1'], self.resolve)
+
+    def test_cloud_config_allows_password_ssh_only_without_keys(self):
+        from g5.agent import cloud_documents
+        out = adapt(dict(neutral(2, image='ubuntu-24.04-minimal'), guest=dict(GUEST)), ['server1'], self.resolve)
+        plan = dict(out, id='p' * 32)
+        for vm in plan['vms']:
+            for nic in vm['nics']:
+                nic['mac'] = '52:54:00:00:00:01'
+        data = json.loads(cloud_documents(plan, plan['vms'][0], 1450)['user-data'].split('\n', 1)[1])
+        self.assertTrue(data['ssh_pwauth'])
+        self.assertEqual(data['users'][0]['passwd'], GUEST['password_hash'])
+
+    def test_rejects_unknown_images_and_no_workers(self):
+        with self.assertRaisesRegex(Fault, 'CirrOS o Ubuntu'):
+            adapt(neutral(image='debian-12'), ['server1'], self.resolve)
         with self.assertRaisesRegex(Fault, 'workers'):
             adapt(neutral(), [], self.resolve)
         self.assertFalse(needs_adapter({'provider': 'openstack', 'vms': [{'name': 'a'}]}))

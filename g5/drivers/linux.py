@@ -69,7 +69,7 @@ def validate_spec(spec, config):
                 require(isinstance(guest.get('username'), str) and re.fullmatch(r'[a-z][a-z0-9_-]{0,30}', guest['username']), 'Usuario Ubuntu requerido')
                 require(isinstance(guest.get('password_hash'), str) and re.fullmatch(r'\$6\$[a-zA-Z0-9./]{1,16}\$[a-zA-Z0-9./]{86}', guest['password_hash']), 'Hash SHA512 crypt requerido para consola Ubuntu')
                 keys = guest.get('ssh_authorized_keys', [])
-                require(isinstance(keys, list) and 1 <= len(keys) <= 8, 'Indique 1..8 claves SSH públicas')
+                require(isinstance(keys, list) and len(keys) <= 8, 'Hasta 8 claves SSH públicas')  # 0: solo contraseña (Ex2)
                 for key in keys:
                     require(isinstance(key, str) and len(key) < 8192 and '\n' not in key and re.match(r'^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)) [A-Za-z0-9+/]+={0,3}(?: |$)', key), 'Clave SSH pública inválida')
         nic_names = [n.get('name') for n in vm['nics'] if isinstance(n, dict) and n.get('name')]

@@ -1,4 +1,5 @@
 """Driver OpenStack de punta a punta contra un OpenStack falso con estado."""
+import base64
 import copy
 import hashlib
 import http.client
@@ -76,6 +77,31 @@ class OpenStackDriverTests(OpenStackFixture):
         bad = copy.deepcopy(LINEAL); bad['vms'][0]['zone'] = 'zona-a'
         with self.assertRaises(Fault):
             validate(bad, self.cfg)
+
+    def test_guest_credentials_go_as_user_data_with_config_drive(self):
+        plain = self.run_job(self.create())
+        self.assertEqual(plain['status'], 'READY', plain)
+        self.assertTrue(all(s['user_data'] is None and s['config_drive'] is None for s in self.cloud.servers.values()),
+                        'sin credenciales no cambia el arranque de CirrOS')
+        spec = copy.deepcopy(LINEAL)
+        spec['name'] = 'ubuntu-os'
+        spec['guest'] = {'username': 'alumno', 'password_hash': '$6$testsalt$' + 'b' * 86}
+        slice_ = self.run_job(self.create(spec, 'os-create-ubuntu'))
+        self.assertEqual(slice_['status'], 'READY', slice_)
+        mine = [s for s in self.cloud.servers.values() if s['user_data']]
+        self.assertEqual(len(mine), 3)
+        for server in mine:
+            self.assertIs(server['config_drive'], True)
+            text = base64.b64decode(server['user_data']).decode()
+            self.assertTrue(text.startswith('#cloud-config\n'))
+            data = json.loads(text.split('\n', 1)[1])
+            self.assertEqual(data['users'][0]['name'], 'alumno')
+            self.assertEqual(data['users'][0]['passwd'], spec['guest']['password_hash'])
+            self.assertTrue(data['ssh_pwauth'])
+            self.assertEqual(data['hostname'], server['name'].rsplit('-', 1)[-1])
+        for bad in ({'username': 'alumno', 'password': 'claro'}, {'username': 'alumno', 'password_hash': 'x'}):
+            with self.assertRaises(Fault):
+                validate(dict(LINEAL, guest=bad), self.cfg)
 
     def test_size_without_flavor_is_rejected_before_admission(self):
         """Sin create_flavors, un tamaño sin flavor se rechaza en el preflight: nada se crea en OpenStack."""
