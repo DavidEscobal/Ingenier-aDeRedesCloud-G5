@@ -4,6 +4,7 @@
 Uso en el app server:
   python3 scripts/smoke_gateway_slices.py --user admin123 [--course TEL141] [--template templates/os-lineal-1g.json]
       [--provider linux --provider openstack] [--zone ZONA] [--hold 60]
+      [--image ubuntu-24.04-minimal-cloudimg-amd64 --size 1/1024/4 --guest-user alumno]
 
 Con --provider (repetible) se prueba la misma topología en cada proveedor con un solo login; se muestra la
 decisión del VM Placement (R4) y el servidor de cada VM. --hold deja el slice READY esos segundos antes de borrarlo.
@@ -69,11 +70,25 @@ def main():
     parser.add_argument('--image', help='imagen del catálogo para todas las VMs (reemplaza la de la plantilla)')
     parser.add_argument('--timeout', type=int, default=600, help='segundos de espera por estado final')
     parser.add_argument('--delete', metavar='SLICE_ID', help='solo borrar ese slice y esperar DELETED')
+    parser.add_argument('--guest-user', help='usuario de las VMs Ubuntu; pide su contraseña sin mostrarla')
+    parser.add_argument('--size', help='vcpus/memory_mb/disk_gb para todas las VMs, p. ej. 1/1024/4')
     args = parser.parse_args()
     base_spec = json.load(open(args.template))
     if args.image:
         for vm in base_spec['vms']:
             vm['image'] = args.image
+    if args.size:
+        vcpus, memory_mb, disk_gb = (int(x) for x in args.size.split('/'))
+        for vm in base_spec['vms']:
+            vm.update(vcpus=vcpus, memory_mb=memory_mb, disk_gb=disk_gb)
+    guest = None
+    if args.guest_user:
+        vm_password = getpass.getpass('Contraseña para el usuario %s de las VMs: ' % args.guest_user)
+        if vm_password != getpass.getpass('Repítela: '):
+            print('FAIL las contraseñas de las VMs no coinciden')
+            return 1
+        guest = {'username': args.guest_user, 'password': vm_password}
+    args.guest = guest
     password = getpass.getpass('Contraseña de %s: ' % args.user)
     status, body = call(args.url, 'POST', '/v1/auth/login', body={'username': args.user, 'password': password})
     password = None
@@ -116,6 +131,8 @@ def run_slice(args, token, spec, check):
     sid = None
     try:
         body = {'course_id': args.course, 'spec': spec}
+        if args.guest:
+            body['guest'] = args.guest
         if args.zone:
             body['zone'] = args.zone
         status, accepted = call(args.url, 'POST', '/v1/slices', token, body, uuid.uuid4().hex)
