@@ -39,6 +39,22 @@ kernel no toma la entropía de `virtio-rng` sin `rngd`, y las VMs de un mismo se
 Antes, con una VM por servidor, el slice quedaba READY en 57 s. Pendiente: imagen CirrOS ≥ 0.5 en el almacén Linux o
 crear en paralelo las VMs de un mismo servidor.
 
+## Aceleración de Linux (2026-11-15, autorizada; platform-manager en 9274ddf)
+
+Cambio 509a6dd: cada worker enciende **todas** sus VMs y después configura los invitados (antes, una VM no se encendía
+hasta que la anterior terminaba de arrancar). Prueba `test_worker_powers_on_all_vms_before_guest_setup`.
+Misma topología `lineal-3vm` (3 VMs en un servidor), por el gateway con `--image`:
+
+| Imagen | Servidor (placement) | NETWORK_READY → READY | READY total | Antes (MS-17) | Resultado |
+|---|---|---|---|---|---|
+| `cirros` (CirrOS 0.4, 12,7 MB) | server1 ×3 | 209 s | **222 s** | 616 s | 10/10 OK |
+| `cirros-062` (CirrOS 0.6.2, 21 MB) | server1 ×3 | 30 s | **45,5 s** | — | 10/10 OK |
+
+- Con 0.4 sigue pagándose una espera de entropía (~3 min), ahora una sola vez por servidor. Con 0.6.2 desaparece.
+- La primera vez, `cirros-062` se trajo de Glance al almacén Linux (queda en caché; `cirros` intacta).
+- Borrado del slice con 0.4: un `RETRY` en server4 (`ip link del g5wc7c3e4e78a: Cannot find device`); el reintento
+  terminó y quedó DELETED en 5 s. Conviene que el borrado del agente tolere una interfaz ya inexistente.
+
 ## Estado final verificado
 
 - server1–4: sin procesos QEMU, sin namespaces, sin directorios de VMs ni de slices.

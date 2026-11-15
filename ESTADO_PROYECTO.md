@@ -234,7 +234,10 @@ coordina Monitoreo → VM Placement → platform-manager (que reserva de forma a
   OpenStack: plan → worker1 para las 3 VMs, confirmado en Nova, READY 25 s, borrado limpio. Linux: plan → server3,
   reserva y QEMU solo en server3; READY en 10 min 16 s porque CirrOS 0.4 espera ~181 s de entropía por VM y un mismo
   servidor crea sus VMs en serie (no es del placement). Todo borrado y verificado en ambos proveedores.
-- **Pendiente:** acelerar Linux (CirrOS ≥ 0.5 en el almacén o VMs del mismo servidor en paralelo); decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
+- **Linux acelerado (2026-11-15, 509a6dd desplegado):** cada worker enciende todas sus VMs antes de configurarlas.
+  3 VMs en un servidor: `cirros` (0.4) 616 s → 222 s; **`cirros-062` 45,5 s**. Recomendación: usar `cirros-062` en Linux.
+  Detalle en MS-17. Pendiente menor: borrado del agente tolerante a interfaz ya inexistente en server4 (hubo un RETRY).
+- **Pendiente:** decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
   (Linux usa `zone` de `cluster.json`, por defecto `linux`; OpenStack, agregados de Nova); actualizar el HLD
   (dice BFD; lo acordado es BCDP v2); paquetes `g5-install` con LF para que la huella coincida con el commit.
 
