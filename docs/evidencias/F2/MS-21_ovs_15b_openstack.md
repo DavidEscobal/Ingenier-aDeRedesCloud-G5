@@ -40,6 +40,16 @@ y pasa a creer que vm1 está detrás de worker2; entonces descarta el unicast ha
 (OVS, VLAN) aprende por VLAN, así que el problema está fuera de nuestro código. No hay acceso a los workers ni al
 switch para confirmarlo; queda para el JP.
 
-**Mitigaciones posibles (sin implementar):** (1) que el JP ajuste el aprendizaje de MAC por VLAN en el tramo físico;
-(2) ubicar la VM switch y sus vecinas de enlaces «sin IP» en el mismo compute (con 0,5 GB por VM, como el Anexo, las
-cuatro caben en uno), con afinidad en el VM Placement o fijando `host` en la topología.
+## Intento de mitigación: las 4 VMs en el mismo compute (mismo día)
+
+- Se creó el flavor `g5-1c-512m-4g` (autorizado por el usuario) y la plantilla `templates/ovs-15b-1host.json`
+  (vm1, vm3, vm4, vm5 con 512 MB, fijadas en worker3, vacío). Se desplegó 9e32610 en el platform-manager (367f2ac).
+- **Rechazado por el VM Placement** antes de crear nada: `HEURISTIC_NO_PLAN: la VM vm4 fijada en worker3 no cabe
+  (disco)`. Nova informa **9 GB de disco local por compute** (worker1–3); con 4 GB por VM Ubuntu caben 2 por compute.
+- Conclusión: con este disco no se puede ubicar la VM switch junto a sus tres vecinas. Y cualquier vecina en otro
+  compute reproduce el fallo, porque el OVS saca sus tramas hacia el tramo físico desde el compute de vm4. Además, el
+  paso 3 del Ex2 fija servidores concretos, así que en la demo habrá vecinas en otros computes.
+
+**Queda para el JP:** (1) que el tramo físico entre computes aprenda MACs por VLAN (o confirmar cómo está armado);
+(2) más disco en los computes de OpenStack (9 GB) o arranque desde volumen. Se conserva el flavor `g5-1c-512m-4g`
+(0,5 GB como el Anexo). Slices de prueba borrados.
