@@ -209,6 +209,10 @@ async def upstream_call(client, name: str, method: str, path: str, access_token:
     if response.status_code >= 400:
         detail = data.get("detail") if isinstance(data, dict) else None
         headers = {"WWW-Authenticate": "Bearer"} if response.status_code == 401 else {}
+        if isinstance(detail, list):  # 422 de validación: solo campo y mensaje (nunca el valor enviado)
+            parts = ["%s: %s" % (".".join(str(x) for x in e.get("loc", []) if x != "body"), e.get("msg", ""))
+                     for e in detail[:5] if isinstance(e, dict)]
+            detail = "; ".join(parts)[:500] or None
         raise HTTPException(response.status_code, detail if isinstance(detail, str) else name + "_error",
                             headers=headers)
     return JSONResponse(status_code=response.status_code, content=data)

@@ -192,6 +192,7 @@ class SliceFlowTests(unittest.TestCase):
                                     headers={"Idempotency-Key": uuid.uuid4().hex})
             self.assertEqual(status, 422, error)
             self.assertNotIn(secret, json.dumps(error), "el error no devuelve la contraseña")
+            self.assertIn("guest.", error["detail"], "el gateway dice qué campo falló")
 
     def test_isolation_between_users_and_admin_scope(self):
         status, accepted = self.create(self.prof)
