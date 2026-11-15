@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
-> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-14 (R4 placement + monitoreo; antes 2026-11-08: integración `app`, Docker en el app server, D-10).
+> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-15 (R4 placement + monitoreo desplegados; antes 2026-11-08: integración `app`, Docker en el app server, D-10).
 
 ## Estado general
 - **F0 (auditoría) y F1 (núcleo de Slice Manager agnóstico + driver OpenStack) terminadas.**
@@ -202,7 +202,7 @@ Prueba real en el clúster (código f23b9cb desplegado en `~/g5-orchestrator` de
   17 NT por funciones pendientes de F2–F4). El plan está redactado; Slice Manager **no** está completo.
 - Actividad 1: la ejecuta el grupo en el headnode con `docs/pruebas/LAB6_ACTIVIDAD1_GUIA_EJECUCION.md`.
 
-## R4 VM Placement y monitoreo D-13 (2026-11-14, implementado; **sin desplegar ni probar en real**)
+## R4 VM Placement y monitoreo D-13 (2026-11-14, implementado; **desplegado 2026-11-15**, sin slice real aún)
 Diseño acordado con el grupo y el JP (`vm-placement_md/`): BCDP v2. Respeta la arquitectura: el **Slice Manager**
 coordina Monitoreo → VM Placement → platform-manager (que reserva de forma atómica).
 - `services/vm-placement` (fc5835e): BCDP v2 de `bcdp2.py` con la misma lógica, validador, VMs fijadas, zona, salud,
@@ -214,10 +214,22 @@ coordina Monitoreo → VM Placement → platform-manager (que reserva de forma a
   página Recursos (32cd0d6). Tecnología: microservicio propio; Prometheus/Grafana quedan como extensión de diseño.
 - Slice Manager (86d7c2c): plan antes de enviar, candado por proveedor, registro de planes de los últimos 90 s,
   reintento si la reserva falló por capacidad, 409 con motivo; zona elegida en la web.
-- **Para activarlo:** tokens y `keys.json` (ver `deploy/README.md`), reinstalar agentes (acción `metrics`), rebuild.
-- **Pendiente:** probar en real (Linux y OpenStack); decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
+- **Despliegue (2026-11-15, autorizado por el usuario):** agente `metrics` reinstalado por el usuario en server1–4
+  (`/opt/g5-cluster/agent.py`, huella 18ff5f0d, CRLF de la copia Windows; mismo contenido que el commit). App server
+  en 837020c; tokens `placement`, `monitoring-read`, `monitoring` (644) y `monitoring` con rol `service` en `keys.json`
+  (respaldo `keys.json.bak-20261115`). Construidos y levantados platform-manager, slice-manager, gateway, web,
+  vm-placement, monitoring: los 10 contenedores *healthy*.
+- **Verificado en real (solo lectura, sin crear recursos):** monitoreo con server1–3 sanos (CPU real 1–2 centésimas) y
+  worker1–3 de Nova (zona `nova`, sin agregados); gateway 200 con token y 401 sin él; historial de server1. Planner real
+  del slice-manager sin enviar: Linux 3 VMs → server1 (consolida); Linux 12 VMs → 409 «CPU real insuficiente»;
+  OpenStack 3 VMs → worker3, worker3, worker1; 10 VMs → 409 por CPU y disco. El app server **no** llega a 9100/22 de
+  los servidores (solo por el gateway): confirma el monitoreo por el agente SSH.
+- **Hallazgo:** Nova da `disk_available_least` negativo en worker1/worker2; el monitoreo ahora usa `local_gb_used`
+  (lo que Nova hace cumplir) y el otro dato solo se informa (837020c). OpenStack queda justo de disco (9 GB/worker; hoy
+  5 VMs ajenas ocupan 20 GB).
+- **Pendiente:** slice de prueba creado desde la web en Linux y en OpenStack (requiere autorización); decidir candidatos Linux (hoy server1–3, server4 puerta) y zonas
   (Linux usa `zone` de `cluster.json`, por defecto `linux`; OpenStack, agregados de Nova); actualizar el HLD
-  (dice BFD; lo acordado es BCDP v2); prueba previa: el app server no respondió por SSH el 2026-11-14 (VPN).
+  (dice BFD; lo acordado es BCDP v2); paquetes `g5-install` con LF para que la huella coincida con el commit.
 
 ## Brecha frente a la demo del Ex2 (referencia: `Contexto_md/Ex2_Validacion_de_Implementacion.md`, 2026-11-13)
 El documento es el **Ex2 de 2026-1** (13/07/2026): sirve como referencia de lo que se pedirá; el de 2026-2 puede variar.
