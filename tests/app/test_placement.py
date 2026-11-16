@@ -116,6 +116,14 @@ class Planner(unittest.TestCase):
         self.assertEqual(r["plan"], {"vm1": "server2"})
         self.assertEqual(r["hosts_opened"], 0)
 
+    def test_elige_host_con_ram_suficiente(self):
+        # server1 ya está en uso (sería el preferido) pero le quedan 216 MB de RAM; la VM pide 512 MB → server2.
+        hosts = [host(1, occupied=True, vcpus_used=1, ram_used_mb=2600, disk_used_mb=1024), host(2)]
+        r = plan(request(hosts, [vm(1, cpu_cent=50)]))
+        self.assertEqual(r["status"], "PLAN_FOUND")
+        self.assertEqual(r["plan"], {"vm1": "server2"})
+        self.assertEqual(r["hosts_opened"], 1)
+
     def test_vm_fijada(self):
         r = plan(request([host(1), host(2)], [vm(1, host="server2"), vm(2, cpu_cent=50)]))
         self.assertEqual(r["plan"]["vm1"], "server2")

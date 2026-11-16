@@ -1,4 +1,4 @@
-Ejecución de las pruebas automáticas del módulo de VM Placement — 2026-11-16 23:01 UTC, rama fase2 (81252e5)
+Ejecución de las pruebas automáticas del módulo de VM Placement — 2026-11-16 23:11 UTC, rama fase2
 
 == Algoritmo, servicio, integración con el Slice Manager, modo automático y topologías
 test_plan (test_placement.Api.test_plan) ... ok
@@ -10,6 +10,7 @@ test_regresion_guia (test_placement.Engine.test_regresion_guia) ... ok
 test_validador (test_placement.Engine.test_validador) ... ok
 test_consolida_con_cpu_prevista (test_placement.Planner.test_consolida_con_cpu_prevista) ... ok
 test_determinista (test_placement.Planner.test_determinista) ... ok
+test_elige_host_con_ram_suficiente (test_placement.Planner.test_elige_host_con_ram_suficiente) ... ok
 test_prefiere_host_ocupado (test_placement.Planner.test_prefiere_host_ocupado) ... ok
 test_slice_referencia_sin_telemetria (test_placement.Planner.test_slice_referencia_sin_telemetria) ... ok
 test_timeout (test_placement.Planner.test_timeout) ... ok
@@ -36,11 +37,11 @@ test_semantics_bus_is_one_shared_segment_and_lineal_is_point_to_point (test_topo
 test_drafts_are_private_versioned_and_round_trip_as_export (test_topology.TopologyServiceTests.test_drafts_are_private_versioned_and_round_trip_as_export) ... ok
 test_errors_are_readable_and_auth_is_required (test_topology.TopologyServiceTests.test_errors_are_readable_and_auth_is_required) ... ok
 test_generate_combine_and_compile_through_gateway (test_topology.TopologyServiceTests.test_generate_combine_and_compile_through_gateway) ... ok
-Ran 35 tests in 10.971s
+Ran 36 tests in 11.567s
 OK
 
 == Traducción a OpenStack (zona:host) con un OpenStack simulado
 test_placement_host_and_zone_force_the_compute (test_openstack_driver.OpenStackDriverTests.test_placement_host_and_zone_force_the_compute) ... ok
 test_hypervisors_inventory_with_zones (test_openstack_driver.OpenStackDriverTests.test_hypervisors_inventory_with_zones) ... ok
-Ran 2 tests in 1.465s
+Ran 2 tests in 1.506s
 OK
