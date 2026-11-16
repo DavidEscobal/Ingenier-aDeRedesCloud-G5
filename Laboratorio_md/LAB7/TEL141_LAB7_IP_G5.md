@@ -397,69 +397,122 @@ flowchart TD
 
 ### g) Plan de pruebas (unit testing)
 
-Las pruebas se ejecutan con `python -m unittest discover -s tests/app` (y el script `scripts/verificar.sh` antes de
-cada integración). Todas usan inventarios sintéticos y deterministas, sin tocar el clúster.
+#### Idea general
 
-**Pruebas unitarias del algoritmo y del servicio** (`tests/app/test_placement.py`) **[Implementado, en verde]**
+El módulo de VM Placement se prueba como una **caja negra**. Se le da una entrada, se lee su salida y se compara
+con la salida esperada, escrita de antemano:
 
-| # | Caso | Entrada | Salida esperada | Test |
-|---|---|---|---|---|
-| U1 | Caso de control del HLD | 6 demandas 1,92 / 1,60 / 0,96 / 0,64 ×3 en 2 y 3 hosts de 3,4 CPU | Z = 2 en ambos | `test_control_hld_z2` |
-| U2 | Línea base BFD peor que BCDP | Mismo caso | BFD da Z = 3 o sin plan | `test_bfd_peor_en_control` |
-| U3 | Regresión | Instancias del generador (60/10, 120/20; holgura 1,5 / 1,2 / 1,0) | Plan en todas; Z medio de la guía | `test_regresion_guia` |
-| U4 | Validador | Plan correcto / VM sin host / host excedido en cada dimensión | Pasa / falla / falla | `test_validador` |
-| U5 | **Host con recursos suficientes (Linux)** | 3 VMs de 2 vCPU sin perfil de CPU en server1–3 (4 CPU c/u) | `PLAN_FOUND`, una VM por host (el 85 % de CPU real admite una sola de 2 vCPU) | `test_slice_referencia_sin_telemetria` |
-| U6 | Consolidación con CPU prevista | 5 VMs de 1 vCPU con CPU prevista 0,40 | Todas en 1 host (`hosts_opened` = 1) | `test_consolida_con_cpu_prevista` |
-| U7 | Prefiere hosts ocupados | Un host ya ocupado con hueco | El plan lo usa antes de abrir otro | `test_prefiere_host_ocupado` |
-| U8 | VM fijada | VM con `host` | Respetada; si no cabe, rechazo con motivo | `test_vm_fijada` |
-| U9 | **Zona de disponibilidad** (regla que usa OpenStack; igual en Linux) | Hosts en `z1` y `z2`; se pide `z1` | Solo hosts de `z1`; el de `z2` en `discarded_hosts`. Sin hosts sanos en `z1`: `HEURISTIC_NO_PLAN` «… en la zona z1» | `test_zona_salud_y_telemetria` |
-| U10 | Salud y telemetría | Host caído y host con telemetría de 60 s | Descartados con su motivo | `test_zona_salud_y_telemetria` |
-| U11 | **Ningún host cumple** | 4 VMs de 2 vCPU en 3 hosts; 3 VMs en un host con tope de 2 vCPU | `HEURISTIC_NO_PLAN` con el motivo («recurso más ajustado: CPU real», «vCPU insuficiente») | `test_slice_referencia_sin_telemetria`, `test_tope_de_vcpu` |
-| U12 | Tiempo límite | Instancia grande con límite mínimo | `PLANNING_TIMEOUT` | `test_timeout` |
-| U13 | Determinismo | Misma solicitud dos veces | Mismo plan | `test_determinista` |
-| U14 | Seguridad de la API | Sin token / token inválido | 401 | `test_requiere_token` |
-| U15 | Contrato HTTP | Petición válida; petición con un ID de VM repetido | 200 con plan (respeta la VM fijada) / 422 | `test_plan`, `test_valida_entrada` |
+- **Entrada:**
+  - la lista de servidores, cada uno con su capacidad (núcleos, RAM, disco), lo que ya tiene en uso, su zona y si
+    está sano;
+  - la lista de VMs del slice, cada una con vCPU, RAM y disco;
+  - opcionalmente, la zona de disponibilidad pedida y la plataforma (Linux, OpenStack o automático).
+- **Salida:** una de dos respuestas.
+  - **Plan encontrado:** a qué servidor va cada VM (por ejemplo, «vm1 → server2»), cuántos servidores vacíos hubo que
+    empezar a usar y qué servidores se descartaron, con el motivo.
+  - **Rechazo:** el código del rechazo y una frase con el motivo (por ejemplo, «no hay servidores en la zona z1» o «la
+    VM no cabe: RAM»).
 
-**Pruebas de integración con el Slice Manager** (`tests/app/test_slice_placement.py`) **[Implementado, en verde]**
+Cada prueba es un **escenario pequeño e inventado**, armado para que la respuesta correcta se pueda calcular a mano.
+Las pruebas no usan el clúster real, así que siempre dan el mismo resultado y se ejecutan en segundos. Un solo
+comando las corre todas y muestra cuáles pasan y cuáles fallan. El grupo las ejecuta antes de integrar cualquier
+cambio.
 
-| # | Caso | Esperado |
+**Datos de referencia de los escenarios.** Salvo que se indique otra cosa, se usan estos valores:
+
+- **Servidor estándar:** 4 núcleos, 2,75 GB de RAM y 5 GB de disco, sano y con datos de monitoreo recientes.
+- **VM estándar:** 1 vCPU, 512 MB de RAM y 1 GB de disco.
+
+**Reglas que el módulo debe respetar** (explicadas en la parte e):
+
+- La CPU realmente usada en un servidor no puede pasar del **85 %** de sus núcleos; con 4 núcleos, el límite son 3,4.
+- Se pueden asignar hasta **2 vCPU por núcleo**.
+- La RAM y el disco no se sobreasignan.
+- Si no se sabe cuánto CPU usará una VM, se supone que usará todas sus vCPU (el caso más prudente).
+
+#### Grupo 1 — Las cuatro casuísticas del enunciado
+
+**P1. Linux: elegir servidores con recursos suficientes (CPU y RAM)**
+
+| Escenario | Entrada | Salida esperada | Qué demuestra |
+|---|---|---|---|
+| P1.1 | 3 servidores estándar vacíos; 3 VMs de 2 vCPU cada una | Plan: **una VM por servidor** | Dos VMs de 2 vCPU usarían 4 CPU, más que el límite de 3,4; el módulo las separa en vez de saturar un servidor |
+| P1.2 | Los mismos 3 servidores; 5 VMs de 1 vCPU que usan solo el 40 % de su CPU | Plan: **las 5 en un solo servidor** | Si las VMs consumen poco, el módulo consolida y deja libres los demás servidores |
+| P1.3 | server1 vacío; server2 ya ejecuta otra VM y tiene espacio; llega 1 VM | Plan: **vm1 → server2**; 0 servidores nuevos | El módulo prefiere completar un servidor que ya está en uso antes que empezar a usar uno vacío |
+| P1.4 | 2 servidores; el usuario fijó vm1 en server2; vm2 sin fijar | **vm1 → server2** (se respeta) y vm2 también va a server2 | Una elección explícita del usuario se respeta, y el servidor elegido se aprovecha para las demás VMs |
+
+**P2. OpenStack: aplicar la zona de disponibilidad**
+
+| Escenario | Entrada | Salida esperada | Qué demuestra |
+|---|---|---|---|
+| P2.1 | 4 servidores: server1 en la zona z2, server2 caído, server3 con datos de monitoreo de hace 40 s y server4 sano en z1. Se pide la **zona z1** | Plan: **vm1 → server4**. server1, server2 y server3 aparecen como descartados, cada uno con su motivo («fuera de la zona z1», «host no saludable», «telemetría vencida (40 s)») | El módulo solo considera servidores de la zona pedida, sanos y con información actualizada, y explica por qué descartó los demás |
+| P2.2 | Lo mismo, pero sin server4 | **Rechazo:** «no hay servidores candidatos en la zona z1» | Si la zona pedida no tiene dónde ubicar la VM, no se ubica en otra zona |
+| P2.3 | El plan dice «vm1 → worker2 en zona-a» y «vm2 → worker3» (zona por defecto). Se crea el slice en un OpenStack simulado | La orden enviada a OpenStack lleva `availability_zone = "zona-a:worker2"` para vm1 y `"nova:worker3"` para vm2; cada VM queda en ese compute | La decisión del módulo se traduce correctamente al mecanismo de OpenStack (zona:host) |
+| P2.4 | Una VM con zona pero sin servidor asignado | **Rechazo** al validar la solicitud | No se envían a OpenStack órdenes incompletas |
+
+**P3. Ningún servidor cumple con los recursos pedidos**
+
+| Escenario | Entrada | Salida esperada | Qué demuestra |
+|---|---|---|---|
+| P3.1 | 3 servidores estándar; **4 VMs** de 2 vCPU | **Rechazo** con el motivo «recurso más ajustado: CPU real» | Si el slice no cabe completo, se rechaza entero; nunca se despliega a medias |
+| P3.2 | Una VM fijada en server1 que pide 9999 MB de RAM | **Rechazo:** «la VM no cabe (RAM)» | Se informa qué recurso falta |
+| P3.3 | Un servidor que admite como máximo 2 vCPU; 3 VMs de 1 vCPU | **Rechazo:** «vCPU insuficiente» | Se respeta el tope de vCPU del servidor aunque la CPU real esté libre |
+| P3.4 | Una VM fijada en un servidor que no existe (server9) | **Rechazo** | Una entrada imposible no produce un plan |
+| P3.5 | Se pide crear un slice que no cabe, a través del orquestador completo | El usuario recibe un error con el motivo; **no se crea ninguna VM** ni se reserva nada | Un rechazo no deja recursos a medio crear |
+
+**P4. Modo automático: el módulo decide la plataforma**
+
+Aquí el usuario pide la plataforma «automático». El módulo calcula un plan para Linux y otro para OpenStack y se
+queda con el que **empieza a usar menos servidores vacíos**. Si empatan, elige Linux.
+
+| Escenario | Situación de los clústeres | Salida esperada |
 |---|---|---|
-| I1 | El plan se escribe en la especificación | Cada VM con `host`; en OpenStack también `zone` (`test_plan_escribe_host_y_zona`) |
-| I2 | Sin recursos | 409 con el motivo del placement (`test_sin_recursos_rechaza_con_motivo`) |
-| I3 | Dos slices seguidos con telemetría vieja | El segundo ve el compromiso del primero (`test_registro_de_planes_recientes_evita_doble_asignacion`) |
-| I4 | La reserva pierde la carrera | Se vuelve a planificar (`test_reintenta_si_la_reserva_fallo_por_capacidad`) |
-| I5 | VM fijada por el usuario | Se respeta (`test_vm_fijada_por_el_usuario`) |
-| I6 | Monitoreo caído o especificación incompleta | 503 / 422 sin desplegar (`test_monitoreo_caido_o_spec_incompleta`) |
+| P4.1 | Linux sin RAM libre; OpenStack con espacio | Elige **OpenStack**. Cada VM lleva su compute y su zona; Linux aparece como descartado con su motivo |
+| P4.2 | En Linux habría que empezar a usar un servidor vacío; en OpenStack cabe en uno que ya está en uso | Elige **OpenStack** (0 servidores nuevos frente a 1) |
+| P4.3 | Ambas plataformas necesitan lo mismo | Elige **Linux** (regla de desempate) y no agrega datos de zona de OpenStack |
+| P4.4 | Ninguna de las dos tiene capacidad | **Rechazo** con el motivo de cada plataforma («linux: …», «openstack: …») |
+| P4.5 | Linux tiene capacidad, pero no admite la imagen pedida | Intenta Linux, recibe el rechazo y despliega en **OpenStack**; el motivo del rechazo queda registrado |
+| P4.6 | El usuario fijó una VM en worker1, que es un compute de OpenStack | Elige **OpenStack**, porque la VM fijada determina la plataforma |
+| P4.7 | Entre el cálculo del plan y la reserva, otro slice ocupó el espacio | El módulo **vuelve a calcular** el plan (2 intentos) en lugar de fallar |
 
-**Pruebas del driver OpenStack** (`tests/test_openstack_driver.py`, con un OpenStack falso):
-`test_placement_host_and_zone_force_the_compute` comprueba que el servidor se crea con
-`availability_zone="zona-a:worker2"` y queda en ese host, y que pedir zona sin host se rechaza;
-`test_hypervisors_inventory_with_zones` comprueba que las zonas se leen de los agregados.
+#### Grupo 2 — Calidad y robustez del algoritmo
 
-**Selección automática de plataforma** (`tests/app/test_slice_placement.py`, clase `AutoProvider`)
-**[Implementado, en verde]**
-
-| # | Entrada (`provider: "auto"`) | Esperado | Test |
+| Prueba | Entrada | Salida esperada | Qué demuestra |
 |---|---|---|---|
-| A1 | Linux sin RAM libre; OpenStack con capacidad | Elige OpenStack; cada VM con `host` worker y `zone`; Linux en `rejected` | `test_a1_elige_el_unico_proveedor_con_capacidad` |
-| A2 | Linux tendría que ocupar un servidor vacío (Z = 1); OpenStack tiene uno ya ocupado con hueco (Z = 0) | Elige OpenStack, `hosts_opened` = 0; candidatos `{openstack: 0, linux: 1}` | `test_a2_elige_el_que_abre_menos_hosts_nuevos` |
-| A3 | Ambos con el mismo Z | Desempate: Linux (sin `zone` de Nova en la spec) | `test_a3_empate_prefiere_linux` |
-| A4 | Ninguno con plan | 409 con el motivo de `linux:` y de `openstack:` | `test_a4_ninguno_puede_rechaza_con_el_motivo_de_cada_uno` |
-| A5 | El platform-manager rechaza la spec en Linux (imagen no admitida) | Prueba OpenStack y lo despliega allí; el motivo queda en `rejected` | `test_a5_si_la_plataforma_rechaza_la_spec_prueba_la_siguiente` |
-| A6 | Una VM fijada en `worker1`; y una reserva que pierde la carrera | Elige OpenStack; con la carrera perdida vuelve a planificar (`attempts` = 2) | `test_vm_fijada_decide_la_plataforma_y_carrera_perdida_replanifica` |
+| R1. Caso de control | 6 VMs con consumos de CPU de 1,92 / 1,60 / 0,96 / 0,64 / 0,64 / 0,64 núcleos; servidores con 3,4 núcleos útiles | Nuestro algoritmo usa **2 servidores**; el algoritmo clásico *Best Fit Decreasing* usa 3 o no encuentra plan | El algoritmo elegido aprovecha mejor los servidores que la alternativa simple |
+| R2. Escenarios grandes | 60 VMs en 10 servidores y 120 VMs en 20 servidores, con 10 variantes aleatorias cada uno y distintos niveles de holgura | Encuentra plan en todos; el promedio de servidores usados coincide con el valor de referencia del diseño | Un cambio futuro en el código no empeora los resultados |
+| R3. Verificación independiente | Un plan correcto, uno con una VM sin servidor y uno que excede un servidor | Correcto / incorrecto / incorrecto | Un verificador aparte revisa cada plan antes de usarlo; un error del algoritmo no llega al clúster |
+| R4. Tiempo límite | 1500 VMs y 200 servidores con un límite de 0,05 s | Rechazo por **tiempo agotado**, en menos de 2 s | El módulo nunca deja esperando al usuario |
+| R5. Resultado repetible | La misma solicitud dos veces | Exactamente el mismo plan | El módulo es determinista: sus decisiones se pueden reproducir y explicar |
+| R6. Seguridad | Solicitud sin credencial o con una credencial falsa | Acceso denegado | Solo los componentes autorizados del orquestador pueden pedir un plan |
+| R7. Entrada inválida | Dos VMs con el mismo nombre | Solicitud rechazada por datos inválidos | Las entradas mal formadas se detectan antes de calcular |
 
-El compilador de topologías acepta `auto` y valida las VMs fijadas contra los servidores de ambos clústeres
-(`tests/app/test_topology.py`).
+#### Grupo 3 — El módulo dentro del orquestador
 
-**Demostración en ambos entornos [Probado en el clúster, MS-17]:**
+| Prueba | Salida esperada |
+|---|---|
+| O1. El plan llega al despliegue | Cada VM se despliega con el servidor del plan y, en OpenStack, también con la zona |
+| O2. Dos slices seguidos | El segundo slice tiene en cuenta lo que se asignó al primero, aunque el monitoreo aún no lo haya registrado; no se asigna dos veces el mismo espacio |
+| O3. El monitoreo no responde | El orquestador avisa que el servicio no está disponible y no despliega a ciegas |
 
-| Clúster | Slice | Plan | Comprobación independiente |
-|---|---|---|---|
-| OpenStack | 3 VMs CirrOS (1 vCPU, 512 MB, 1 GB) | `PLAN_FOUND`, 0,6 ms, vm1–3 → worker1 (consolida) | Nova `OS-EXT-SRV-ATTR:host` = worker1 en las 3 |
-| Linux | 3 VMs CirrOS | `PLAN_FOUND`, 0,3 ms, vm1–3 → server3 | Procesos `qemu-system-x86_64` solo en server3; `allocations` coincide |
+#### Cómo se demuestra que decide bien en ambos entornos
 
-Criterio de aceptación del módulo: todas las pruebas U, I y del driver en verde; en el clúster, el host de cada VM
-coincide con el plan en ambos backends; ningún slice sin plan deja recursos creados.
+1. **Con las pruebas automáticas:** los grupos 1 a 3 cubren Linux, OpenStack y el modo automático. Si todas pasan, la
+   lógica de decisión es correcta para entradas conocidas.
+2. **En los clústeres reales** (prueba hecha el 15/11/2026). Se creó un slice de 3 VMs pequeñas en cada plataforma y
+   se comparó el plan con **dónde quedaron realmente las VMs**, según la propia plataforma:
+
+   | Clúster | Plan del módulo | Verificación independiente | Resultado |
+   |---|---|---|---|
+   | OpenStack | Las 3 VMs en worker1 (consolida), calculado en 0,6 ms | OpenStack informa que las 3 VMs están en worker1 | ✅ Coincide |
+   | Linux | Las 3 VMs en server3, calculado en 0,3 ms | Los procesos de las 3 VMs corren solo en server3 | ✅ Coincide |
+   | Automático | Linux rechazó el slice (red no admitida) y se eligió OpenStack | El slice quedó desplegado en OpenStack | ✅ Coincide |
+
+**Criterio de aceptación.** El módulo se considera validado si se cumplen las tres condiciones:
+
+- todas las pruebas de los grupos 1, 2 y 3 pasan;
+- en ambos clústeres reales, cada VM quedó en el servidor que indicó el plan;
+- ningún slice rechazado dejó recursos creados.
 
 ---
 
