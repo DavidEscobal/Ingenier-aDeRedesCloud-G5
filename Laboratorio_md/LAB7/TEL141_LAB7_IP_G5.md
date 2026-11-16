@@ -361,43 +361,25 @@ hay perfil (el caso conservador); falta construir los perfiles.
 
 ### f) Diagrama de flujo del módulo de placement
 
-```mermaid
-flowchart TD
-    A([Solicitud de slice: VMs, proveedor, zona]) --> B{¿VMs con worker ya asignado?}
-    B -- Sí --> Z1[Se envía sin placement]
-    B -- No --> C[Slice Manager: candado por proveedor]
-    C --> D[Monitoreo: estado normalizado de los hosts<br/>+ planes admitidos en los últimos 90 s]
-    D --> E[VM Placement: filtrar por zona, salud y telemetría ≤ 15 s]
-    E --> F{¿Hay candidatos?}
-    F -- No --> R1[HEURISTIC_NO_PLAN: sin servidores en la zona]
-    F -- Sí --> G[Descontar VMs fijadas por el usuario]
-    G --> H{¿La VM fijada cabe?}
-    H -- No --> R2[HEURISTIC_NO_PLAN: VM fijada no cabe]
-    H -- Sí --> I[BCDP v2 con el slice completo<br/>límite 1 s]
-    I --> J{¿Plan?}
-    J -- Tiempo agotado --> R3[PLANNING_TIMEOUT]
-    J -- No --> R4[HEURISTIC_NO_PLAN + motivo del recurso escaso]
-    J -- Sí --> K[Validador independiente]
-    K -- Inválido --> R5[INVALID_OR_ERROR]
-    K -- Válido --> L{Proveedor}
-    L -- Linux --> M1[worker = host por VM]
-    L -- OpenStack --> M2[host y zona por VM<br/>availability_zone = zona:host]
-    M1 --> N[Platform-manager: reserva atómica]
-    M2 --> N
-    N --> O{¿Reserva aceptada?}
-    O -- 409 capacidad, intento < 3 --> D
-    O -- Sí --> P[Registrar plan 90 s + despliegue por el driver]
-    P --> Q([Slice READY con las VMs en los hosts del plan])
-    R1 --> X([409 al usuario con el motivo])
-    R2 --> X
-    R3 --> X
-    R4 --> X
-    R5 --> X
-```
+![Diagrama de flujo del módulo de VM Placement](diagramas/flujo_vm_placement.png)
+
+*Versión vectorial para ampliar: [`diagramas/flujo_vm_placement.svg`](diagramas/flujo_vm_placement.svg).*
+
+**Cómo leer el diagrama:**
+
+- **Símbolos:** óvalos para el inicio y el fin, un paralelogramo para la entrada, rectángulos para los procesos,
+  rombos para las decisiones y círculos «A» como conectores.
+- **Colores:** cada color indica qué componente del orquestador hace el paso (ver la leyenda).
+- **Camino central (hacia abajo):** el slice que sí se despliega.
+- **Columna de la derecha:** todos los rechazos. Terminan en un mismo fin donde el usuario recibe el motivo, sin
+  recursos creados.
+- **Línea de la izquierda:** el reintento cuando otra solicitud ocupó el espacio entre el cálculo y la reserva
+  (máximo 3 intentos).
+- **Recuadro punteado:** cómo se aplica el mismo flujo en modo automático.
 
 ### g) Plan de pruebas (unit testing)
 
-#### Idea general
+#### Cómo se prueba el módulo
 
 El módulo de VM Placement se prueba como una **caja negra**. Se le da una entrada, se lee su salida y se compara
 con la salida esperada, escrita de antemano:
@@ -405,121 +387,241 @@ con la salida esperada, escrita de antemano:
 - **Entrada:**
   - la lista de servidores, cada uno con su capacidad (núcleos, RAM, disco), lo que ya tiene en uso, su zona y si
     está sano;
-  - la lista de VMs del slice, cada una con vCPU, RAM y disco;
-  - opcionalmente, la zona de disponibilidad pedida y la plataforma (Linux, OpenStack o automático).
-- **Salida:** una de dos respuestas.
-  - **Plan encontrado:** a qué servidor va cada VM (por ejemplo, «vm1 → server2»), cuántos servidores vacíos hubo que
-    empezar a usar y qué servidores se descartaron, con el motivo.
-  - **Rechazo:** el código del rechazo y una frase con el motivo (por ejemplo, «no hay servidores en la zona z1» o «la
-    VM no cabe: RAM»).
+  - la lista de VMs del slice, con sus vCPU, RAM y disco;
+  - opcionalmente, la zona pedida y la plataforma (Linux, OpenStack o automático).
+- **Salida:**
+  - un **plan** que indica a qué servidor va cada VM (por ejemplo, «vm1 → server2»); o
+  - un **rechazo** con el motivo (por ejemplo, «no hay servidores candidatos en la zona z1»).
 
-Cada prueba es un **escenario pequeño e inventado**, armado para que la respuesta correcta se pueda calcular a mano.
-Las pruebas no usan el clúster real, así que siempre dan el mismo resultado y se ejecutan en segundos. Un solo
-comando las corre todas y muestra cuáles pasan y cuáles fallan. El grupo las ejecuta antes de integrar cualquier
-cambio.
+Cada caso usa escenarios pequeños e inventados, armados para que la respuesta correcta se pueda calcular a mano. Las
+pruebas automáticas no tocan el clúster real, así que siempre dan el mismo resultado. Al final se demuestra el
+módulo en los dos clústeres reales (casos VP-10 a VP-12).
 
-**Datos de referencia de los escenarios.** Salvo que se indique otra cosa, se usan estos valores:
+**Datos de referencia de los escenarios** (salvo que el caso indique otros valores):
 
-- **Servidor estándar:** 4 núcleos, 2,75 GB de RAM y 5 GB de disco, sano y con datos de monitoreo recientes.
+- **Servidor estándar:** 4 núcleos, 2,75 GB de RAM y 5 GB de disco.
 - **VM estándar:** 1 vCPU, 512 MB de RAM y 1 GB de disco.
 
-**Reglas que el módulo debe respetar** (explicadas en la parte e):
+**Reglas que el módulo debe respetar:**
 
-- La CPU realmente usada en un servidor no puede pasar del **85 %** de sus núcleos; con 4 núcleos, el límite son 3,4.
+- La CPU realmente usada en un servidor no puede pasar del **85 %** de sus núcleos (3,4 de 4 núcleos).
 - Se pueden asignar hasta **2 vCPU por núcleo**.
 - La RAM y el disco no se sobreasignan.
-- Si no se sabe cuánto CPU usará una VM, se supone que usará todas sus vCPU (el caso más prudente).
+- Si no se sabe cuánto usará una VM, se supone que usará todas sus vCPU.
 
-#### Grupo 1 — Las cuatro casuísticas del enunciado
+**Resultados obtenidos:**
 
-**P1. Linux: elegir servidores con recursos suficientes (CPU y RAM)**
+- **VP-01 a VP-09:** se ejecutaron el **16/11/2026** con 37 pruebas automáticas, todas aprobadas. La salida de la
+  ejecución está en [`evidencias/ejecucion_pruebas_vm_placement.txt`](evidencias/ejecucion_pruebas_vm_placement.txt).
+- **VP-10 a VP-12:** se hicieron en los clústeres reales el 15/11/2026.
 
-| Escenario | Entrada | Salida esperada | Qué demuestra |
+**Leyenda de resultados:**
+
+- **PASS:** los resultados obtenidos son iguales a los esperados.
+- **FAIL:** los resultados obtenidos no son iguales a los esperados.
+- **NT:** la prueba no se realizó.
+
+#### Resumen
+
+| Caso | Nombre | Tipo | Resultado |
 |---|---|---|---|
-| P1.1 | 3 servidores estándar vacíos; 3 VMs de 2 vCPU cada una | Plan: **una VM por servidor** | Dos VMs de 2 vCPU usarían 4 CPU, más que el límite de 3,4; el módulo las separa en vez de saturar un servidor |
-| P1.2 | Los mismos 3 servidores; 5 VMs de 1 vCPU que usan solo el 40 % de su CPU | Plan: **las 5 en un solo servidor** | Si las VMs consumen poco, el módulo consolida y deja libres los demás servidores |
-| P1.3 | server1 vacío; server2 ya ejecuta otra VM y tiene espacio; llega 1 VM | Plan: **vm1 → server2**; 0 servidores nuevos | El módulo prefiere completar un servidor que ya está en uso antes que empezar a usar uno vacío |
-| P1.4 | 2 servidores; el usuario fijó vm1 en server2; vm2 sin fijar | **vm1 → server2** (se respeta) y vm2 también va a server2 | Una elección explícita del usuario se respeta, y el servidor elegido se aprovecha para las demás VMs |
+| VP-01 | Selección de servidores con recursos suficientes en Linux | Unitaria | PASS |
+| VP-02 | Restricción de zona de disponibilidad | Unitaria | PASS |
+| VP-03 | Traducción de la decisión a OpenStack (zona:host) | Integración | PASS |
+| VP-04 | Ningún servidor cumple con los recursos pedidos | Unitaria / Integración | PASS |
+| VP-05 | Selección automática de plataforma | Unitaria / Integración | PASS |
+| VP-06 | Calidad del algoritmo frente a la alternativa clásica | Unitaria | PASS |
+| VP-07 | Robustez: verificador, tiempo límite y resultado repetible | Unitaria | PASS |
+| VP-08 | Seguridad y entradas inválidas | Unitaria | PASS |
+| VP-09 | El módulo dentro del orquestador | Integración | PASS |
+| VP-10 | Demostración en el clúster OpenStack | Funcional | PASS |
+| VP-11 | Demostración en el clúster Linux | Funcional | PASS |
+| VP-12 | Modo automático en los clústeres reales | Funcional | PASS |
 
-**P2. OpenStack: aplicar la zona de disponibilidad**
+#### VP-01 · Selección de servidores con recursos suficientes en Linux
 
-| Escenario | Entrada | Salida esperada | Qué demuestra |
-|---|---|---|---|
-| P2.1 | 4 servidores: server1 en la zona z2, server2 caído, server3 con datos de monitoreo de hace 40 s y server4 sano en z1. Se pide la **zona z1** | Plan: **vm1 → server4**. server1, server2 y server3 aparecen como descartados, cada uno con su motivo («fuera de la zona z1», «host no saludable», «telemetría vencida (40 s)») | El módulo solo considera servidores de la zona pedida, sanos y con información actualizada, y explica por qué descartó los demás |
-| P2.2 | Lo mismo, pero sin server4 | **Rechazo:** «no hay servidores candidatos en la zona z1» | Si la zona pedida no tiene dónde ubicar la VM, no se ubica en otra zona |
-| P2.3 | El plan dice «vm1 → worker2 en zona-a» y «vm2 → worker3» (zona por defecto). Se crea el slice en un OpenStack simulado | La orden enviada a OpenStack lleva `availability_zone = "zona-a:worker2"` para vm1 y `"nova:worker3"` para vm2; cada VM queda en ese compute | La decisión del módulo se traduce correctamente al mecanismo de OpenStack (zona:host) |
-| P2.4 | Una VM con zona pero sin servidor asignado | **Rechazo** al validar la solicitud | No se envían a OpenStack órdenes incompletas |
-
-**P3. Ningún servidor cumple con los recursos pedidos**
-
-| Escenario | Entrada | Salida esperada | Qué demuestra |
-|---|---|---|---|
-| P3.1 | 3 servidores estándar; **4 VMs** de 2 vCPU | **Rechazo** con el motivo «recurso más ajustado: CPU real» | Si el slice no cabe completo, se rechaza entero; nunca se despliega a medias |
-| P3.2 | Una VM fijada en server1 que pide 9999 MB de RAM | **Rechazo:** «la VM no cabe (RAM)» | Se informa qué recurso falta |
-| P3.3 | Un servidor que admite como máximo 2 vCPU; 3 VMs de 1 vCPU | **Rechazo:** «vCPU insuficiente» | Se respeta el tope de vCPU del servidor aunque la CPU real esté libre |
-| P3.4 | Una VM fijada en un servidor que no existe (server9) | **Rechazo** | Una entrada imposible no produce un plan |
-| P3.5 | Se pide crear un slice que no cabe, a través del orquestador completo | El usuario recibe un error con el motivo; **no se crea ninguna VM** ni se reserva nada | Un rechazo no deja recursos a medio crear |
-
-**P4. Modo automático: el módulo decide la plataforma**
-
-Aquí el usuario pide la plataforma «automático». El módulo calcula un plan para Linux y otro para OpenStack y se
-queda con el que **empieza a usar menos servidores vacíos**. Si empatan, elige Linux.
-
-| Escenario | Situación de los clústeres | Salida esperada |
-|---|---|---|
-| P4.1 | Linux sin RAM libre; OpenStack con espacio | Elige **OpenStack**. Cada VM lleva su compute y su zona; Linux aparece como descartado con su motivo |
-| P4.2 | En Linux habría que empezar a usar un servidor vacío; en OpenStack cabe en uno que ya está en uso | Elige **OpenStack** (0 servidores nuevos frente a 1) |
-| P4.3 | Ambas plataformas necesitan lo mismo | Elige **Linux** (regla de desempate) y no agrega datos de zona de OpenStack |
-| P4.4 | Ninguna de las dos tiene capacidad | **Rechazo** con el motivo de cada plataforma («linux: …», «openstack: …») |
-| P4.5 | Linux tiene capacidad, pero no admite la imagen pedida | Intenta Linux, recibe el rechazo y despliega en **OpenStack**; el motivo del rechazo queda registrado |
-| P4.6 | El usuario fijó una VM en worker1, que es un compute de OpenStack | Elige **OpenStack**, porque la VM fijada determina la plataforma |
-| P4.7 | Entre el cálculo del plan y la reserva, otro slice ocupó el espacio | El módulo **vuelve a calcular** el plan (2 intentos) en lugar de fallar |
-
-#### Grupo 2 — Calidad y robustez del algoritmo
-
-| Prueba | Entrada | Salida esperada | Qué demuestra |
-|---|---|---|---|
-| R1. Caso de control | 6 VMs con consumos de CPU de 1,92 / 1,60 / 0,96 / 0,64 / 0,64 / 0,64 núcleos; servidores con 3,4 núcleos útiles | Nuestro algoritmo usa **2 servidores**; el algoritmo clásico *Best Fit Decreasing* usa 3 o no encuentra plan | El algoritmo elegido aprovecha mejor los servidores que la alternativa simple |
-| R2. Escenarios grandes | 60 VMs en 10 servidores y 120 VMs en 20 servidores, con 10 variantes aleatorias cada uno y distintos niveles de holgura | Encuentra plan en todos; el promedio de servidores usados coincide con el valor de referencia del diseño | Un cambio futuro en el código no empeora los resultados |
-| R3. Verificación independiente | Un plan correcto, uno con una VM sin servidor y uno que excede un servidor | Correcto / incorrecto / incorrecto | Un verificador aparte revisa cada plan antes de usarlo; un error del algoritmo no llega al clúster |
-| R4. Tiempo límite | 1500 VMs y 200 servidores con un límite de 0,05 s | Rechazo por **tiempo agotado**, en menos de 2 s | El módulo nunca deja esperando al usuario |
-| R5. Resultado repetible | La misma solicitud dos veces | Exactamente el mismo plan | El módulo es determinista: sus decisiones se pueden reproducir y explicar |
-| R6. Seguridad | Solicitud sin credencial o con una credencial falsa | Acceso denegado | Solo los componentes autorizados del orquestador pueden pedir un plan |
-| R7. Entrada inválida | Dos VMs con el mismo nombre | Solicitud rechazada por datos inválidos | Las entradas mal formadas se detectan antes de calcular |
-
-#### Grupo 3 — El módulo dentro del orquestador
-
-| Prueba | Salida esperada |
+| Campo | Detalle |
 |---|---|
-| O1. El plan llega al despliegue | Cada VM se despliega con el servidor del plan y, en OpenStack, también con la zona |
-| O2. Dos slices seguidos | El segundo slice tiene en cuenta lo que se asignó al primero, aunque el monitoreo aún no lo haya registrado; no se asigna dos veces el mismo espacio |
-| O3. El monitoreo no responde | El orquestador avisa que el servicio no está disponible y no despliega a ciegas |
+| **Número de caso** | VP-01 |
+| **Tipo de prueba** | Unitaria |
+| **Objetivos** | Verificar que el módulo elige servidores Linux con CPU y RAM suficientes, sin saturar ninguno, y que aprovecha bien los servidores. |
+| **Prerrequisitos** | • Código del orquestador con las dependencias instaladas.<br>• No se necesita acceso al clúster. |
+| **Procedimiento** | 1. Escenario A: 3 servidores estándar vacíos y 3 VMs de 2 vCPU cada una.<br>2. Escenario B: los mismos servidores y 5 VMs de 1 vCPU que usan el 40 % de su CPU.<br>3. Escenario C: server1 vacío y server2 ya ocupado con espacio libre; llega 1 VM.<br>4. Escenario D: el usuario fija vm1 en server2; vm2 no está fijada.<br>5. Pedir el plan al módulo en cada escenario y compararlo con el esperado. |
+| **Resultados esperados** | • A: **una VM por servidor**. Dos VMs de 2 vCPU sumarían 4 CPU, más que el límite de 3,4.<br>• B: **las 5 VMs en un solo servidor**, porque consumen poco.<br>• C: **vm1 → server2**; no se ocupa ningún servidor vacío.<br>• D: **vm1 → server2**, como pidió el usuario, y vm2 también va a server2. |
+| **Resultados obtenidos** | **PASS**. Los cuatro escenarios dieron exactamente el plan esperado. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | El escenario A también muestra la regla del 85 %: con 4 VMs de 2 vCPU el slice ya no cabe (ver VP-04). |
 
-#### Cómo se demuestra que decide bien en ambos entornos
+#### VP-02 · Restricción de zona de disponibilidad
 
-1. **Con las pruebas automáticas:** los grupos 1 a 3 cubren Linux, OpenStack y el modo automático. Si todas pasan, la
-   lógica de decisión es correcta para entradas conocidas.
-2. **En los clústeres reales** (prueba hecha el 15/11/2026). Se creó un slice de 3 VMs pequeñas en cada plataforma y
-   se comparó el plan con **dónde quedaron realmente las VMs**, según la propia plataforma:
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-02 |
+| **Tipo de prueba** | Unitaria |
+| **Objetivos** | Verificar que el módulo solo considera servidores de la zona pedida, sanos y con información actualizada, y que explica por qué descarta los demás. |
+| **Prerrequisitos** | • Igual que VP-01. |
+| **Procedimiento** | 1. Preparar 4 servidores:<br>   • server1 en la zona z2;<br>   • server2 caído;<br>   • server3 con datos de monitoreo de hace 40 s;<br>   • server4 sano y al día en z1.<br>2. Pedir un plan para 1 VM en la **zona z1**.<br>3. Repetir sin server4. |
+| **Resultados esperados** | • Paso 2: **vm1 → server4**. Los otros tres servidores aparecen como descartados, cada uno con su motivo: «fuera de la zona z1», «host no saludable o en mantenimiento» y «telemetría vencida (40 s)».<br>• Paso 3: **rechazo** «no hay servidores candidatos en la zona z1». La VM no se coloca en otra zona. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | La misma regla de zonas se aplica en Linux y en OpenStack. En el clúster real solo existe la zona `nova` de OpenStack (ver Limitaciones). |
 
-   | Clúster | Plan del módulo | Verificación independiente | Resultado |
-   |---|---|---|---|
-   | OpenStack | Las 3 VMs en worker1 (consolida), calculado en 0,6 ms | OpenStack informa que las 3 VMs están en worker1 | ✅ Coincide |
-   | Linux | Las 3 VMs en server3, calculado en 0,3 ms | Los procesos de las 3 VMs corren solo en server3 | ✅ Coincide |
-   | Automático | Linux rechazó el slice (red no admitida) y se eligió OpenStack | El slice quedó desplegado en OpenStack | ✅ Coincide |
+#### VP-03 · Traducción de la decisión a OpenStack (zona:host)
 
-**Criterio de aceptación.** El módulo se considera validado si se cumplen las tres condiciones:
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-03 |
+| **Tipo de prueba** | Integración (con un OpenStack simulado) |
+| **Objetivos** | Verificar que la decisión del módulo («VM → compute, zona») se convierte correctamente en la orden que entiende OpenStack, y que cada VM queda en el compute elegido. |
+| **Prerrequisitos** | • Igual que VP-01.<br>• Se usa un OpenStack simulado que responde como Nova y Neutron. |
+| **Procedimiento** | 1. Crear un slice de 3 VMs con esta decisión:<br>   • vm1 → worker2 en zona-a;<br>   • vm2 → worker3 en la zona por defecto;<br>   • vm3 sin decisión.<br>2. Revisar la orden enviada a OpenStack para cada VM y el compute donde quedó.<br>3. Enviar una VM con zona pero sin compute. |
+| **Resultados esperados** | • vm1 se crea con `availability_zone = "zona-a:worker2"` y queda en worker2.<br>• vm2 se crea con `"nova:worker3"` y queda en worker3.<br>• vm3 no lleva zona; la ubica OpenStack.<br>• La VM del paso 3 se **rechaza** antes de enviarla. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | El mismo mecanismo se comprobó en el clúster real en VP-10. |
 
-- todas las pruebas de los grupos 1, 2 y 3 pasan;
-- en ambos clústeres reales, cada VM quedó en el servidor que indicó el plan;
-- ningún slice rechazado dejó recursos creados.
+#### VP-04 · Ningún servidor cumple con los recursos pedidos
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-04 |
+| **Tipo de prueba** | Unitaria e integración |
+| **Objetivos** | Verificar que, cuando el slice no cabe, el módulo lo rechaza completo, indica qué recurso falta y no deja nada creado. |
+| **Prerrequisitos** | • Igual que VP-01. |
+| **Procedimiento** | 1. Pedir un plan para 4 VMs de 2 vCPU en 3 servidores estándar.<br>2. Fijar en server1 una VM que pide 9999 MB de RAM.<br>3. Usar un servidor que admite como máximo 2 vCPU con 3 VMs de 1 vCPU.<br>4. Fijar una VM en un servidor que no existe (server9).<br>5. A través del orquestador completo, crear un slice que no cabe en ningún servidor. |
+| **Resultados esperados** | 1. Rechazo: «recurso más ajustado: CPU real».<br>2. Rechazo: «no cabe (RAM)».<br>3. Rechazo: «vCPU insuficiente».<br>4. Rechazo.<br>5. El usuario recibe un error con el motivo, la solicitud **no llega a la plataforma** y no se crea ninguna VM. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | Un slice nunca se despliega a medias: o caben todas sus VMs o no se crea ninguna. |
+
+#### VP-05 · Selección automática de plataforma
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-05 |
+| **Tipo de prueba** | Unitaria e integración |
+| **Objetivos** | Verificar que, cuando la entrada indica plataforma «automático», el módulo elige bien entre Linux y OpenStack. Regla: se elige la que ocupa menos servidores vacíos; en caso de empate, Linux. |
+| **Prerrequisitos** | • Igual que VP-01.<br>• Se simulan ambos clústeres. |
+| **Procedimiento** | Pedir un slice en modo automático en cada situación:<br>1. Linux sin RAM libre; OpenStack con espacio.<br>2. Linux tendría que ocupar un servidor vacío; en OpenStack cabe en uno que ya está en uso.<br>3. Ambas plataformas necesitan lo mismo.<br>4. Ninguna de las dos tiene capacidad.<br>5. Linux tiene espacio pero no admite la imagen pedida.<br>6. El usuario fijó una VM en worker1, que es un compute de OpenStack.<br>7. Otro slice ocupa el espacio entre el cálculo y la reserva. |
+| **Resultados esperados** | 1. OpenStack; Linux queda descartado con su motivo.<br>2. OpenStack (0 servidores nuevos frente a 1).<br>3. Linux, por la regla de empate.<br>4. Rechazo con el motivo de cada plataforma.<br>5. Se intenta Linux, se recibe su rechazo y se despliega en OpenStack.<br>6. OpenStack, porque la VM fijada determina la plataforma.<br>7. Se vuelve a calcular el plan (2.º intento) en lugar de fallar. |
+| **Resultados obtenidos** | **PASS** en las 7 situaciones. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | El caso 5 también se reprodujo en el clúster real (VP-12). |
+
+#### VP-06 · Calidad del algoritmo frente a la alternativa clásica
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-06 |
+| **Tipo de prueba** | Unitaria |
+| **Objetivos** | Verificar que el algoritmo elegido (BCDP v2) aprovecha mejor los servidores que el clásico *Best Fit Decreasing* (BFD) y que un cambio futuro en el código no empeora sus resultados. |
+| **Prerrequisitos** | • Igual que VP-01. |
+| **Procedimiento** | 1. **Caso de control:** 6 VMs que consumen 1,92 / 1,60 / 0,96 / 0,64 / 0,64 / 0,64 núcleos, en 2 y en 3 servidores con 3,4 núcleos útiles. Resolverlo con BCDP v2 y con BFD.<br>2. **Escenarios grandes:** 60 VMs en 10 servidores y 120 VMs en 20 servidores, con 10 variantes aleatorias de cada uno y distintos márgenes de capacidad. |
+| **Resultados esperados** | • Paso 1: BCDP v2 usa **2 servidores**; BFD usa 3 o no encuentra plan.<br>• Paso 2: hay plan en todas las variantes y el promedio de servidores usados coincide con el valor de referencia obtenido al diseñar el algoritmo. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | Usar menos servidores deja más capacidad libre para los slices siguientes. |
+
+#### VP-07 · Robustez: verificador, tiempo límite y resultado repetible
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-07 |
+| **Tipo de prueba** | Unitaria |
+| **Objetivos** | Verificar que un plan incorrecto nunca llega al clúster, que el módulo responde a tiempo y que sus decisiones se pueden reproducir. |
+| **Prerrequisitos** | • Igual que VP-01. |
+| **Procedimiento** | 1. Dar al verificador independiente tres planes: uno correcto, uno con una VM sin servidor y uno que excede la capacidad de un servidor.<br>2. Pedir un plan para 1500 VMs y 200 servidores con un límite de 0,05 s.<br>3. Hacer la misma solicitud dos veces. |
+| **Resultados esperados** | 1. Correcto / incorrecto / incorrecto.<br>2. Rechazo por **tiempo agotado**, con respuesta en menos de 2 s.<br>3. Exactamente el mismo plan las dos veces. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | En operación normal el límite es 1 s. En el clúster real, los planes se calcularon en menos de 1 ms (VP-10 y VP-11). |
+
+#### VP-08 · Seguridad y entradas inválidas
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-08 |
+| **Tipo de prueba** | Unitaria |
+| **Objetivos** | Verificar que solo los componentes autorizados del orquestador pueden pedir un plan y que las entradas mal formadas se rechazan antes de calcular. |
+| **Prerrequisitos** | • Igual que VP-01. |
+| **Procedimiento** | 1. Pedir un plan sin credencial y con una credencial falsa.<br>2. Pedir un plan con credencial válida y una VM fijada.<br>3. Pedir un plan con dos VMs con el mismo nombre. |
+| **Resultados esperados** | 1. Acceso denegado.<br>2. Plan encontrado, respetando la VM fijada.<br>3. Solicitud rechazada por datos inválidos. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | — |
+
+#### VP-09 · El módulo dentro del orquestador
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-09 |
+| **Tipo de prueba** | Integración |
+| **Objetivos** | Verificar que el plan llega correctamente al despliegue y que el orquestador se comporta bien en situaciones de concurrencia y de falla. |
+| **Prerrequisitos** | • Igual que VP-01.<br>• Se simulan el monitoreo y la plataforma. |
+| **Procedimiento** | 1. Crear un slice y revisar lo que se envía a desplegar.<br>2. Crear dos slices seguidos antes de que el monitoreo registre el primero.<br>3. Simular que la reserva falla porque otro slice ocupó el espacio.<br>4. Simular que el monitoreo no responde. |
+| **Resultados esperados** | 1. Cada VM va con el servidor del plan y, en OpenStack, también con la zona.<br>2. El segundo slice tiene en cuenta lo asignado al primero; no se asigna dos veces el mismo espacio.<br>3. Se vuelve a calcular el plan y se reintenta.<br>4. El orquestador avisa que el servicio no está disponible y no despliega sin información. |
+| **Resultados obtenidos** | **PASS**. |
+| **Evidencias** | Salida de la ejecución de las pruebas automáticas. |
+| **Comentarios y/o observaciones** | — |
+
+#### VP-10 · Demostración en el clúster OpenStack
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-10 |
+| **Tipo de prueba** | Funcional / Integración (clúster real) |
+| **Objetivos** | Demostrar que, en OpenStack, las VMs quedan en el compute que decidió el módulo. |
+| **Prerrequisitos** | • Orquestador desplegado en el app server.<br>• Sesión iniciada en la interfaz web.<br>• Acceso de solo lectura a OpenStack para verificar. |
+| **Procedimiento** | 1. Ingresar al sistema.<br>2. Crear un slice de 3 VMs CirrOS (1 vCPU, 512 MB, 1 GB) en OpenStack.<br>3. Anotar el plan que devuelve el módulo.<br>4. Consultar a OpenStack en qué compute quedó cada VM (atributo *host* de la instancia).<br>5. Borrar el slice. |
+| **Resultados esperados** | • Plan encontrado.<br>• El compute que informa OpenStack para cada VM coincide con el plan.<br>• Las instancias quedan en estado ACTIVE. |
+| **Resultados obtenidos** | **PASS** (15/11/2026). El plan se calculó en 0,6 ms y puso vm1–vm3 en worker1, consolidando en un solo compute. OpenStack informó worker1 para las 3 VMs. |
+| **Evidencias** | Registro de la prueba en el clúster (evidencia MS-17 del proyecto) con la respuesta del módulo y la consulta a OpenStack. |
+| **Comentarios y/o observaciones** | El slice se borró en 15 s. |
+
+#### VP-11 · Demostración en el clúster Linux
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-11 |
+| **Tipo de prueba** | Funcional / Integración (clúster real) |
+| **Objetivos** | Demostrar que, en el clúster Linux, las VMs se ejecutan en el servidor que decidió el módulo. |
+| **Prerrequisitos** | • Igual que VP-10.<br>• Agentes del orquestador activos en los servidores Linux. |
+| **Procedimiento** | 1. Ingresar al sistema.<br>2. Crear un slice de 3 VMs CirrOS en Linux.<br>3. Anotar el plan.<br>4. Revisar en cada servidor qué procesos de VM (`qemu-system-x86_64`) están corriendo.<br>5. Borrar el slice. |
+| **Resultados esperados** | • Plan encontrado.<br>• Los procesos de las 3 VMs corren solo en el servidor del plan.<br>• Las reservas del orquestador coinciden con el plan. |
+| **Resultados obtenidos** | **PASS** (15/11/2026). El plan se calculó en 0,3 ms y puso vm1–vm3 en server3. Los procesos de las 3 VMs corrían solo en server3. |
+| **Evidencias** | Registro de la prueba en el clúster (evidencia MS-17 del proyecto). |
+| **Comentarios y/o observaciones** | — |
+
+#### VP-12 · Modo automático en los clústeres reales
+
+| Campo | Detalle |
+|---|---|
+| **Número de caso** | VP-12 |
+| **Tipo de prueba** | Funcional / Integración (clúster real) |
+| **Objetivos** | Demostrar que, en modo automático, el orquestador decide la plataforma con los clústeres reales y que pasa a la otra si la elegida rechaza la solicitud. |
+| **Prerrequisitos** | • Igual que VP-10. |
+| **Procedimiento** | 1. Crear un slice CirrOS con plataforma «automático», con una red que el clúster Linux no admite.<br>2. Revisar qué plataforma eligió el módulo, el motivo del rechazo y dónde quedó el slice. |
+| **Resultados esperados** | • Linux rechaza la solicitud e indica el motivo.<br>• El orquestador despliega el slice en OpenStack sin intervención del usuario. |
+| **Resultados obtenidos** | **PASS** (15/11/2026). Linux ganó el desempate, pero rechazó la red privada pedida. El slice se desplegó en OpenStack. |
+| **Evidencias** | Registro de la prueba en el clúster (evidencia MS-20 del proyecto). |
+| **Comentarios y/o observaciones** | Corresponde a la situación 5 de VP-05, ahora con los clústeres reales. |
+
+#### Criterio de aceptación del módulo
+
+El módulo se considera validado si se cumplen las tres condiciones:
+
+- los casos VP-01 a VP-09 dan PASS;
+- en ambos clústeres reales, cada VM queda en el servidor que indicó el plan (VP-10 a VP-12);
+- ningún slice rechazado deja recursos creados.
+
+**Estado al 16/11/2026: los 12 casos en PASS.**
 
 ---
 
 ## Limitaciones y pendientes declarados
 
 - Zonas reales: el clúster tiene solo `nova` (OpenStack) y `linux`; crear agregados con zona requiere al JP.
-- Selección automática de plataforma: implementada y probada con tests (A1–A6); falta probarla en el clúster real.
+- Selección automática de plataforma: implementada, con pruebas automáticas (VP-05) y probada en los clústeres reales (VP-12).
 - Perfil P99 de CPU por tipo de VM: diseño; hoy demanda completa sin perfil.
 - Disco en Linux: con reserva completa, una VM Ubuntu de 4 GB no cabe en servidores con ≈ 6,5 GB libres; se
   evalúa aprovisionamiento delgado o ampliar disco (consulta al JP).

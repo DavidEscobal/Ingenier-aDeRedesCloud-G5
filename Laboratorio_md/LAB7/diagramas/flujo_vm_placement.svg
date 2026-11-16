@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="2140" viewBox="0 0 1120 2140" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#34495E"/></marker></defs>
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<text x="560.0" y="30.0" font-size="20" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Diagrama de flujo del módulo de VM Placement (orquestador G5)</text>
+<rect x="700" y="70" width="370" height="225" rx="6" fill="#FFFFFF" stroke="#AAB7B8"/>
+<text x="714" y="94" font-size="14" font-weight="bold" fill="#1B2631">Leyenda</text>
+<rect x="714" y="110" width="26" height="16" rx="3" fill="#DCEBFB" stroke="#2F6FB0" stroke-width="1.5"/>
+<text x="750" y="123" font-size="13" fill="#1B2631">Slice Manager</text>
+<rect x="714" y="135" width="26" height="16" rx="3" fill="#DFF3E3" stroke="#2E8B57" stroke-width="1.5"/>
+<text x="750" y="148" font-size="13" fill="#1B2631">Monitoreo</text>
+<rect x="714" y="160" width="26" height="16" rx="3" fill="#FFF1D6" stroke="#C98A12" stroke-width="1.5"/>
+<text x="750" y="173" font-size="13" fill="#1B2631">VM Placement</text>
+<rect x="714" y="185" width="26" height="16" rx="3" fill="#EDE3F7" stroke="#7B4FB0" stroke-width="1.5"/>
+<text x="750" y="198" font-size="13" fill="#1B2631">Platform-manager (reserva y despliegue)</text>
+<rect x="714" y="210" width="26" height="16" rx="3" fill="#FBE3E3" stroke="#C0392B" stroke-width="1.5"/>
+<text x="750" y="223" font-size="13" fill="#1B2631">Rechazo (se informa al usuario)</text>
+<polygon points="727,235 740,244 727,253 714,244" fill="#FFFFFF" stroke="#34495E" stroke-width="1.5"/>
+<text x="750" y="249" font-size="13" fill="#1B2631">Decisión</text>
+<circle cx="900" cy="244" r="9" fill="#FFFFFF" stroke="#2E4053" stroke-width="1.5"/>
+<text x="916" y="249" font-size="13" fill="#1B2631">Conector</text>
+<rect x="330.0" y="58.0" width="200" height="44" rx="22" fill="#2E4053" stroke="#2E4053" stroke-width="2"/>
+<text x="430.0" y="80.0" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle" dominant-baseline="middle">INICIO</text>
+<polyline points="430,102 430,128" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="258.0,130.0 638.0,130.0 602.0,190.0 222.0,190.0" fill="#F4F6F7" stroke="#566573" stroke-width="2"/>
+<text x="430.0" y="151.2" font-size="14" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Solicitud de slice: VMs (vCPU, RAM, disco),</text>
+<text x="430.0" y="168.8" font-size="14" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">plataforma (Linux, OpenStack o automático) y zona</text>
+<polyline points="430,190 430,218" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="430.0,218.0 580.0,270.0 430.0,322.0 280.0,270.0" fill="#FFFFFF" stroke="#2F6FB0" stroke-width="2"/>
+<text x="430.0" y="261.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿Todas las VMs ya tienen</text>
+<text x="430.0" y="278.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">servidor asignado?</text>
+<polyline points="280,270 168,270" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="255" y="262" font-size="13" font-weight="bold" fill="#34495E" text-anchor="end">Sí</text>
+<circle cx="150" cy="270" r="18" fill="#FFFFFF" stroke="#2E4053" stroke-width="2"/>
+<text x="150.0" y="270.0" font-size="15" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">A</text>
+<polyline points="430,322 430,352" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="438" y="342" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">No</text>
+<rect x="250.0" y="353.0" width="360" height="54" rx="6" fill="#DCEBFB" stroke="#2F6FB0" stroke-width="2"/>
+<text x="430.0" y="371.2" font-size="14" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Bloquear la plataforma</text>
+<text x="430.0" y="388.8" font-size="14" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(se planifica una solicitud a la vez)</text>
+<polyline points="430,407 430,437" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="250.0" y="438.0" width="360" height="64" rx="6" fill="#DFF3E3" stroke="#2E8B57" stroke-width="2"/>
+<text x="430.0" y="453.8" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Obtener el estado de los servidores</text>
+<text x="430.0" y="470.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(capacidad, uso, salud, zona) y los planes</text>
+<text x="430.0" y="486.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">admitidos en los últimos 90 s</text>
+<polyline points="430,502 430,532" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="250.0" y="533.0" width="360" height="64" rx="6" fill="#FFF1D6" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="548.8" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Filtrar servidores candidatos:</text>
+<text x="430.0" y="565.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">de la zona pedida, sanos y con datos</text>
+<text x="430.0" y="581.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">de hace 15 s o menos</text>
+<polyline points="430,597 430,625" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="430.0,625.0 580.0,675.0 430.0,725.0 280.0,675.0" fill="#FFFFFF" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="666.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿Queda algún</text>
+<text x="430.0" y="683.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">servidor candidato?</text>
+<polyline points="430,725 430,755" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="438" y="745" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">Sí</text>
+<rect x="250.0" y="755.0" width="360" height="54" rx="6" fill="#FFF1D6" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="773.2" font-size="14" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Ubicar primero las VMs que el</text>
+<text x="430.0" y="790.8" font-size="14" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">usuario fijó en un servidor</text>
+<polyline points="430,809 430,837" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="430.0,837.0 580.0,887.0 430.0,937.0 280.0,887.0" fill="#FFFFFF" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="878.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿Las VMs fijadas</text>
+<text x="430.0" y="895.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">caben en su servidor?</text>
+<polyline points="430,937 430,967" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="438" y="957" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">Sí</text>
+<rect x="240.0" y="967.0" width="380" height="66" rx="6" fill="#FFF1D6" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="983.8" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Ejecutar BCDP v2 con el slice completo</text>
+<text x="430.0" y="1000.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(llenar primero servidores ya en uso; abrir el</text>
+<text x="430.0" y="1016.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">menor número de servidores vacíos; límite 1 s)</text>
+<polyline points="430,1033 430,1061" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="430.0,1061.0 580.0,1111.0 430.0,1161.0 280.0,1111.0" fill="#FFFFFF" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="1102.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿Se encontró un plan</text>
+<text x="430.0" y="1119.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">dentro del tiempo?</text>
+<polyline points="430,1161 430,1191" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="438" y="1181" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">Sí</text>
+<rect x="250.0" y="1191.0" width="360" height="54" rx="6" fill="#FFF1D6" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="1209.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Revisar el plan con un verificador</text>
+<text x="430.0" y="1226.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">independiente (capacidades y asignaciones)</text>
+<polyline points="430,1245 430,1273" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="430.0,1273.0 580.0,1323.0 430.0,1373.0 280.0,1323.0" fill="#FFFFFF" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="1323.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿El plan es válido?</text>
+<polyline points="430,1373 430,1401" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="438" y="1393" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">Sí</text>
+<polygon points="430.0,1401.0 560.0,1451.0 430.0,1501.0 300.0,1451.0" fill="#FFFFFF" stroke="#C98A12" stroke-width="2"/>
+<text x="430.0" y="1442.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿Plataforma</text>
+<text x="430.0" y="1459.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">del slice?</text>
+<polyline points="300,1451 250,1451 250,1507" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="290" y="1443" font-size="13" font-weight="bold" fill="#34495E" text-anchor="end">Linux</text>
+<polyline points="560,1451 610,1451 610,1507" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="570" y="1443" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">OpenStack</text>
+<rect x="130.0" y="1507.0" width="240" height="66" rx="6" fill="#FFF1D6" stroke="#C98A12" stroke-width="2"/>
+<text x="250.0" y="1531.9" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Decisión para Linux</text>
+<text x="250.0" y="1548.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">worker = servidor del plan</text>
+<rect x="480.0" y="1507.0" width="260" height="66" rx="6" fill="#FFF1D6" stroke="#C98A12" stroke-width="2"/>
+<text x="610.0" y="1531.9" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Decisión para OpenStack</text>
+<text x="610.0" y="1548.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">availability_zone = «zona:host»</text>
+<polyline points="250,1573 250,1600 430,1600" fill="none" stroke="#34495E" stroke-width="1.8"/>
+<polyline points="610,1573 610,1600 430,1600 430,1628" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<circle cx="150" cy="1660" r="18" fill="#FFFFFF" stroke="#2E4053" stroke-width="2"/>
+<text x="150.0" y="1660.0" font-size="15" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">A</text>
+<polyline points="168,1660 248,1660" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="250.0" y="1628.0" width="360" height="64" rx="6" fill="#EDE3F7" stroke="#7B4FB0" stroke-width="2"/>
+<text x="430.0" y="1643.8" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Reservar los recursos de forma atómica</text>
+<text x="430.0" y="1660.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(si otra solicitud ocupó el espacio,</text>
+<text x="430.0" y="1676.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">la reserva falla)</text>
+<polyline points="430,1692 430,1720" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<polygon points="430.0,1720.0 580.0,1772.0 430.0,1824.0 280.0,1772.0" fill="#FFFFFF" stroke="#2F6FB0" stroke-width="2"/>
+<text x="430.0" y="1763.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">¿Reserva</text>
+<text x="430.0" y="1780.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">aceptada?</text>
+<polyline points="280,1772 90,1772 90,470 248,470" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="100" y="1796" font-size="13" font-weight="bold" fill="#34495E">No, por capacidad</text>
+<text x="100" y="1812" font-size="13" font-weight="bold" fill="#34495E">(intento &lt; 3): replanificar</text>
+<polyline points="430,1824 430,1854" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="438" y="1844" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">Sí</text>
+<rect x="240.0" y="1856.0" width="380" height="64" rx="6" fill="#EDE3F7" stroke="#7B4FB0" stroke-width="2"/>
+<text x="430.0" y="1879.9" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">Registrar el plan (90 s) y desplegar las VMs</text>
+<text x="430.0" y="1896.1" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">con el driver de la plataforma</text>
+<polyline points="430,1920 430,1950" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="220.0" y="1952.0" width="420" height="66" rx="33" fill="#2E4053" stroke="#2E4053" stroke-width="2"/>
+<text x="430.0" y="1976.2" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle" dominant-baseline="middle">FIN: slice desplegado,</text>
+<text x="430.0" y="1993.8" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle" dominant-baseline="middle">cada VM en el servidor indicado por el plan</text>
+<polyline points="580,675 750,675" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="590" y="667" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">No</text>
+<rect x="750.0" y="640.0" width="240" height="70" rx="6" fill="#FBE3E3" stroke="#C0392B" stroke-width="2"/>
+<text x="870.0" y="658.8" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Rechazo</text>
+<text x="870.0" y="675.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">no hay servidores candidatos</text>
+<text x="870.0" y="691.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">en la zona pedida</text>
+<polyline points="990,675 1060,675" fill="none" stroke="#34495E" stroke-width="1.8"/>
+<polyline points="580,887 750,887" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="590" y="879" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">No</text>
+<rect x="750.0" y="852.0" width="240" height="70" rx="6" fill="#FBE3E3" stroke="#C0392B" stroke-width="2"/>
+<text x="870.0" y="870.8" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Rechazo</text>
+<text x="870.0" y="887.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">la VM fijada no cabe</text>
+<text x="870.0" y="903.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(se indica el recurso: CPU, RAM o disco)</text>
+<polyline points="990,887 1060,887" fill="none" stroke="#34495E" stroke-width="1.8"/>
+<polyline points="580,1111 750,1111" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="590" y="1103" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">No</text>
+<rect x="750.0" y="1076.0" width="240" height="70" rx="6" fill="#FBE3E3" stroke="#C0392B" stroke-width="2"/>
+<text x="870.0" y="1094.8" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Rechazo</text>
+<text x="870.0" y="1111.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">sin plan o tiempo agotado</text>
+<text x="870.0" y="1127.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(se indica el recurso más escaso)</text>
+<polyline points="990,1111 1060,1111" fill="none" stroke="#34495E" stroke-width="1.8"/>
+<polyline points="580,1323 750,1323" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="590" y="1315" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">No</text>
+<rect x="750.0" y="1288.0" width="240" height="70" rx="6" fill="#FBE3E3" stroke="#C0392B" stroke-width="2"/>
+<text x="870.0" y="1306.8" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Rechazo</text>
+<text x="870.0" y="1323.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">plan inválido (error interno);</text>
+<text x="870.0" y="1339.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">no se despliega nada</text>
+<polyline points="990,1323 1060,1323" fill="none" stroke="#34495E" stroke-width="1.8"/>
+<polyline points="580,1772 750,1772" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="590" y="1764" font-size="13" font-weight="bold" fill="#34495E" text-anchor="start">No</text>
+<rect x="750.0" y="1737.0" width="240" height="70" rx="6" fill="#FBE3E3" stroke="#C0392B" stroke-width="2"/>
+<text x="870.0" y="1755.8" font-size="13" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Rechazo</text>
+<text x="870.0" y="1772.0" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">la plataforma no aceptó la reserva</text>
+<text x="870.0" y="1788.2" font-size="13" fill="#1B2631" font-weight="normal" text-anchor="middle" dominant-baseline="middle">(otro motivo o 3 intentos fallidos)</text>
+<polyline points="990,1772 1060,1772" fill="none" stroke="#34495E" stroke-width="1.8"/>
+<polyline points="1060,675 1060,2085 1020,2085" fill="none" stroke="#34495E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="720.0" y="2055.0" width="300" height="60" rx="30" fill="#FBE3E3" stroke="#C0392B" stroke-width="2"/>
+<text x="870.0" y="2076.2" font-size="14" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">FIN: el usuario recibe el motivo</text>
+<text x="870.0" y="2093.8" font-size="14" fill="#1B2631" font-weight="bold" text-anchor="middle" dominant-baseline="middle">(no queda ningún recurso creado)</text>
+<rect x="690" y="345" width="400" height="152" rx="4" fill="#FEF9E7" stroke="#B7950B" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="702" y="367.0" font-size="13" fill="#1B2631" font-weight="bold">Modo automático (plataforma «auto»)</text>
+<text x="702" y="383.9" font-size="13" fill="#1B2631" font-weight="normal">Los pasos desde «Obtener el estado» hasta</text>
+<text x="702" y="400.8" font-size="13" fill="#1B2631" font-weight="normal">«Revisar el plan» se hacen para Linux y para</text>
+<text x="702" y="417.7" font-size="13" fill="#1B2631" font-weight="normal">OpenStack. Se elige el plan que abre menos</text>
+<text x="702" y="434.6" font-size="13" fill="#1B2631" font-weight="normal">servidores vacíos (empate: Linux). Si la</text>
+<text x="702" y="451.5" font-size="13" fill="#1B2631" font-weight="normal">plataforma elegida rechaza la solicitud, se</text>
+<text x="702" y="468.4" font-size="13" fill="#1B2631" font-weight="normal">despliega en la otra.</text>
+<line x1="612" y1="470" x2="688" y2="440" stroke="#B7950B" stroke-width="1.5" stroke-dasharray="6 4"/>
+</svg>

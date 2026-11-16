@@ -1,0 +1,46 @@
+Ejecución de las pruebas automáticas del módulo de VM Placement — 2026-11-16 23:01 UTC, rama fase2 (81252e5)
+
+== Algoritmo, servicio, integración con el Slice Manager, modo automático y topologías
+test_plan (test_placement.Api.test_plan) ... ok
+test_requiere_token (test_placement.Api.test_requiere_token) ... ok
+test_valida_entrada (test_placement.Api.test_valida_entrada) ... ok
+test_bfd_peor_en_control (test_placement.Engine.test_bfd_peor_en_control) ... ok
+test_control_hld_z2 (test_placement.Engine.test_control_hld_z2) ... ok
+test_regresion_guia (test_placement.Engine.test_regresion_guia) ... ok
+test_validador (test_placement.Engine.test_validador) ... ok
+test_consolida_con_cpu_prevista (test_placement.Planner.test_consolida_con_cpu_prevista) ... ok
+test_determinista (test_placement.Planner.test_determinista) ... ok
+test_prefiere_host_ocupado (test_placement.Planner.test_prefiere_host_ocupado) ... ok
+test_slice_referencia_sin_telemetria (test_placement.Planner.test_slice_referencia_sin_telemetria) ... ok
+test_timeout (test_placement.Planner.test_timeout) ... ok
+test_tope_de_vcpu (test_placement.Planner.test_tope_de_vcpu) ... ok
+test_vm_fijada (test_placement.Planner.test_vm_fijada) ... ok
+test_zona_salud_y_telemetria (test_placement.Planner.test_zona_salud_y_telemetria) ... ok
+test_a1_elige_el_unico_proveedor_con_capacidad (test_slice_placement.AutoProvider.test_a1_elige_el_unico_proveedor_con_capacidad) ... ok
+test_a2_elige_el_que_abre_menos_hosts_nuevos (test_slice_placement.AutoProvider.test_a2_elige_el_que_abre_menos_hosts_nuevos) ... ok
+test_a3_empate_prefiere_linux (test_slice_placement.AutoProvider.test_a3_empate_prefiere_linux) ... ok
+test_a4_ninguno_puede_rechaza_con_el_motivo_de_cada_uno (test_slice_placement.AutoProvider.test_a4_ninguno_puede_rechaza_con_el_motivo_de_cada_uno) ... ok
+test_a5_si_la_plataforma_rechaza_la_spec_prueba_la_siguiente (test_slice_placement.AutoProvider.test_a5_si_la_plataforma_rechaza_la_spec_prueba_la_siguiente) ... ok
+test_vm_fijada_decide_la_plataforma_y_carrera_perdida_replanifica (test_slice_placement.AutoProvider.test_vm_fijada_decide_la_plataforma_y_carrera_perdida_replanifica) ... ok
+test_monitoreo_caido_o_spec_incompleta (test_slice_placement.SlicePlacement.test_monitoreo_caido_o_spec_incompleta) ... ok
+test_plan_escribe_host_y_zona (test_slice_placement.SlicePlacement.test_plan_escribe_host_y_zona) ... ok
+test_registro_de_planes_recientes_evita_doble_asignacion (test_slice_placement.SlicePlacement.test_registro_de_planes_recientes_evita_doble_asignacion) ... ok
+test_reintenta_si_la_reserva_fallo_por_capacidad (test_slice_placement.SlicePlacement.test_reintenta_si_la_reserva_fallo_por_capacidad) ... ok
+test_sin_recursos_rechaza_con_motivo (test_slice_placement.SlicePlacement.test_sin_recursos_rechaza_con_motivo) ... ok
+test_vm_fijada_por_el_usuario (test_slice_placement.SlicePlacement.test_vm_fijada_por_el_usuario) ... ok
+test_addressing_is_deterministic_and_keeps_last_octet_per_node (test_topology.GeneratorTests.test_addressing_is_deterministic_and_keeps_last_octet_per_node) ... ok
+test_combining_renames_collisions_and_links_both_parts (test_topology.GeneratorTests.test_combining_renames_collisions_and_links_both_parts) ... ok
+test_every_generator_compiles_to_a_spec_the_engine_accepts (test_topology.GeneratorTests.test_every_generator_compiles_to_a_spec_the_engine_accepts) ... ok
+test_limits_and_invalid_documents_are_explained (test_topology.GeneratorTests.test_limits_and_invalid_documents_are_explained) ... ok
+test_semantics_bus_is_one_shared_segment_and_lineal_is_point_to_point (test_topology.GeneratorTests.test_semantics_bus_is_one_shared_segment_and_lineal_is_point_to_point) ... ok
+test_drafts_are_private_versioned_and_round_trip_as_export (test_topology.TopologyServiceTests.test_drafts_are_private_versioned_and_round_trip_as_export) ... ok
+test_errors_are_readable_and_auth_is_required (test_topology.TopologyServiceTests.test_errors_are_readable_and_auth_is_required) ... ok
+test_generate_combine_and_compile_through_gateway (test_topology.TopologyServiceTests.test_generate_combine_and_compile_through_gateway) ... ok
+Ran 35 tests in 10.971s
+OK
+
+== Traducción a OpenStack (zona:host) con un OpenStack simulado
+test_placement_host_and_zone_force_the_compute (test_openstack_driver.OpenStackDriverTests.test_placement_host_and_zone_force_the_compute) ... ok
+test_hypervisors_inventory_with_zones (test_openstack_driver.OpenStackDriverTests.test_hypervisors_inventory_with_zones) ... ok
+Ran 2 tests in 1.465s
+OK
