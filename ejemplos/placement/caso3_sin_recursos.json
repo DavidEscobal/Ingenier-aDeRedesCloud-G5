@@ -1,0 +1,19 @@
+{
+  "nombre": "Caso 3 - Ningún servidor cumple: 7 VMs Ubuntu en 3 computes de 9 GB",
+  "descripcion": "Cada VM pide 4 GB de disco; en total se piden 28 GB y hay 27 GB.",
+  "plataforma": "openstack",
+  "servidores": [
+    {"nombre": "worker1", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9},
+    {"nombre": "worker2", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9},
+    {"nombre": "worker3", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9}
+  ],
+  "vms": [
+    {"nombre": "vm1", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3},
+    {"nombre": "vm2", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3},
+    {"nombre": "vm3", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3},
+    {"nombre": "vm4", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3},
+    {"nombre": "vm5", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3},
+    {"nombre": "vm6", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3},
+    {"nombre": "vm7", "vcpus": 1, "ram_mb": 512, "disco_gb": 4, "cpu_prevista": 0.3}
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "nombre": "Caso 4 - Modo automático: el módulo elige Linux u OpenStack",
+  "descripcion": "Linux tiene servidores vacíos; en OpenStack worker1 ya está en uso y tiene espacio.",
+  "plataforma": "auto",
+  "servidores": {
+    "linux": [
+      {"nombre": "server2", "nucleos": 4, "ram_gb": 4, "disco_gb": 20},
+      {"nombre": "server3", "nucleos": 4, "ram_gb": 4, "disco_gb": 20}
+    ],
+    "openstack": [
+      {"nombre": "worker1", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9,
+       "uso": {"vcpus": 1, "cpu_real": 0.2, "ram_mb": 512, "disco_gb": 1}},
+      {"nombre": "worker2", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9}
+    ]
+  },
+  "vms": [
+    {"nombre": "vm1", "vcpus": 1, "ram_mb": 512, "disco_gb": 1, "cpu_prevista": 0.5},
+    {"nombre": "vm2", "vcpus": 1, "ram_mb": 512, "disco_gb": 1, "cpu_prevista": 0.5}
+  ]
+}

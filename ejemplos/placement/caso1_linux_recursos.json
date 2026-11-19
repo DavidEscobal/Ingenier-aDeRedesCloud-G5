@@ -1,0 +1,16 @@
+{
+  "nombre": "Caso 1 - Linux: elegir servidores con CPU y RAM suficientes",
+  "descripcion": "server1 ya tiene VMs y casi no le queda RAM; server2 y server3 están vacíos.",
+  "plataforma": "linux",
+  "servidores": [
+    {"nombre": "server1", "nucleos": 4, "ram_gb": 4, "disco_gb": 20,
+     "uso": {"vcpus": 2, "cpu_real": 1.2, "ram_mb": 3700, "disco_gb": 4}},
+    {"nombre": "server2", "nucleos": 4, "ram_gb": 4, "disco_gb": 20},
+    {"nombre": "server3", "nucleos": 4, "ram_gb": 4, "disco_gb": 20}
+  ],
+  "vms": [
+    {"nombre": "vm1", "vcpus": 1, "ram_mb": 512, "disco_gb": 1, "cpu_prevista": 0.5},
+    {"nombre": "vm2", "vcpus": 2, "ram_mb": 1024, "disco_gb": 2},
+    {"nombre": "vm3", "vcpus": 2, "ram_mb": 1024, "disco_gb": 2}
+  ]
+}
