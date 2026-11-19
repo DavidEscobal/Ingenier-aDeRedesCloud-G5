@@ -45,14 +45,21 @@ def _num(d, *claves, defecto=None, factor=1):
     return defecto
 
 
-def servidor(s, plataforma):
-    """Servidor del archivo de entrada → host normalizado (el formato que entrega el módulo de monitoreo)."""
+def servidor(s, plataforma, avisos):
+    """Servidor del archivo de entrada → host normalizado (el formato que entrega el módulo de monitoreo).
+
+    Igual que el orquestador: en Linux el monitoreo mide la CPU real de cada servidor; en OpenStack no hay ese
+    dato por host, así que se ignora `cpu_real` y se suponen al 100 % las vCPU ya asignadas."""
     if not s.get("nombre"):
         raise EntradaInvalida("cada servidor necesita «nombre»")
     uso = s.get("uso") or {}
     uso.setdefault("nombre", s["nombre"])
     vcpus_usadas = int(_num(uso, "vcpus", defecto=0))
     cpu_real = uso.get("cpu_real")
+    if cpu_real is not None and plataforma == "openstack":
+        avisos.append("%s: se ignora «cpu_real»; en OpenStack el orquestador no la mide y supone sus vCPU "
+                      "asignadas al 100 %%" % s["nombre"])
+        cpu_real = None
     h = {
         "id": s["nombre"], "provider": plataforma,
         "zone": s.get("zona") or ZONA_POR_DEFECTO[plataforma],
@@ -71,14 +78,15 @@ def servidor(s, plataforma):
     return h
 
 
-def vm(v):
+def vm(v, avisos):
     if not v.get("nombre"):
         raise EntradaInvalida("cada VM necesita «nombre»")
     out = {"id": v["nombre"], "vcpus": int(_num(v, "vcpus")),
            "ram_mb": int(_num(v, "ram_mb", "ram_gb", factor=(1, 1024))),
            "disk_mb": int(_num(v, "disco_gb", factor=1024))}
-    if v.get("cpu_prevista") is not None:
-        out["cpu_cent"] = int(round(_num(v, "cpu_prevista") * 100))
+    if v.get("cpu_prevista") is not None:   # el orquestador no la envía: toda VM nueva cuenta al 100 % de sus vCPU
+        avisos.append("%s: se ignora «cpu_prevista»; el orquestador supone que cada VM nueva usa el 100 %% de sus "
+                      "vCPU (el perfil de uso previsto es diseño pendiente)" % v["nombre"])
     if v.get("servidor"):
         out["host"] = v["servidor"]
     return out
@@ -90,18 +98,19 @@ def leer(path):
     plataforma = data.get("plataforma", "openstack")
     if plataforma not in ("linux", "openstack", "auto"):
         raise EntradaInvalida("«plataforma» debe ser linux, openstack o auto")
+    avisos = []
     servs = data.get("servidores")
     if plataforma == "auto":
         if not isinstance(servs, dict) or not all(p in servs for p in PLATAFORMAS):
             raise EntradaInvalida("en modo auto, «servidores» debe tener las listas «linux» y «openstack»")
-        hosts = {p: [servidor(s, p) for s in servs[p]] for p in PLATAFORMAS}
+        hosts = {p: [servidor(s, p, avisos) for s in servs[p]] for p in PLATAFORMAS}
     else:
         if isinstance(servs, dict):
             servs = servs.get(plataforma)
         if not isinstance(servs, list) or not servs:
             raise EntradaInvalida("«servidores» debe ser una lista no vacía")
-        hosts = {plataforma: [servidor(s, plataforma) for s in servs]}
-    vms = [vm(v) for v in data.get("vms") or []]
+        hosts = {plataforma: [servidor(s, plataforma, avisos) for s in servs]}
+    vms = [vm(v, avisos) for v in data.get("vms") or []]
     if not vms:
         raise EntradaInvalida("«vms» debe ser una lista no vacía")
     nombres = [v["id"] for v in vms]
@@ -109,7 +118,8 @@ def leer(path):
         raise EntradaInvalida("hay VMs con el mismo nombre")
     politica = dict(POLITICA, **(data.get("politica") or {}))
     return {"nombre": data.get("nombre") or Path(path).stem, "descripcion": data.get("descripcion"),
-            "plataforma": plataforma, "zona": data.get("zona"), "hosts": hosts, "vms": vms, "politica": politica}
+            "plataforma": plataforma, "zona": data.get("zona"), "hosts": hosts, "vms": vms, "politica": politica,
+            "avisos": avisos}
 
 
 def simular(caso):
@@ -224,10 +234,11 @@ def mostrar(caso, respuestas, elegida):
     print("Reglas: hasta %s vCPU por núcleo; CPU real <= %d %% de los núcleos; datos de monitoreo <= %d s; "
           "límite de cálculo %s s" % (str(pol["cpu_ratio"]).replace(".", ","), round(pol["cpu_limit"] * 100),
                                       pol["max_age_s"], str(pol["timeout_s"]).replace(".", ",")))
-    print("\nVMs pedidas:")
-    print(tabla(["VM", "vCPU", "CPU prevista (núcleos)", "RAM (GB)", "Disco (GB)", "Fijada en"],
-                [[v["id"], v["vcpus"], cpu(v["cpu_cent"]) if "cpu_cent" in v else "%d (sin dato: se supone todo)" % v["vcpus"],
-                  gb(v["ram_mb"]), gb(v["disk_mb"]), v.get("host", "-")] for v in caso["vms"]]))
+    for a in caso["avisos"]:
+        print("Aviso: " + a)
+    print("\nVMs pedidas (cada una cuenta con el 100 % de sus vCPU, igual que en el orquestador):")
+    print(tabla(["VM", "vCPU", "RAM (GB)", "Disco (GB)", "Fijada en"],
+                [[v["id"], v["vcpus"], gb(v["ram_mb"]), gb(v["disk_mb"]), v.get("host", "-")] for v in caso["vms"]]))
     for p, r in respuestas.items():
         mostrar_entrada(caso, caso["hosts"][p], p)
         mostrar_resultado(caso, p, r, caso["hosts"][p])

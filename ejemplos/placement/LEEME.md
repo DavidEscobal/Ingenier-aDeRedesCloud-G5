@@ -36,12 +36,12 @@ Para guardar el resultado en un archivo: `... > resultado.txt`.
   "zona": "zona-a",
   "servidores": [
     {"nombre": "worker1", "zona": "zona-a", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9,
-     "uso": {"vcpus": 1, "cpu_real": 0.3, "ram_mb": 1024, "disco_gb": 4}},
+     "uso": {"vcpus": 1, "ram_mb": 1024, "disco_gb": 4}},
     {"nombre": "worker2", "zona": "zona-a", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9, "sano": false}
   ],
   "vms": [
     {"nombre": "vm1", "vcpus": 1, "ram_mb": 1024, "disco_gb": 4},
-    {"nombre": "vm2", "vcpus": 1, "ram_mb": 512, "disco_gb": 1, "cpu_prevista": 0.4, "servidor": "worker1"}
+    {"nombre": "vm2", "vcpus": 1, "ram_mb": 512, "disco_gb": 1, "servidor": "worker1"}
   ]
 }
 ```
@@ -62,7 +62,7 @@ Para guardar el resultado en un archivo: `... > resultado.txt`.
 | `ram_mb` o `ram_gb` | Sí | RAM total |
 | `disco_gb` | Sí | Disco total |
 | `zona` | No | Por defecto `nova` en OpenStack y `linux` en Linux |
-| `uso` | No | Lo que ya está asignado: `vcpus`, `ram_mb` o `ram_gb`, `disco_gb` y `cpu_real` (núcleos realmente usados). Si falta `cpu_real`, se supone que las vCPU asignadas se usan al 100 % |
+| `uso` | No | Lo que ya está asignado: `vcpus`, `ram_mb` o `ram_gb` y `disco_gb`. Solo en Linux se puede agregar `cpu_real` (núcleos realmente usados, que el monitoreo mide en cada servidor). En OpenStack ese dato no existe por servidor, así que se supone que las vCPU asignadas se usan al 100 % |
 | `sano` | No | `false` = servidor caído o en mantenimiento |
 | `datos_hace_s` | No | Antigüedad de los datos de monitoreo. Más de 15 s = se descarta |
 | `vcpus_max` | No | Tope de vCPU del servidor |
@@ -75,11 +75,11 @@ Para guardar el resultado en un archivo: `... > resultado.txt`.
 | `vcpus` | Sí | vCPU pedidas |
 | `ram_mb` o `ram_gb` | Sí | RAM pedida |
 | `disco_gb` | Sí | Disco pedido |
-| `cpu_prevista` | No | Núcleos que se espera que use. Si falta, se supone el 100 % de sus vCPU |
 | `servidor` | No | Fija la VM en ese servidor (decisión del usuario) |
 
 **Reglas del orquestador:**
 
+- Cada VM nueva cuenta con el 100 % de sus vCPU (supuesto prudente).
 - Hasta 2 vCPU por núcleo.
 - La CPU real usada no puede pasar del 85 % de los núcleos.
 - RAM y disco sin sobreasignar.

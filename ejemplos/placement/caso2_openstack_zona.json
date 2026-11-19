@@ -4,15 +4,59 @@
   "plataforma": "openstack",
   "zona": "zona-a",
   "servidores": [
-    {"nombre": "worker1", "zona": "zona-a", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9,
-     "uso": {"vcpus": 1, "ram_mb": 1024, "disco_gb": 4}},
-    {"nombre": "worker2", "zona": "zona-a", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9},
-    {"nombre": "worker3", "zona": "zona-b", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9},
-    {"nombre": "worker4", "zona": "zona-a", "nucleos": 4, "ram_mb": 3935, "disco_gb": 9, "sano": false}
+    {
+      "nombre": "worker1",
+      "zona": "zona-a",
+      "nucleos": 4,
+      "ram_mb": 3935,
+      "disco_gb": 9,
+      "uso": {
+        "vcpus": 1,
+        "ram_mb": 1024,
+        "disco_gb": 4
+      }
+    },
+    {
+      "nombre": "worker2",
+      "zona": "zona-a",
+      "nucleos": 4,
+      "ram_mb": 3935,
+      "disco_gb": 9
+    },
+    {
+      "nombre": "worker3",
+      "zona": "zona-b",
+      "nucleos": 4,
+      "ram_mb": 3935,
+      "disco_gb": 9
+    },
+    {
+      "nombre": "worker4",
+      "zona": "zona-a",
+      "nucleos": 4,
+      "ram_mb": 3935,
+      "disco_gb": 9,
+      "sano": false
+    }
   ],
   "vms": [
-    {"nombre": "vm1", "vcpus": 1, "ram_mb": 1024, "disco_gb": 4},
-    {"nombre": "vm2", "vcpus": 1, "ram_mb": 1024, "disco_gb": 4},
-    {"nombre": "vm3", "vcpus": 1, "ram_mb": 512, "disco_gb": 1}
+    {
+      "nombre": "vm1",
+      "vcpus": 1,
+      "ram_mb": 1024,
+      "disco_gb": 4
+    },
+    {
+      "nombre": "vm2",
+      "vcpus": 1,
+      "ram_mb": 1024,
+      "disco_gb": 4
+    },
+    {
+      "nombre": "vm3",
+      "vcpus": 1,
+      "ram_mb": 512,
+      "disco_gb": 1
+    }
   ]
 }
