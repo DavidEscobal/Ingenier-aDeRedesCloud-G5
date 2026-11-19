@@ -75,6 +75,24 @@ class SlicePlacement(unittest.TestCase):
         self.assertEqual(summary["hosts_opened"], 1)
         self.assertNotIn("host", SPEC["vms"][0])                 # la spec original no se toca
 
+    def test_disco_decimal_se_planifica_redondeando_hacia_arriba(self):
+        # Anexo del Ex2: Ubuntu 20.04 con 2,5 GB. Antes int(2.5) = 2 GB subestimaba el disco.
+        env = Env([host("worker1", disk_mb=2600), host("worker2")])
+        spec = json.loads(json.dumps(SPEC)); spec["vms"] = spec["vms"][:1]; spec["vms"][0]["disk_gb"] = 2.5
+
+        async def submit(s):
+            return {"id": "j", "slice_id": "s", "status": "PENDING"}
+        job, summary = run(env.planner().admit(spec, None, submit))
+        self.assertEqual(env.placements[0]["vms"][0]["disk_mb"], 2560)
+        self.assertEqual(summary["status"], "PLAN_FOUND")
+        planner = env.planner()
+        planner.ledger.add("openstack", dict(spec, vms=[dict(spec["vms"][0], host="worker1")]))
+        self.assertEqual(planner.ledger.usage("openstack")["worker1"][2], 2560)
+        spec["vms"][0]["disk_gb"] = "x"
+        with self.assertRaises(HTTPException) as e:
+            run(env.planner().plan(spec))
+        self.assertEqual(e.exception.status_code, 422)
+
     def test_sin_recursos_rechaza_con_motivo(self):
         env = Env([host("worker1", ram_used_mb=3800), host("worker2", healthy=False)])
 

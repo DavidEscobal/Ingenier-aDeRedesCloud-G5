@@ -90,7 +90,7 @@ class VmView(BaseModel):
     image: str | None = None
     vcpus: int | None = None
     memory_mb: int | None = None
-    disk_gb: int | None = None
+    disk_gb: float | None = None   # admite 2.5 (Anexo del Ex2: Ubuntu 20.04 con 2,5 GB)
     host: str | None = None
     networks: list[str] = []
 

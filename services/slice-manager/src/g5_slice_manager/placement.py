@@ -11,6 +11,7 @@ La telemetría no reserva: la reserva sigue siendo del platform-manager.
 """
 import asyncio
 import copy
+import math
 import time
 
 import httpx
@@ -18,6 +19,14 @@ from fastapi import HTTPException
 
 LEDGER_TTL_S = 90
 PROVIDERS = ("linux", "openstack")   # orden fijo: candados y desempate del modo automático
+
+
+def disk_mb(disk_gb):
+    """Disco de una VM en MB para el placement; admite decimales (2.5 GB) y redondea hacia arriba."""
+    value = float(disk_gb)
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError("disk_gb")
+    return math.ceil(value * 1024)
 
 
 class Ledger:
@@ -30,7 +39,7 @@ class Ledger:
         now = self.clock()
         for vm in spec["vms"]:
             if vm.get("host"):
-                self.items.append((now + self.ttl, provider, vm["host"], vm["vcpus"], vm["memory_mb"], vm["disk_gb"] * 1024))
+                self.items.append((now + self.ttl, provider, vm["host"], vm["vcpus"], vm["memory_mb"], disk_mb(vm["disk_gb"])))
 
     def usage(self, provider):
         now = self.clock()
@@ -88,7 +97,7 @@ class Planner:
         provider = spec.get("provider", "linux")
         try:
             vms = [{"id": v["name"], "vcpus": int(v["vcpus"]), "ram_mb": int(v["memory_mb"]),
-                    "disk_mb": int(v["disk_gb"]) * 1024, **({"host": v["host"]} if v.get("host") else {})}
+                    "disk_mb": disk_mb(v["disk_gb"]), **({"host": v["host"]} if v.get("host") else {})}
                    for v in spec["vms"]]
         except (KeyError, TypeError, ValueError):
             raise HTTPException(422, "invalid_spec: cada VM necesita name, vcpus, memory_mb y disk_gb") from None
