@@ -32,9 +32,9 @@ def adapt(spec, workers, resolve_image):
     networks = spec.setdefault('networks', [])
     for i, vm in enumerate(spec['vms']):
         if isinstance(vm, dict) and vm.get('internet') is True:
-            access = 'inet%d' % (i + 1)  # nombre corto: el de la VM puede tener hasta 32 caracteres
-            networks.append({'name': access, 'cidr': '10.200.%d.0/27' % (i + 1)})
-            vm['nics'] = [{'name': 'inet0', 'network': access, 'ip': '10.200.%d.10' % (i + 1)}] + list(vm.get('nics') or [])
+            inet = 'inet%d' % (i + 1)  # nombre corto: el de la VM puede tener hasta 32 caracteres
+            networks.append({'name': inet, 'cidr': '10.200.%d.0/27' % (i + 1)})
+            vm['nics'] = [{'name': 'inet0', 'network': inet, 'ip': '10.200.%d.10' % (i + 1)}] + list(vm.get('nics') or [])
     if len(networks) > 64:
         raise Fault('Linux admite hasta 64 redes por slice (incluidas las de acceso a Internet)')
     for k, net in enumerate(networks):

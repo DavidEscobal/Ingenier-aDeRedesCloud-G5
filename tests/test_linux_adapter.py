@@ -115,6 +115,18 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(out['vms'][2]['guest']['ssh_authorized_keys'], [KEY])
         validate_spec(out, self.cfg)
 
+    def test_ubuntu_switch_vm_with_internet_and_unaddressed_links(self):
+        # Topología lineal VM1–VM2–VM3 con OVS en VM2 (Ubuntu 2,5 GB) y salida a Internet: antes la red de acceso
+        # pisaba las credenciales del slice y el adaptador fallaba con cualquier VM Ubuntu con Internet.
+        spec = json.loads((ROOT / 'templates/ovs-lineal-linux.json').read_text(encoding='utf-8'))
+        spec['guest'] = dict(GUEST)
+        out = adapt(spec, ['server1', 'server2', 'server3'], self.resolve)
+        vm2 = out['vms'][1]
+        self.assertEqual(vm2['guest'], dict(GUEST, os='ubuntu', ssh_authorized_keys=[]))
+        self.assertEqual([n['network'] for n in vm2['nics']], ['inet2', 'l12', 'l23'])
+        self.assertEqual((vm2['worker'], vm2['disk_gb']), ('server2', 2.5))
+        validate_spec(out, self.cfg)
+
     def test_ubuntu_without_or_with_bad_credentials_is_rejected(self):
         with self.assertRaisesRegex(Fault, 'usuario y contraseña'):
             adapt(neutral(image='ubuntu-24.04-minimal'), ['server1'], self.resolve)

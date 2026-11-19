@@ -2,17 +2,16 @@
   "name": "ovs-lineal",
   "provider": "linux",
   "networks": [
-    {"name": "inet", "cidr": "192.168.30.0/27", "dhcp": true},
     {"name": "l12"},
     {"name": "l23"}
   ],
   "vms": [
-    {"name": "vm1", "image": "cirros", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "host": "server1",
+    {"name": "vm1", "image": "cirros-062", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "host": "server1",
      "nics": [{"network": "l12"}]},
-    {"name": "vm2", "image": "ubuntu-20.04", "vcpus": 1, "memory_mb": 1024, "disk_gb": 3, "host": "server2",
+    {"name": "vm2", "image": "ubuntu-20.04", "vcpus": 1, "memory_mb": 1024, "disk_gb": 2.5, "host": "server2",
      "internet": true,
-     "nics": [{"network": "inet", "ip": "192.168.30.10"}, {"network": "l12"}, {"network": "l23"}]},
-    {"name": "vm3", "image": "cirros", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "host": "server3",
+     "nics": [{"network": "l12"}, {"network": "l23"}]},
+    {"name": "vm3", "image": "cirros-062", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "host": "server3",
      "nics": [{"network": "l23"}]}
   ]
 }
