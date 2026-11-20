@@ -2,6 +2,10 @@
 
 > **Leer primero en cada sesión nueva.** Última actualización local: 2026-11-20.
 
+## 2026-11-20 — Pruebas de microservicios en GitHub Actions
+
+El workflow `tests` omitía `vm-placement` y `monitoring`. Ahora instala las dependencias fijadas de los siete servicios y construye con esa misma lista la ruta de importación para las pruebas y la exportación de contratos OpenAPI.
+
 ## 2026-11-20 — Visualizador de topología en slices (web, pendiente de despliegue)
 
 - **Nuevo slice** muestra el lienzo de React Flow bajo la vista previa compilada. Las topologías predefinidas, las guardadas y las que se reciben desde el editor conservan las posiciones y los segmentos del documento.
