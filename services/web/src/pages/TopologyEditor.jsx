@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import {
-  Background, ConnectionMode, Controls, Handle, MiniMap, Position, ReactFlow, useEdgesState, useNodesState,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+import { useEdgesState, useNodesState } from '@xyflow/react'
+import { TopologyCanvas } from '../TopologyCanvas.jsx'
 import { Api } from '../api.js'
 import { download, freeId, fromFlow, IDENT, localProblems, toFlow } from '../topology.js'
 
@@ -11,29 +9,6 @@ function sizeOf(data, sizes) {
   return sizes.find((s) => s.vcpus === data.vcpus && s.memory_mb === data.memory_mb && s.disk_gb === data.disk_gb)
 }
 
-function VmNode({ id, data, selected }) {
-  return (
-    <div className={'vm-node' + (selected ? ' selected' : '')}>
-      <Handle type="source" position={Position.Top} />
-      <div className="vm-icon" aria-hidden="true">▣</div>
-      <div className="vm-name">{id}</div>
-      <div className="vm-meta">{data.image} · {data.vcpus} vCPU · {data.memory_mb} MB · {data.disk_gb} GB{data.internet ? ' · Internet' : ''}{data.host ? ' · ' + data.host : ''}</div>
-      <Handle type="source" position={Position.Bottom} />
-    </div>
-  )
-}
-
-function BusNode({ id, selected }) {
-  return (
-    <div className={'bus-node' + (selected ? ' selected' : '')}>
-      <Handle type="source" position={Position.Top} />
-      <span>bus · {id}</span>
-      <Handle type="source" position={Position.Bottom} />
-    </div>
-  )
-}
-
-const NODE_TYPES = { vm: VmNode, bus: BusNode }
 const PREFIXES = ['n', 'a', 'b', 'c', 'd', 'e', 'f', 'g']
 
 export default function TopologyEditor() {
@@ -318,14 +293,10 @@ export default function TopologyEditor() {
         </aside>
 
         <div className="canvas">
-          <ReactFlow nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} connectionMode={ConnectionMode.Loose}
+          <TopologyCanvas nodes={nodes} edges={edges}
                      onNodesChange={(c) => { onNodesChange(c); if (c.some((x) => x.type === 'position' && x.dragging === false || x.type === 'remove')) setDirty(true) }}
                      onEdgesChange={(c) => { onEdgesChange(c); if (c.some((x) => x.type === 'remove')) setDirty(true) }}
-                     onConnect={onConnect} fitView deleteKeyCode={['Backspace', 'Delete']} proOptions={{ hideAttribution: true }}>
-            <Background gap={20} />
-            <MiniMap pannable zoomable />
-            <Controls showInteractive={false} />
-          </ReactFlow>
+                     onConnect={onConnect} deleteKeyCode={['Backspace', 'Delete']} />
           {vmCount === 0 && !nodes.length && (
             <div className="canvas-empty">Elige una topología predefinida o agrega VMs para empezar.</div>
           )}

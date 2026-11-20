@@ -22,11 +22,37 @@ export function toFlow(topology) {
     } else {
       const xs = s.members.map((m) => nodes.find((n) => n.id === m)?.position.x || 0)
       nodes.push({ id: s.id, type: 'bus', position: s.position || { x: xs.reduce((a, b) => a + b, 0) / xs.length, y: 40 },
-        data: { addressed: s.addressed !== false } })
+        data: { addressed: s.addressed !== false, label: s.label } })
       for (const m of s.members) edges.push({ id: `${s.id}:${m}`, source: m, target: s.id, type: 'straight', data: { bus: s.id } })
     }
   }
   return { nodes, edges }
+}
+
+// El detalle conserva la pertenencia a redes, pero no las posiciones ni el tipo original de segmento.
+export function sliceToFlow(vms) {
+  const networks = new Map()
+  for (const vm of vms) {
+    for (const network of new Set(vm.networks || [])) {
+      if (!networks.has(network)) networks.set(network, [])
+      networks.get(network).push(vm.name)
+    }
+  }
+  const pairs = new Set()
+  const segments = Array.from(networks, ([name, members]) => {
+    const pair = JSON.stringify(members)
+    const direct = members.length === 2 && !pairs.has(pair)
+    if (direct) pairs.add(pair)
+    return { id: 'net:' + name, label: name, kind: direct ? 'link' : 'bus', members }
+  })
+  const graph = toFlow({ nodes: vms.map((vm) => ({ ...vm, id: vm.name })), segments })
+  const count = graph.nodes.length
+  graph.nodes.forEach((node, i) => {
+    const angle = count === 2 ? Math.PI * (i - 1) : 2 * Math.PI * (i - 1) / count - Math.PI / 2
+    node.position = { x: Math.round(Math.cos(angle) * Math.max(180, count * 45)),
+      y: Math.round(Math.sin(angle) * Math.max(100, count * 27)) }
+  })
+  return graph
 }
 
 export function fromFlow(nodes, edges, name, description = '') {

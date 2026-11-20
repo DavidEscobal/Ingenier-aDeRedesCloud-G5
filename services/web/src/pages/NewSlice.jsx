@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Api } from '../api.js'
-import { NAME } from '../topology.js'
+import { TopologyViewer } from '../TopologyCanvas.jsx'
+import { NAME, toFlow } from '../topology.js'
 
 // Nuevo slice = elegir una topología (predefinida o guardada en el editor), el proveedor, el nombre y el curso.
 // El catálogo (formas, tamaños, imágenes, proveedores) lo da el topology-manager: nada fijo en este código.
@@ -26,7 +27,8 @@ export default function NewSlice() {
   const [zones, setZones] = useState([])
   const [name, setName] = useState(fromEditor?.name || 'lineal-3')
   const [topology, setTopology] = useState(fromEditor)
-  const [preview, setPreview] = useState(null)
+  const [compiled, setCompiled] = useState(null)
+  const preview = compiled?.topology === topology && compiled?.provider === provider ? compiled.spec : null
   const [imageNames, setImageNames] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -54,8 +56,9 @@ export default function NewSlice() {
   useEffect(() => {
     if (!catalog) return
     let cancelled = false
+    setTopology(null)
     const done = (t) => { if (!cancelled) { setTopology(t); setError('') } }
-    const fail = (err) => { if (!cancelled) { setTopology(null); setPreview(null); setError(err.message) } }
+    const fail = (err) => { if (!cancelled) { setTopology(null); setCompiled(null); setError(err.message) } }
     if (source === 'editor') done(fromEditor)
     else if (source.startsWith('draft:')) Api.draft(source.slice(6)).then((d) => done(d.topology)).catch(fail)
     else if (generator) {
@@ -80,8 +83,8 @@ export default function NewSlice() {
     if (!topology) return
     let cancelled = false
     Api.compile(topology, provider, NAME.test(name) ? name : undefined)
-      .then((spec) => { if (!cancelled) { setPreview(spec); setError('') } })
-      .catch((err) => { if (!cancelled) { setPreview(null); setError(err.message) } })
+      .then((spec) => { if (!cancelled) { setCompiled({ topology, provider, spec }); setError('') } })
+      .catch((err) => { if (!cancelled) { setCompiled(null); setError(err.message) } })
     return () => { cancelled = true }
   }, [topology, provider]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -132,8 +135,8 @@ export default function NewSlice() {
         </div>
       </div>
 
-      <form className="form-grid" onSubmit={submit} noValidate>
-        <div className="panel">
+      <div className="form-grid">
+        <form className="panel" onSubmit={submit} noValidate>
           <label>Curso
             <select value={course} onChange={(e) => { setCourse(e.target.value); setError('') }} disabled={!courses?.length}>
               {courses === null && <option>Cargando…</option>}
@@ -219,35 +222,38 @@ export default function NewSlice() {
           )}
           {error && <p className="error" role="alert">{error}</p>}
           <button type="submit" disabled={busy || !courses?.length || !preview}>{busy ? 'Enviando…' : 'Desplegar slice'}</button>
-        </div>
+        </form>
 
-        <div className="panel">
-          <h2>Vista previa</h2>
-          {!preview && !error && <p className="muted">Preparando…</p>}
-          {preview && (
-            <>
-              <p className="muted small">{PROVIDER_LABEL[provider] || provider} · {vms.length} VMs · {totals.vcpus} vCPU ·
-                {' '}{totals.ram} MB RAM · {totals.disk} GB disco</p>
-              <table className="table compact">
-                <thead><tr><th>VM</th><th>Imagen</th><th>vCPU</th><th>RAM</th><th>Disco</th><th>Interfaces</th></tr></thead>
-                <tbody>
-                  {vms.map((vm) => (
-                    <tr key={vm.name}>
-                      <td>{vm.name}{vm.internet ? ' · Internet' : ''}{vm.host ? ' · ' + vm.host : ''}</td><td>{vm.image}</td><td>{vm.vcpus}</td>
-                      <td>{vm.memory_mb} MB</td><td>{vm.disk_gb} GB</td>
-                      <td className="mono small">{vm.nics.map((x) => `${x.network} ${x.ip || 'DHCP'}`).join(' · ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <h3>Redes</h3>
-              <ul className="nets">
-                {preview.networks.map((x) => <li key={x.name}><strong>{x.name}</strong> <span className="mono">{x.cidr}</span></li>)}
-              </ul>
-            </>
-          )}
+        <div className="slice-preview">
+          <div className="panel">
+            <h2>Vista previa</h2>
+            {!preview && !error && <p className="muted">Preparando…</p>}
+            {preview && (
+              <>
+                <p className="muted small">{PROVIDER_LABEL[provider] || provider} · {vms.length} VMs · {totals.vcpus} vCPU ·
+                  {' '}{totals.ram} MB RAM · {totals.disk} GB disco</p>
+                <table className="table compact">
+                  <thead><tr><th>VM</th><th>Imagen</th><th>vCPU</th><th>RAM</th><th>Disco</th><th>Interfaces</th></tr></thead>
+                  <tbody>
+                    {vms.map((vm) => (
+                      <tr key={vm.name}>
+                        <td>{vm.name}{vm.internet ? ' · Internet' : ''}{vm.host ? ' · ' + vm.host : ''}</td><td>{vm.image}</td><td>{vm.vcpus}</td>
+                        <td>{vm.memory_mb} MB</td><td>{vm.disk_gb} GB</td>
+                        <td className="mono small">{vm.nics.map((x) => `${x.network} ${x.ip || 'DHCP'}`).join(' · ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <h3>Redes</h3>
+                <ul className="nets">
+                  {preview.networks.map((x) => <li key={x.name}><strong>{x.name}</strong> <span className="mono">{x.cidr}</span></li>)}
+                </ul>
+              </>
+            )}
+          </div>
+          {preview && <TopologyViewer {...toFlow(topology)} />}
         </div>
-      </form>
+      </div>
     </section>
   )
 }

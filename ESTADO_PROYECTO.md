@@ -1,6 +1,13 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
-> **Leer primero en cada sesión nueva.** Última actualización: 2026-11-15 tarde (OpenStack: modo auto, stress-ng con uso real, MTU, enlaces sin IP, 15b–e).
+> **Leer primero en cada sesión nueva.** Última actualización local: 2026-11-20.
+
+## 2026-11-20 — Visualizador de topología en slices (web, pendiente de despliegue)
+
+- **Nuevo slice** muestra el lienzo de React Flow bajo la vista previa compilada. Las topologías predefinidas, las guardadas y las que se reciben desde el editor conservan las posiciones y los segmentos del documento.
+- **Detalle de slice** muestra el lienzo bajo la tabla de VMs, en el lugar del resumen de placement y la ayuda de consola. El detalle de la API proporciona VMs y redes por VM. La web distribuye los nodos y deduce las conexiones de esas membresías. Dos miembros se representan con un enlace directo. Las redes de otro tamaño y las conexiones adicionales entre el mismo par tienen un nodo de red.
+- Ambos visores permiten navegar, ampliar y encuadrar. La edición sigue en Topologías. El cambio de ejecución se limita al servicio Compose `web`.
+- Verificación local con `npm run build` en `services/web`, cuatro pruebas con `node --test services/web/tests/topology-viewer.test.js` desde la raíz y navegación en Chrome con datos de prueba.
 
 ## Punto de reanudación (2026-11-15, cierre de sesión tarde) — LEER PRIMERO
 - **Rama `fase2` en GitHub = 5f8c098** (push hecho, `bash scripts/verificar.sh` en verde). App server `~/g5-app`:
