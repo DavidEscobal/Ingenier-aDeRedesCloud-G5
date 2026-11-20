@@ -18,6 +18,7 @@ import httpx
 from fastapi import HTTPException
 
 LEDGER_TTL_S = 90
+DISK_MARGIN_MB = 2048   # el mismo margen (`disk_margin_gb`) que exige el agente Linux antes de crear VMs
 PROVIDERS = ("linux", "openstack")   # orden fijo: candados y desempate del modo automático
 
 
@@ -27,6 +28,18 @@ def disk_mb(disk_gb):
     if not math.isfinite(value) or value <= 0:
         raise ValueError("disk_gb")
     return math.ceil(value * 1024)
+
+
+def linux_disk_capacity(h, free_mb, margin_mb, image_mb):
+    """Disco que el placement puede repartir en un servidor Linux, con la misma cuenta que el agente.
+
+    El agente crea una VM solo si el disco libre real cubre el crecimiento completo de los discos reservados,
+    las imágenes base que falten y un margen. La capacidad configurada (`disk_gb` de cluster.json) no lo
+    refleja: con ella el placement juntaba en un servidor VMs que el agente después rechazaba. Cuenta
+    conservadora: los discos ya reservados pueden crecer hasta su tamaño y cada servidor podría necesitar
+    todas las imágenes del slice."""
+    available = max(0, int(free_mb) - margin_mb - int(h["disk_used_mb"]) - image_mb)
+    return max(int(h["disk_used_mb"]), min(int(h["disk_mb"]), int(h["disk_used_mb"]) + available))
 
 
 class Ledger:
@@ -53,8 +66,10 @@ class Ledger:
 
 
 class Planner:
-    def __init__(self, monitoring, placement, monitoring_token, placement_token, policy=None):
+    def __init__(self, monitoring, placement, monitoring_token, placement_token, policy=None,
+                 platform=None, platform_token=None, disk_margin_mb=DISK_MARGIN_MB):
         self.monitoring, self.placement = monitoring, placement
+        self.platform, self.platform_token, self.disk_margin_mb = platform, platform_token, disk_margin_mb
         self.monitoring_token, self.placement_token = monitoring_token, placement_token
         self.policy = policy or {}
         self.ledger = Ledger()
@@ -89,8 +104,21 @@ class Planner:
                           "disk_used_mb": h["disk_used_mb"] + add[2],
                           "cpu_real_cent": None if real is None else real + 100 * add[0],
                           "occupied": bool(h.get("occupied")) or bool(add[0]),
-                          "healthy": bool(h.get("healthy")), "age_s": h.get("age_s")})
+                          "healthy": bool(h.get("healthy")), "age_s": h.get("age_s"),
+                          "_disk_free_mb": h.get("disk_free_mb")})
         return hosts
+
+    async def image_mb(self, spec):
+        """MB de las imágenes base del slice en el almacén Linux (la copia a cada servidor ocupa ese disco)."""
+        if self.platform is None:
+            return 0
+        try:
+            r = await self.platform.get("/v1/images", headers={"Authorization": "Bearer " + self.platform_token})
+            sizes = {row["name"]: int(row["size"]) for row in r.json()} if r.status_code == 200 else {}
+        except (httpx.RequestError, ValueError, KeyError, TypeError):
+            sizes = {}
+        names = {v.get("image") for v in spec.get("vms", [])}
+        return sum(math.ceil(sizes.get(n, 0) / 1024 ** 2) for n in names)
 
     async def plan(self, spec, zone=None):
         """Devuelve (spec con host por VM, resumen del plan). 409 con el motivo si no hay plan."""
@@ -102,6 +130,11 @@ class Planner:
         except (KeyError, TypeError, ValueError):
             raise HTTPException(422, "invalid_spec: cada VM necesita name, vcpus, memory_mb y disk_gb") from None
         hosts = await self.hosts(provider)
+        image_mb = await self.image_mb(spec) if provider == "linux" else 0
+        for h in hosts:
+            free = h.pop("_disk_free_mb", None)
+            if provider == "linux" and free is not None:
+                h["disk_mb"] = linux_disk_capacity(h, free, self.disk_margin_mb, image_mb)
         body = {"provider": provider, "zone": zone, "hosts": hosts, "vms": vms, "policy": self.policy}
         try:
             r = await self.placement.post("/v1/placements", json=body,

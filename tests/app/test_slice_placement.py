@@ -93,6 +93,35 @@ class SlicePlacement(unittest.TestCase):
             run(env.planner().plan(spec))
         self.assertEqual(e.exception.status_code, 422)
 
+    def test_linux_usa_el_disco_libre_real_y_reparte_entre_servidores(self):
+        # Caso real (19/11): 6 GB reservables por servidor en cluster.json, pero ~6 GB libres de verdad y el agente
+        # exige además 2 GB de margen y las imágenes base. Antes el plan juntaba las 3 VMs en un servidor y el agente
+        # rechazaba el slice; ahora la Ubuntu queda sola y las CirrOS en otro servidor.
+        hosts = [host(n, "linux", provider="linux", disk_mb=6144, ram_mb=3840, ram_used_mb=0, disk_free_mb=free)
+                 for n, free in (("server1", 5573), ("server2", 6033), ("server3", 5747))]
+        spec = {"name": "lineal", "provider": "linux", "networks": [], "vms": [
+            {"name": "vm1", "image": "cirros-062", "vcpus": 1, "memory_mb": 512, "disk_gb": 1},
+            {"name": "vm2", "image": "focal-server-cloudimg-amd64", "vcpus": 1, "memory_mb": 1024, "disk_gb": 2.5},
+            {"name": "vm3", "image": "cirros-062", "vcpus": 1, "memory_mb": 512, "disk_gb": 1}]}
+
+        def images(request):
+            assert request.headers["Authorization"] == "Bearer " + "x" * 40
+            return httpx.Response(200, json=[{"name": "cirros-062", "size": 21430272},
+                                             {"name": "focal-server-cloudimg-amd64", "size": 987693056}])
+        env = Env(hosts)
+        planner = env.planner()
+        planner.platform = httpx.AsyncClient(base_url="http://pm", transport=httpx.MockTransport(images))
+        planner.platform_token = "x" * 40
+        placed, summary = run(planner.plan(spec))
+        where = {v["name"]: v["host"] for v in placed["vms"]}
+        self.assertNotIn(where["vm2"], (where["vm1"], where["vm3"]), "la Ubuntu no cabe junto a las CirrOS")
+        self.assertEqual(env.placements[0]["hosts"][1]["disk_mb"], 6033 - 2048 - 942 - 21)
+        # Sin el dato de disco libre (p. ej. telemetría sin métricas) se usa la capacidad configurada.
+        for h in hosts:
+            h["disk_free_mb"] = None
+        placed, _ = run(Env(hosts).planner().plan(spec))
+        self.assertEqual(len({v["host"] for v in placed["vms"]}), 1)
+
     def test_sin_recursos_rechaza_con_motivo(self):
         env = Env([host("worker1", ram_used_mb=3800), host("worker2", healthy=False)])
 

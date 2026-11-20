@@ -235,7 +235,9 @@ async def lifespan(app):
                       "cpu_limit": float(os.getenv("PLACEMENT_CPU_LIMIT", "0.85")),
                       "max_age_s": float(os.getenv("PLACEMENT_MAX_AGE_S", "15")),
                       "timeout_s": float(os.getenv("PLACEMENT_TIMEOUT_S", "1.0"))}
-            app.state.planner = Planner(monitoring, placement, tokens[1], tokens[0], policy)
+            app.state.planner = Planner(monitoring, placement, tokens[1], tokens[0], policy,
+                                        platform if platform_url else None, app.state.platform_token,
+                                        int(os.getenv("PLACEMENT_DISK_MARGIN_MB", "2048")))
         try:
             yield
         finally:
