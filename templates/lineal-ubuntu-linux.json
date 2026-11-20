@@ -1,0 +1,54 @@
+{
+  "name": "lineal-ubuntu",
+  "provider": "linux",
+  "networks": [
+    {
+      "name": "l12"
+    },
+    {
+      "name": "l23"
+    }
+  ],
+  "vms": [
+    {
+      "name": "vm1",
+      "image": "cirros-062",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 1,
+      "nics": [
+        {
+          "network": "l12"
+        }
+      ]
+    },
+    {
+      "name": "vm2",
+      "image": "focal-server-cloudimg-amd64",
+      "vcpus": 1,
+      "memory_mb": 1024,
+      "disk_gb": 2.5,
+      "internet": true,
+      "nics": [
+        {
+          "network": "l12"
+        },
+        {
+          "network": "l23"
+        }
+      ]
+    },
+    {
+      "name": "vm3",
+      "image": "cirros-062",
+      "vcpus": 1,
+      "memory_mb": 512,
+      "disk_gb": 1,
+      "nics": [
+        {
+          "network": "l23"
+        }
+      ]
+    }
+  ]
+}

@@ -750,7 +750,7 @@
             "title": "Memory Mb"
           },
           "disk_gb": {
-            "type": "integer",
+            "type": "number",
             "maximum": 2048.0,
             "minimum": 1.0,
             "title": "Disk Gb"

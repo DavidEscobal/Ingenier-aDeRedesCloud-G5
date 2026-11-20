@@ -30,6 +30,10 @@ DEFAULT_SIZES = [
     # Ex2 paso 3: Ubuntu 24.04 minimal con 1 GB de RAM. Su disco virtual es de 3,5 GiB: no cabe en 2 GB (flavor
     # g5-1c-1g-4g en Nova, se crea con autorización).
     {"id": "ubuntu", "label": "Ubuntu · 1 vCPU · 1 GB · 4 GB", "vcpus": 1, "memory_mb": 1024, "disk_gb": 4},
+    # Anexo del Ex2: Ubuntu 20.04 (disco virtual 2,2 GiB) con 2,5 GB. Es el tamaño que cabe en los servidores
+    # Linux (~6 GB libres menos margen e imagen base). En OpenStack no hay flavor de 2,5 GB (Nova usa GB enteros).
+    {"id": "ubuntu-2.5", "label": "Ubuntu 20.04 · 1 vCPU · 1 GB · 2,5 GB (Linux)", "vcpus": 1, "memory_mb": 1024,
+     "disk_gb": 2.5},
 ]
 DEFAULT_IMAGES = ["cirros"]
 
@@ -64,7 +68,7 @@ class Node(Model):
     image: str = Field(min_length=1, max_length=64)
     vcpus: int = Field(ge=1, le=64)
     memory_mb: int = Field(ge=64, le=524288)
-    disk_gb: int = Field(ge=1, le=2048)
+    disk_gb: float = Field(ge=1, le=2048)  # admite 2.5 (Anexo del Ex2)
     internet: bool = False  # salida a Internet: Linux por la puerta del slice; OpenStack por la red provider external (R5)
     host: str | None = Field(default=None, pattern=IDENT)  # servidor fijo (Ex2 paso 3); None = automático
     position: Position | None = None

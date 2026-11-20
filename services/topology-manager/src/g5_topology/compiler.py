@@ -45,7 +45,8 @@ def compile_spec(topology: Topology, provider: str, name: str | None = None):
         networks.append({"name": s.id, "cidr": f"192.168.{k}.0/24", "dhcp": True})
         for m in s.members:
             nics[m].append({"network": s.id, "ip": f"192.168.{k}.{10 + index[m]}"})
-    vms = [{"name": n.id, "image": n.image, "vcpus": n.vcpus, "memory_mb": n.memory_mb, "disk_gb": n.disk_gb,
+    vms = [{"name": n.id, "image": n.image, "vcpus": n.vcpus, "memory_mb": n.memory_mb,
+            "disk_gb": int(n.disk_gb) if float(n.disk_gb).is_integer() else n.disk_gb,  # 2.5 solo si hace falta
             "nics": nics[n.id], **({"internet": True} if n.internet else {}), **({"host": n.host} if n.host else {})}
            for n in topology.nodes]
     return {"name": name or topology.name, "provider": provider, "networks": networks, "vms": vms}

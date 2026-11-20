@@ -42,6 +42,17 @@ class GeneratorTests(unittest.TestCase):
                     spec = compile_spec(topo, "openstack")
                     validate_spec(spec, CORE_CONFIG)  # lanza Fault si el motor lo rechazaría
 
+    def test_ubuntu_of_two_and_a_half_gb_is_in_the_catalog_and_compiles(self):
+        # Anexo del Ex2: Ubuntu 20.04 con 2,5 GB, el tamaño que cabe en los servidores Linux.
+        topo = generate("lineal", 3)
+        node = topo.nodes[1].model_copy(update={"image": "focal-server-cloudimg-amd64", "vcpus": 1,
+                                                 "memory_mb": 1024, "disk_gb": 2.5})
+        topo = Topology.model_validate(dict(topo.model_dump(), nodes=[topo.nodes[0].model_dump(), node.model_dump(),
+                                                                      topo.nodes[2].model_dump()]))
+        self.assertEqual(topo.check_catalog(), [])
+        spec = compile_spec(topo, "linux")
+        self.assertEqual(spec["vms"][1]["disk_gb"], 2.5)
+
     def test_semantics_bus_is_one_shared_segment_and_lineal_is_point_to_point(self):
         bus, lineal = generate("bus", 4), generate("lineal", 4)
         self.assertEqual([(s.kind, len(s.members)) for s in bus.segments], [("bus", 4)])
