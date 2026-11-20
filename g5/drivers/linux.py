@@ -205,8 +205,26 @@ class LinuxDriver(ProviderDriver):
                     'Puerto externo reservado', 409)
             db.execute('INSERT INTO ports VALUES(?,?,?)', (pub['protocol'], pub['external_port'], sid))
         db.execute('INSERT INTO leases VALUES(?,?,?)', (svid, sid, slot))
+        self.plan_transport(plan)
         for link_svid in svids[1:]:
             db.execute('INSERT INTO link_svids VALUES(?,?)', (link_svid, sid))
+
+    def plan_transport(self, plan):
+        """QinQ (por defecto) o VXLAN entre servidores.
+
+        Con VXLAN el switch físico solo ve las MAC de los servidores: las de las VMs viajan dentro del túnel. Así
+        una VM que hace de switch entre VMs de distintos servidores (Ex2 15b–e) ya no confunde a un switch que
+        aprende las MAC sin separar por VLAN. Topología en estrella con centro en el gateway (participa en todos
+        los slices): sin lazos y sin depender de que los workers se vean entre sí. La S-VLAN de cada enlace se usa
+        como VNI."""
+        transport = self.cfg.get('transport', 'qinq')
+        require(transport in ('qinq', 'vxlan'), 'transport debe ser qinq o vxlan')
+        plan['transport'] = transport
+        if transport == 'vxlan':
+            hosts = {name: w['host'] for name, w in self.cfg['workers'].items()}
+            hosts[self.cfg['gateway']['name']] = self.cfg['gateway']['host']
+            plan['tunnel'] = {'hub': self.cfg['gateway']['name'],
+                              'endpoints': {n: hosts[n] for n in self.participants(plan)}}
 
     def participants(self, plan):
         return sorted({v['worker'] for v in plan['vms']} | {self.cfg['gateway']['name']})
@@ -238,7 +256,7 @@ class LinuxDriver(ProviderDriver):
         sid = plan['id']
         switch = self.switch()
         nodes = self.participants(plan)
-        if switch:
+        if switch and plan.get('transport', 'qinq') == 'qinq':
             self.retry(switch, 'fabric_add', ctx, sid=sid, svids=link_svids(plan))
         for node in nodes:
             self.retry(node, 'prepare', ctx, plan=plan)

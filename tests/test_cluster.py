@@ -416,6 +416,29 @@ class AgentTests(Fixture):
         self.store.release(plan['id'], 'DELETED')
         self.assertFalse(self.store.rows('SELECT svid FROM link_svids WHERE slice_id=?', (plan['id'],)))
 
+    def test_vxlan_transport_builds_a_star_through_the_gateway(self):
+        # Con VXLAN el switch físico solo ve las MAC de los servidores (la VM switch del Ex2 15e entre servidores).
+        self.cfg['transport'] = 'vxlan'
+        self.spec['publications'] = []
+        self.spec['networks'].append({'name': 'l2', 'cvid': 101})
+        job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
+        self.assertEqual(plan['transport'], 'vxlan')
+        self.assertEqual(plan['tunnel']['hub'], 'server4')
+        self.assertEqual(plan['tunnel']['endpoints']['server4'], '10.0.10.4')
+        for role, peers in (('worker', ['server4']), ('gateway', sorted(set(plan['tunnel']['endpoints']) - {'server4'}))):
+            agent = self.agent(role); agent.manifest_path(plan['id']).write_text(json.dumps(plan))
+            commands = []
+            with mock.patch.object(agent, 'fabric_add') as fabric, mock.patch.object(agent, 'owned_ovs'),                     mock.patch('g5.agent.output', side_effect=lambda *a, **k: commands.append(' '.join(map(str, a))) or ''):
+                result = agent.network(plan['id'])
+            fabric.assert_not_called()                      # sin S-VLAN en el switch ni en br-int
+            self.assertFalse(any('br-int' in c for c in commands))
+            self.assertEqual(len(result['tunnels']), len(plan['networks']) * len(peers))
+            self.assertEqual({x['peer'] for x in result['tunnels']}, set(peers))
+            for net in plan['networks']:
+                self.assertTrue(any('type=vxlan' in c and 'options:key=%d' % net['svid'] in c
+                                    and 'tag=%d' % net['cvid'] in c for c in commands))
+            self.assertTrue(all(len(x['port']) <= 15 for x in result['tunnels']))
+
     def test_fabric_records_from_before_per_link_svids_are_still_removed(self):
         agent = self.agent('worker'); sid = 'a' * 32
         path = agent.root / 'switch' / (sid + '.json'); path.parent.mkdir(parents=True, exist_ok=True)

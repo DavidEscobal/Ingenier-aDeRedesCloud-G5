@@ -444,6 +444,15 @@ class Agent:
             ident(n['name']); tag(n['cvid'])
             if 'svid' in n:
                 tag(n['svid'])
+        ensure(plan.get('transport', 'qinq') in ('qinq', 'vxlan'), 'Transporte no admitido')
+        if plan.get('transport') == 'vxlan':
+            t = plan['tunnel']
+            ident(t['hub'])
+            ensure(isinstance(t['endpoints'], dict) and t['hub'] in t['endpoints'] and len(t['endpoints']) <= 16,
+                   'Extremos VXLAN inválidos')
+            for name, ip in t['endpoints'].items():
+                ident(name); ipaddress.IPv4Address(ip)
+            ensure(all('svid' in n for n in plan['networks']), 'VXLAN requiere una S-VLAN (VNI) por enlace')
             if 'cidr' in n:  # sin cidr: enlace L2 sin IP (la puerta no se conecta)
                 ipaddress.IPv4Network(n['cidr']); ipaddress.IPv4Address(n['gateway'])
         ipaddress.IPv4Network(plan['transit'])
@@ -577,6 +586,8 @@ class Agent:
 
     def network(self, sid, **_):
         plan = self.load(sid); n = self.names(plan)
+        if plan.get('transport') == 'vxlan':
+            return self.network_vxlan(sid, plan, n)
         self.fabric_add(sid, svids=self.link_svids(plan))
         per_link = all('svid' in x for x in plan['networks'])
         if per_link:   # un par patch por enlace, cada uno con su S-VLAN
@@ -600,6 +611,36 @@ class Agent:
                        'cvlans=' + cvlans, 'other_config:qinq-ethtype=802.1ad', 'external_ids:g5_slice=' + sid)
             output('ip', 'link', 'set', n['bridge'], 'up')
         return {'bridge': n['bridge'], 'links': [{'svid': s, 'cvids': c} for _, _, c, s in links]}
+
+    def vxlan_name(self, sid, idx, peer_idx):
+        return 'g5x' + sid[:8] + '%02x' % idx + '%x' % peer_idx   # 14 caracteres
+
+    def network_vxlan(self, sid, plan, n):
+        """Un puerto VXLAN por (enlace, servidor vecino) en el bridge del slice, de acceso a la C-VLAN del enlace.
+
+        Estrella: cada worker tiene túnel solo con el gateway (hub) y el hub con todos. El switch físico ve solo
+        las MAC de los servidores; las de las VMs viajan dentro del túnel (VNI = S-VLAN del enlace)."""
+        t = plan['tunnel']; me = self.cfg['name']; endpoints = t['endpoints']
+        ensure(me in endpoints, 'Este nodo no participa del slice')
+        order = sorted(endpoints)
+        peers = [t['hub']] if me != t['hub'] else [x for x in order if x != t['hub']]
+        ports = []
+        with self.lock('fabric'):
+            self.owned_ovs('Bridge', n['bridge'], sid)
+            output('ovs-vsctl', '--may-exist', 'add-br', n['bridge'], '--', 'set', 'Bridge', n['bridge'],
+                   'external_ids:g5_slice=' + sid)
+            for idx, net in enumerate(plan['networks']):
+                for peer in peers:
+                    port = self.vxlan_name(sid, idx, order.index(peer))
+                    self.owned_ovs('Port', port, sid)
+                    output('ovs-vsctl', '--may-exist', 'add-port', n['bridge'], port, '--',
+                           'set', 'Interface', port, 'type=vxlan', 'options:remote_ip=' + endpoints[peer],
+                           'options:local_ip=' + endpoints[me], 'options:key=' + str(net['svid']), '--',
+                           'set', 'Port', port, 'vlan_mode=access', 'tag=' + str(net['cvid']),
+                           'external_ids:g5_slice=' + sid)
+                    ports.append({'port': port, 'peer': peer, 'vni': net['svid'], 'cvid': net['cvid']})
+            output('ip', 'link', 'set', n['bridge'], 'up')
+        return {'bridge': n['bridge'], 'transport': 'vxlan', 'tunnels': ports}
 
     def process(self, directory, binary, token):
         path = directory / ('qemu.pid' if binary == 'qemu-system' else 'dnsmasq.pid')
