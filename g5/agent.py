@@ -235,6 +235,15 @@ class Agent:
         return {'bridge': 'g5b' + h, 'customer': 'g5c' + h, 'provider': 'g5p' + h,
                 'ns': 'g5n' + h, 'wan': 'g5w' + h}
 
+    def link_names(self, plan, idx):
+        """Par de puertos patch (lado slice, lado br-int) del enlace idx: 15 caracteres como máximo."""
+        h = plan['id'][:10]
+        return 'g5c' + h + '%02x' % idx, 'g5p' + h + '%02x' % idx
+
+    @staticmethod
+    def link_svids(plan):
+        return sorted({n.get('svid', plan['svid']) for n in plan['networks']})
+
     def vm_dir(self, sid, name):
         ident(name)
         ident(sid, r'[0-9a-f]{32}')
@@ -386,23 +395,29 @@ class Agent:
             atomic(self.root / 'bootstrap.json', {'time': time.time(), 'bridge': bridge})
         return report
 
-    def fabric_add(self, sid, svid, **_):
-        ident(sid, r'[0-9a-f]{32}'); tag(svid)
+    def fabric_add(self, sid, svid=None, svids=None, **_):
+        ident(sid, r'[0-9a-f]{32}')
+        svids = sorted(set(svids)) if svids is not None else [svid]
+        ensure(1 <= len(svids) <= 64, 'Cantidad de S-VLAN inválida')
+        for s in svids:
+            tag(s)
         ensure(not (self.root / 'tombstones' / (sid + '.json')).exists(), 'Slice ya retirado')
         ensure((self.root / 'bootstrap.json').exists(), 'Ejecute bootstrap antes de desplegar')
         path = self.root / 'switch' / (sid + '.json')
         with self.lock('fabric'):
-            record = json.loads(path.read_text()) if path.exists() else {'svid': svid, 'added': []}
-            ensure(record['svid'] == svid, 'SVID no coincide')
+            record = json.loads(path.read_text()) if path.exists() else {'svids': svids, 'added': []}
+            ensure(record.get('svids', [record.get('svid')]) == svids, 'S-VLAN no coinciden')
             for iface in self.cfg['data_ports']:
                 trunks = json.loads(output('ovs-vsctl', 'get', 'Port', iface, 'trunks'))
                 if isinstance(trunks, int):
                     trunks = [trunks]
-                if trunks and svid not in trunks:
-                    if iface not in record['added']:
-                        record['added'].append(iface)
-                        atomic(path, record)  # registrar antes del efecto remoto
-                    output('ovs-vsctl', 'add', 'Port', iface, 'trunks', str(svid))
+                for s in svids:
+                    if trunks and s not in trunks:
+                        if [iface, s] not in record['added']:
+                            record['added'].append([iface, s])
+                            atomic(path, record)  # registrar antes del efecto remoto
+                        output('ovs-vsctl', 'add', 'Port', iface, 'trunks', str(s))
+                        trunks.append(s)
             atomic(path, record)
         return record
 
@@ -413,8 +428,9 @@ class Agent:
         with self.lock('fabric'):
             if path.exists():
                 record = json.loads(path.read_text())
-                for iface in record['added']:
-                    output('ovs-vsctl', 'remove', 'Port', iface, 'trunks', str(record['svid']))
+                for entry in record['added']:
+                    iface, s = (entry, record['svid']) if isinstance(entry, str) else entry  # registro anterior
+                    output('ovs-vsctl', 'remove', 'Port', iface, 'trunks', str(s))
                 path.unlink()
         return {'deleted': True}
 
@@ -426,6 +442,8 @@ class Agent:
         ensure(1 <= len(plan['networks']) <= 64 and 1 <= len(plan['vms']) <= 64, 'Plan demasiado grande')
         for n in plan['networks']:
             ident(n['name']); tag(n['cvid'])
+            if 'svid' in n:
+                tag(n['svid'])
             if 'cidr' in n:  # sin cidr: enlace L2 sin IP (la puerta no se conecta)
                 ipaddress.IPv4Network(n['cidr']); ipaddress.IPv4Address(n['gateway'])
         ipaddress.IPv4Network(plan['transit'])
@@ -559,22 +577,29 @@ class Agent:
 
     def network(self, sid, **_):
         plan = self.load(sid); n = self.names(plan)
-        self.fabric_add(sid, plan['svid'])
+        self.fabric_add(sid, svids=self.link_svids(plan))
+        per_link = all('svid' in x for x in plan['networks'])
+        if per_link:   # un par patch por enlace, cada uno con su S-VLAN
+            links = [self.link_names(plan, i) + ([x['cvid']], x['svid']) for i, x in enumerate(plan['networks'])]
+        else:          # plan anterior: un solo par patch con todas las C-VLAN en la S-VLAN del slice
+            links = [(n['customer'], n['provider'], [x['cvid'] for x in plan['networks']], plan['svid'])]
         with self.lock('fabric'):
-            for table, name in (('Bridge', n['bridge']), ('Port', n['customer']), ('Port', n['provider'])):
-                self.owned_ovs(table, name, sid)
+            self.owned_ovs('Bridge', n['bridge'], sid)
+            for customer, provider, _, _ in links:
+                self.owned_ovs('Port', customer, sid); self.owned_ovs('Port', provider, sid)
             output('ovs-vsctl', '--may-exist', 'add-br', n['bridge'], '--', 'set', 'Bridge', n['bridge'],
                    'external_ids:g5_slice=' + sid)
-            cvlans = ','.join(str(x['cvid']) for x in plan['networks'])
-            output('ovs-vsctl', '--may-exist', 'add-port', n['bridge'], n['customer'], '--',
-                   'set', 'Interface', n['customer'], 'type=patch', 'options:peer=' + n['provider'], '--',
-                   'set', 'Port', n['customer'], 'vlan_mode=trunk', 'trunks=' + cvlans, 'external_ids:g5_slice=' + sid)
-            output('ovs-vsctl', '--may-exist', 'add-port', self.cfg['bridge'], n['provider'], '--',
-                   'set', 'Interface', n['provider'], 'type=patch', 'options:peer=' + n['customer'], '--',
-                   'set', 'Port', n['provider'], 'vlan_mode=dot1q-tunnel', 'tag=' + str(plan['svid']),
-                   'cvlans=' + cvlans, 'other_config:qinq-ethtype=802.1ad', 'external_ids:g5_slice=' + sid)
+            for customer, provider, cvids, svid in links:
+                cvlans = ','.join(str(c) for c in cvids)
+                output('ovs-vsctl', '--may-exist', 'add-port', n['bridge'], customer, '--',
+                       'set', 'Interface', customer, 'type=patch', 'options:peer=' + provider, '--',
+                       'set', 'Port', customer, 'vlan_mode=trunk', 'trunks=' + cvlans, 'external_ids:g5_slice=' + sid)
+                output('ovs-vsctl', '--may-exist', 'add-port', self.cfg['bridge'], provider, '--',
+                       'set', 'Interface', provider, 'type=patch', 'options:peer=' + customer, '--',
+                       'set', 'Port', provider, 'vlan_mode=dot1q-tunnel', 'tag=' + str(svid),
+                       'cvlans=' + cvlans, 'other_config:qinq-ethtype=802.1ad', 'external_ids:g5_slice=' + sid)
             output('ip', 'link', 'set', n['bridge'], 'up')
-        return {'bridge': n['bridge'], 'svid': plan['svid'], 'cvids': cvlans}
+        return {'bridge': n['bridge'], 'links': [{'svid': s, 'cvids': c} for _, _, c, s in links]}
 
     def process(self, directory, binary, token):
         path = directory / ('qemu.pid' if binary == 'qemu-system' else 'dnsmasq.pid')
@@ -1139,9 +1164,12 @@ class Agent:
             if directory.exists():
                 shutil.rmtree(str(directory))
         with self.lock('fabric'):
-            self.owned_ovs('Port', n['provider'], sid)
+            providers = [n['provider']] + [self.link_names(plan, i)[1] for i in range(len(plan['networks']))]
+            for provider in providers:
+                self.owned_ovs('Port', provider, sid)
             self.owned_ovs('Bridge', n['bridge'], sid)
-            output('ovs-vsctl', '--if-exists', 'del-port', self.cfg['bridge'], n['provider'])
+            for provider in providers:
+                output('ovs-vsctl', '--if-exists', 'del-port', self.cfg['bridge'], provider)
             output('ovs-vsctl', '--if-exists', 'del-br', n['bridge'])
         self.fabric_delete(sid)
         with self.lock('reservations'), self.lock('images'):

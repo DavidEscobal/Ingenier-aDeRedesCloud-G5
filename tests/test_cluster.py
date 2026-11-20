@@ -138,7 +138,9 @@ class AdmissionTests(Fixture):
         pa = self.store.get_slice(a['slice_id'])['plan']; pb = self.store.get_slice(b['slice_id'])['plan']
         self.assertNotEqual(pa['svid'], pb['svid'])
         self.assertNotEqual(pa['transit'], pb['transit'])
-        self.assertEqual(pa['networks'], pb['networks'])
+        strip = lambda nets: [{k: v for k, v in n.items() if k != 'svid'} for n in nets]
+        self.assertEqual(strip(pa['networks']), strip(pb['networks']))
+        self.assertFalse({n['svid'] for n in pa['networks']} & {n['svid'] for n in pb['networks']})
 
     def test_duplicate_public_port_rejected_atomically(self):
         self.create()
@@ -387,6 +389,41 @@ class AgentTests(Fixture):
         self.assertEqual(m['vms'], [{'sid': sid, 'vm': 'vm1', 'pid': 4242, 'rss_mb': 256, 'cpu_cent': 50}])
         with self.assertRaises(AgentError):
             agent.metrics(interval=60)
+
+    def test_each_link_gets_its_own_outer_vlan_and_patch_pair(self):
+        # Ex2 15b–e: una VM que hace de switch entre dos enlaces. Con una S-VLAN por slice, br-int y el switch
+        # físico aprendían la MAC de la VM remota en el servidor de la VM switch y descartaban la respuesta.
+        self.spec['publications'] = []
+        self.spec['networks'].append({'name': 'l2', 'cvid': 101})
+        job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']
+        svids = [n['svid'] for n in plan['networks']]
+        self.assertEqual(len(set(svids)), len(svids))
+        self.assertEqual(plan['svid'], svids[0])
+        self.assertEqual(len(self.store.rows('SELECT svid FROM link_svids WHERE slice_id=?', (plan['id'],))), len(svids) - 1)
+        agent = self.agent('worker'); agent.manifest_path(plan['id']).write_text(json.dumps(plan))
+        commands = []
+        def fake(*args, **kw):
+            commands.append(' '.join(map(str, args))); return ''
+        with mock.patch.object(agent, 'fabric_add') as fabric, mock.patch.object(agent, 'owned_ovs'),                 mock.patch('g5.agent.output', side_effect=fake):
+            agent.network(plan['id'])
+        self.assertEqual(fabric.call_args.kwargs['svids'], sorted(svids))
+        for i, net in enumerate(plan['networks']):
+            customer, provider = agent.link_names(plan, i)
+            self.assertLessEqual(len(provider), 15)
+            self.assertTrue(any('add-port br-int ' + provider in c and 'tag=%d' % net['svid'] in c
+                                and 'cvlans=%d' % net['cvid'] in c and 'dot1q-tunnel' in c for c in commands))
+            self.assertTrue(any('add-port ' in c and customer in c and 'trunks=%d' % net['cvid'] in c for c in commands))
+        self.store.release(plan['id'], 'DELETED')
+        self.assertFalse(self.store.rows('SELECT svid FROM link_svids WHERE slice_id=?', (plan['id'],)))
+
+    def test_fabric_records_from_before_per_link_svids_are_still_removed(self):
+        agent = self.agent('worker'); sid = 'a' * 32
+        path = agent.root / 'switch' / (sid + '.json'); path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'svid': 1000, 'added': ['ens4']}))
+        commands = []
+        with mock.patch('g5.agent.output', side_effect=lambda *a, **k: commands.append(' '.join(map(str, a))) or ''),                 mock.patch('g5.agent.atomic'):
+            agent.fabric_delete(sid)
+        self.assertIn('ovs-vsctl remove Port ens4 trunks 1000', commands)
 
     def test_real_qinq_command_builder(self):
         job = self.create(); plan = self.store.get_slice(job['slice_id'])['plan']

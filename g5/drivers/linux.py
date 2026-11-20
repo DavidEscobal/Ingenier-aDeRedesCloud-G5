@@ -12,6 +12,11 @@ from ..model import Fault, require, integer, disk_bytes, slug, display_name, dig
 from .base import ProviderDriver
 
 
+def link_svids(plan):
+    """S-VLAN de cada enlace (planes nuevos) o la única del slice (planes anteriores al cambio)."""
+    return sorted({n.get('svid', plan['svid']) for n in plan['networks']})
+
+
 def validate_spec(spec, config):
     fields(spec, ('name', 'provider', 'networks', 'vms', 'publications'), ('name', 'networks', 'vms'))
     spec = copy.deepcopy(spec)
@@ -156,9 +161,16 @@ class LinuxDriver(ProviderDriver):
         return {'nodes': results, 'simulated': self.backend.simulated}
 
     def reserve(self, db, sid, plan):
-        used = {r[0] for r in db.execute('SELECT svid FROM leases')}
-        svid = next((v for v in range(self.cfg['svid_range'][0], self.cfg['svid_range'][1] + 1) if v not in used), None)
-        require(svid is not None, 'Pool de S-VLAN agotado', 409)
+        # Una S-VLAN por enlace: los switches (br-int de cada servidor y el físico) aprenden MAC por VLAN externa.
+        # Con una sola S-VLAN por slice, una VM que hace de switch entre enlaces (Ex2 15b–e) reinyecta la MAC de
+        # una VM remota desde su propio servidor y la respuesta hacia esa VM se descarta.
+        used = {r[0] for r in db.execute('SELECT svid FROM leases UNION SELECT svid FROM link_svids')}
+        free = (v for v in range(self.cfg['svid_range'][0], self.cfg['svid_range'][1] + 1) if v not in used)
+        svids = [next(free, None) for _ in plan['networks']]
+        require(svids and None not in svids, 'Pool de S-VLAN agotado', 409)
+        svid = svids[0]
+        for network, link_svid in zip(plan['networks'], svids):
+            network['svid'] = link_svid
         used_slots = {r[0] for r in db.execute('SELECT slot FROM leases')}
         pool = ipaddress.ip_network(self.cfg['transit_pool'])
         slot = next((x for x in range(pool.num_addresses // 4) if x not in used_slots), None)
@@ -193,6 +205,8 @@ class LinuxDriver(ProviderDriver):
                     'Puerto externo reservado', 409)
             db.execute('INSERT INTO ports VALUES(?,?,?)', (pub['protocol'], pub['external_port'], sid))
         db.execute('INSERT INTO leases VALUES(?,?,?)', (svid, sid, slot))
+        for link_svid in svids[1:]:
+            db.execute('INSERT INTO link_svids VALUES(?,?)', (link_svid, sid))
 
     def participants(self, plan):
         return sorted({v['worker'] for v in plan['vms']} | {self.cfg['gateway']['name']})
@@ -225,7 +239,7 @@ class LinuxDriver(ProviderDriver):
         switch = self.switch()
         nodes = self.participants(plan)
         if switch:
-            self.retry(switch, 'fabric_add', ctx, sid=sid, svid=plan['svid'])
+            self.retry(switch, 'fabric_add', ctx, sid=sid, svids=link_svids(plan))
         for node in nodes:
             self.retry(node, 'prepare', ctx, plan=plan)
         ctx.event('PREPARED', ','.join(nodes))

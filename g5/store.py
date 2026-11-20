@@ -26,6 +26,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS keys(owner TEXT, key TEXT, hash TEXT, job TEXT,
                 PRIMARY KEY(owner,key));
             CREATE TABLE IF NOT EXISTS leases(svid INTEGER PRIMARY KEY, slice_id TEXT UNIQUE, slot INTEGER UNIQUE);
+            CREATE TABLE IF NOT EXISTS link_svids(svid INTEGER PRIMARY KEY, slice_id TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS allocations(slice_id TEXT, vm TEXT, worker TEXT, cpu INTEGER,
                 mem INTEGER, disk INTEGER, image TEXT, vnc INTEGER, PRIMARY KEY(slice_id,vm), UNIQUE(worker,vnc));
             CREATE TABLE IF NOT EXISTS ports(protocol TEXT, port INTEGER, slice_id TEXT, PRIMARY KEY(protocol,port));
@@ -124,7 +125,7 @@ class Store:
 
     def release(self, sid, status):
         with self.tx() as db:
-            for table in ('allocations', 'leases', 'ports'):
+            for table in ('allocations', 'leases', 'link_svids', 'ports'):
                 db.execute('DELETE FROM ' + table + ' WHERE slice_id=?', (sid,))
             db.execute('UPDATE tokens SET revoked=1 WHERE slice_id=?', (sid,))
             db.execute('UPDATE slices SET reserved=0,status=? WHERE id=?', (status, sid))
