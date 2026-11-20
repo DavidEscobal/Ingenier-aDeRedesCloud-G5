@@ -117,7 +117,7 @@ export default function NewSlice() {
   }
 
   const vms = preview?.vms || []
-  const needsGuest = vms.some((vm) => /ubuntu/i.test(vm.image || ''))
+  const needsGuest = vms.some((vm) => /ubuntu|bionic|focal|jammy|noble/i.test(vm.image || ''))
   const totals = vms.reduce((a, vm) => ({ vcpus: a.vcpus + vm.vcpus, ram: a.ram + vm.memory_mb, disk: a.disk + vm.disk_gb }),
     { vcpus: 0, ram: 0, disk: 0 })
 

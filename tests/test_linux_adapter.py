@@ -146,6 +146,12 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(data['ssh_pwauth'])
         self.assertEqual(data['users'][0]['passwd'], GUEST['password_hash'])
 
+    def test_canonical_release_names_are_ubuntu(self):
+        # La imagen del curso conserva el nombre del archivo: focal-server-cloudimg-amd64 (Ubuntu 20.04).
+        out = adapt(dict(neutral(2, image='focal-server-cloudimg-amd64'), guest=dict(GUEST)), ['server1'], self.resolve)
+        self.assertEqual(out['vms'][0]['guest']['os'], 'ubuntu')
+        validate_spec(out, self.cfg)
+
     def test_rejects_unknown_images_and_no_workers(self):
         with self.assertRaisesRegex(Fault, 'CirrOS o Ubuntu'):
             adapt(neutral(image='debian-12'), ['server1'], self.resolve)

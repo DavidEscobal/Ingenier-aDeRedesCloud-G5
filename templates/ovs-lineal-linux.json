@@ -8,7 +8,7 @@
   "vms": [
     {"name": "vm1", "image": "cirros-062", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "host": "server1",
      "nics": [{"network": "l12"}]},
-    {"name": "vm2", "image": "ubuntu-20.04", "vcpus": 1, "memory_mb": 1024, "disk_gb": 2.5, "host": "server2",
+    {"name": "vm2", "image": "focal-server-cloudimg-amd64", "vcpus": 1, "memory_mb": 1024, "disk_gb": 2.5, "host": "server2",
      "internet": true,
      "nics": [{"network": "l12"}, {"network": "l23"}]},
     {"name": "vm3", "image": "cirros-062", "vcpus": 1, "memory_mb": 512, "disk_gb": 1, "host": "server3",

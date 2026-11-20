@@ -31,8 +31,12 @@ def validate_access(guest):
     return {'username': guest['username'], 'password_hash': guest['password_hash'], 'ssh_authorized_keys': list(keys)}
 
 
+# Nombres de las imágenes cloud oficiales de Canonical (p. ej. focal-server-cloudimg-amd64 = Ubuntu 20.04).
+UBUNTU_NAMES = re.compile(r'ubuntu|bionic|focal|jammy|noble', re.I)
+
+
 def is_ubuntu(image):
-    return isinstance(image, str) and 'ubuntu' in image.lower()
+    return isinstance(image, str) and bool(UBUNTU_NAMES.search(image))
 
 
 MAC = re.compile(r'[0-9a-f]{2}(?::[0-9a-f]{2}){5}')
