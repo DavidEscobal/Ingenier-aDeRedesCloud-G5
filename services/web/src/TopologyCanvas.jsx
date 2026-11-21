@@ -16,6 +16,7 @@ function VmNode({ id, data, selected, isConnectable }) {
     data.vcpus != null && `${data.vcpus}\u00a0vCPU`,
     data.memory_mb != null && `${data.memory_mb}\u00a0MB`,
     data.disk_gb != null && `${data.disk_gb}\u00a0GB`,
+    data.ovs_bridge && 'Switch OVS',
     data.internet && 'Internet',
     data.host,
   ].filter(Boolean)

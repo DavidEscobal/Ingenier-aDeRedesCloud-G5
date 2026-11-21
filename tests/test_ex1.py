@@ -50,6 +50,34 @@ class EX1Tests(unittest.TestCase):
         job=self.create();return self.store.get_slice(job['slice_id'])['plan']
     def agent(self):
         c=dict(self.cfg['common'],**self.cfg['workers']['server1']);c['state_dir']=self.temp.name+'/worker';return Agent(c)
+
+    def test_central_linux_circuits_cover_every_nic_and_gateway(self):
+        self.cfg.pop('switch')
+        self.cfg['require_central_fabric'] = True
+        with self.assertRaisesRegex(Fault, 'VM Placement'):
+            self.app.route('POST', '/v1/slices', {'provider': 'linux', 'vms': [{'name': 'vm1'}]},
+                           'profesor', True, 'missing-placement')
+        hosts = list(self.cfg['workers']) + [self.cfg['gateway']['name']]
+        slots = [dict(host=host, uplink='up%d' % h, port='p%d-%d' % (h, i), vlan=200 + 20*h + i)
+                 for h, host in enumerate(hosts) for i in range(16)]
+        self.cfg['central_fabric'] = {'linux': dict(name='ovs1', role='switch', segment_range=[501, 560], circuits=slots)}
+        job = self.create()
+        self.app.engine.process_one()
+        row = self.store.get_slice(job['slice_id'])
+        self.assertEqual(row['status'], 'READY', row)
+        plan = row['plan']
+        members = {a['vlan']: a for a in plan['fabric']['attachments']}
+        self.assertEqual(len(members), sum(len(v['nics']) for v in plan['vms']) +
+                         sum('cidr' in n for n in plan['networks']))
+        for net in plan['networks']:
+            wires = [nic['wire_vlan'] for vm in plan['vms'] for nic in vm['nics'] if nic['network'] == net['name']]
+            if 'cidr' in net:
+                wires.append(net['gateway_vlan'])
+                self.assertEqual(members[wires[-1]]['host'], self.cfg['gateway']['name'])
+            self.assertEqual(len(wires), len(set(wires)))
+            self.assertEqual(len({members[w]['segment'] for w in wires}), 1)
+        self.assertIn(('ovs1', 'circuit_connect'), [(n,a) for n,a,_ in self.backend.calls])
+
     def test_exact_vm_workers_flavors(self):
         plan=self.plan()
         self.assertEqual([(v['name'],v['worker']) for v in plan['vms']], [('vm1','server1'),('vm2','server2'),('vm3','server3'),('vm4','server1'),('vm5','server2'),('vm6','server3')])

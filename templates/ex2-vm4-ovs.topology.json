@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "name": "Ex2_VM4_OVS",
+  "cluster": "openstack",
+  "description": "VM4 une VM1, VM3 y VM5 en capa 2. VM4 y VM5 tienen salida a Internet.",
+  "nodes": [
+    {"id":"vm1","image":"ubuntu-24.04-minimal-cloudimg-amd64","vcpus":1,"memory_mb":1024,"disk_gb":4,"position":{"x":0,"y":400}},
+    {"id":"vm2","image":"cirros","vcpus":1,"memory_mb":512,"disk_gb":1,"position":{"x":340,"y":560}},
+    {"id":"vm3","image":"ubuntu-24.04-minimal-cloudimg-amd64","vcpus":1,"memory_mb":1024,"disk_gb":4,"position":{"x":680,"y":400}},
+    {"id":"vm4","image":"ubuntu-24.04-minimal-cloudimg-amd64","vcpus":1,"memory_mb":1024,"disk_gb":4,"internet":true,"ovs_bridge":true,"position":{"x":340,"y":255}},
+    {"id":"vm5","image":"ubuntu-24.04-minimal-cloudimg-amd64","vcpus":1,"memory_mb":1024,"disk_gb":4,"internet":true,"position":{"x":340,"y":115}},
+    {"id":"vm6","image":"cirros","vcpus":1,"memory_mb":512,"disk_gb":1,"position":{"x":340,"y":-25}}
+  ],
+  "segments": [
+    {"id":"l12","kind":"link","members":["vm1","vm2"]},
+    {"id":"l23","kind":"link","members":["vm2","vm3"]},
+    {"id":"l14","kind":"link","members":["vm1","vm4"],"addressed":false},
+    {"id":"l34","kind":"link","members":["vm3","vm4"],"addressed":false},
+    {"id":"l45","kind":"link","members":["vm4","vm5"],"addressed":false},
+    {"id":"l56","kind":"link","members":["vm5","vm6"]}
+  ]
+}

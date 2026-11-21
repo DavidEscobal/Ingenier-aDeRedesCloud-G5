@@ -148,6 +148,9 @@ class Application:
                 return 200, s.rows('SELECT id,owner,name,provider,status,reserved FROM slices' + ('' if admin else ' WHERE owner=?'), () if admin else (owner,))
             if method == 'POST':
                 if needs_adapter(body):
+                    if self.config.get('require_central_fabric'):
+                        require(all(isinstance(v, dict) and v.get('host') for v in body['vms']),
+                                'Falta el servidor asignado por VM Placement en el clúster Linux', 409)
                     workers = [r['id'] for r in s.rows('SELECT id FROM nodes WHERE enabled=1 ORDER BY id')
                                if r['id'] in self.config.get('workers', {})]
                     body = adapt(body, workers, self.linux_image_ready)
@@ -423,6 +426,8 @@ def main():
     p.add_argument('--port', type=int, default=8085)
     p.add_argument('--cert'); p.add_argument('--key')
     p.add_argument('--simulate', action='store_true')
+    p.add_argument('--require-central-fabric', action='store_true',
+                   help='exige circuitos verificados del OVS central para admitir slices nuevos')
     p.add_argument('--openstack-env', default='~/.g5/openstack.env', help='openrc con OS_* (permisos 600)')
     p.add_argument('--internal-network', action='store_true',
                    help='permite HTTP sin TLS fuera de loopback: solo dentro de una red Docker interna sin puertos publicados')
@@ -434,6 +439,8 @@ def main():
     lock = (Path(args.state) / 'api.lock').open('a')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     config = json.loads(Path(args.config).read_text())
+    if args.require_central_fabric:
+        config['require_central_fabric'] = True
     env_file = Path(args.openstack_env).expanduser()
     if 'openstack' in config and env_file.exists():
         # Las variables ya presentes en el entorno (p. ej. systemd) tienen prioridad.

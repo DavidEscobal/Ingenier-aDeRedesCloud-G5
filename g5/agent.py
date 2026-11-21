@@ -181,6 +181,14 @@ def cloud_documents(plan, vm, mtu):
             'runcmd': [['sysctl', '-p', '/etc/sysctl.d/99-ex1-no-forward.conf'],
                        ['systemctl', 'enable', '--now', 'ssh'],
                        ['systemctl', 'enable', '--now', 'getty@tty1.service']]}
+    if vm.get('ovs_bridge'):
+        if vm['internet']:
+            data['packages'] = ['openvswitch-switch']
+        data['runcmd'].append(['ovs-vsctl', '--may-exist', 'add-br', 'br0'])
+        for idx, nic in enumerate(vm['nics']):
+            if not (idx == 0 and vm['internet']):
+                data['runcmd'].append(['ovs-vsctl', '--may-exist', 'add-port', 'br0', nic.get('name', 'eth%d' % idx)])
+        data['runcmd'].append(['ip', 'link', 'set', 'br0', 'up'])
     network = {'version': 2, 'ethernets': {}}
     for idx, nic in enumerate(vm['nics']):
         net = next(n for n in plan['networks'] if n['name'] == nic['network'])
@@ -188,9 +196,11 @@ def cloud_documents(plan, vm, mtu):
         cfg = {'match': {'macaddress': nic['mac']}, 'set-name': name,
                'dhcp4': False, 'dhcp6': False, 'accept-ra': False, 'optional': True,
                'mtu': mtu}
-        if 'ip' in nic:  # enlace sin IP: interfaz levantada sin dirección
+        if idx == 0 and vm['internet'] and net.get('dhcp'):
+            cfg['dhcp4'] = True
+        elif 'ip' in nic:  # enlace sin IP: interfaz levantada sin dirección
             cfg['addresses'] = [nic['ip'] + '/' + net['cidr'].split('/')[1]]
-        if idx == 0 and (vm['internet'] or any(p['vm'] == vm['name'] for p in plan['publications'])):
+        if idx == 0 and not cfg['dhcp4'] and (vm['internet'] or any(p['vm'] == vm['name'] for p in plan['publications'])):
             cfg['gateway4'] = net['gateway']
             cfg['nameservers'] = {'addresses': ['8.8.8.8']}
         network['ethernets'][name] = cfg
@@ -207,9 +217,52 @@ def cirros_documents(plan, vm):
     return {'meta-data': meta, 'user-data': ''}
 
 
+def mapped_interface(mac, sysnet=Path('/sys/class/net')):
+    ensure(re.fullmatch(r'[0-9a-f]{2}(:[0-9a-f]{2}){5}', mac), 'MAC de inventario inválida')
+    found = [p for p in sysnet.iterdir() if (p / 'address').read_text().strip().lower() == mac]
+    # El puerto LOCAL de un bridge puede heredar la MAC de su NIC.
+    names = [p.name for p in found if (p / 'device').exists()]
+    ensure(len(names) == 1, 'No se encontró una única NIC física para ' + mac)
+    return names[0]
+
+
+def port_vlans():
+    table = json.loads(output('ovs-vsctl', '--format=json', '--columns=name,vlan_mode,tag,trunks', 'list', 'Port'))
+    def values(value):
+        return value[1] if isinstance(value, list) and value[0] == 'set' else [value]
+    result = {}
+    for row in table['data']:
+        fields = dict(zip(table['headings'], row))
+        tags = values(fields['tag'])
+        mode = values(fields['vlan_mode']) or ['access' if tags else 'trunk']
+        result[fields['name']] = (mode[0], set(tags), set(values(fields['trunks'])))
+    return result
+
+
+def carries_vlan(rule, vid):
+    mode, tags, trunks = rule
+    if mode == 'access':
+        return vid in tags
+    ensure(mode in ('trunk', 'native-tagged', 'native-untagged'), 'Modo de troncal no soportado: ' + mode)
+    return vid in tags or not trunks or vid in trunks
+
+
 class Agent:
     def __init__(self, cfg):
-        self.cfg = cfg
+        self.cfg = dict(cfg)
+        if cfg.get('management_mac'):
+            self.cfg['management_interface'] = mapped_interface(cfg['management_mac'])
+        if cfg.get('data_mac'):
+            self.cfg['data_ports'] = [mapped_interface(cfg['data_mac'])]
+        if cfg.get('circuits'):
+            slots = list(cfg['circuits'])
+            if cfg.get('external_circuit'):
+                slots.append(cfg['external_circuit'])
+            names = {u: mapped_interface(u) if ':' in u else u for u in {s['uplink'] for s in slots}}
+            self.cfg['circuits'] = [dict(s, uplink=names[s['uplink']]) for s in cfg['circuits']]
+            if cfg.get('external_circuit'):
+                self.cfg['external_circuit'] = dict(slots[-1], uplink=names[slots[-1]['uplink']])
+            self.cfg['data_ports'] = sorted(set(names.values()))
         self.root = Path(cfg.get('state_dir', '/var/lib/g5-cluster'))
         for name in ('slices', 'vms', 'images', 'locks', 'switch', 'tombstones'):
             (self.root / name).mkdir(parents=True, exist_ok=True)
@@ -373,6 +426,16 @@ class Agent:
     def bootstrap(self, **_):
         report = self.doctor()
         ensure(report['ok'], '; '.join(report['problems']))
+        if self.cfg['role'] == 'switch' and 'circuits' in self.cfg:
+            with self.lock('fabric'):
+                commands, _ = self.circuit_setup()
+                if commands:
+                    output('ovs-vsctl', '--timeout=15', *commands)
+                self.check_switching_bridge()
+                self.check_uplinks(self.all_circuits())
+                for slot in self.all_circuits():
+                    self.check_circuit(slot)
+            return report
         with self.lock('fabric'):
             bridge = self.cfg['bridge']
             for iface in self.cfg['data_ports']:
@@ -395,10 +458,206 @@ class Agent:
             atomic(self.root / 'bootstrap.json', {'time': time.time(), 'bridge': bridge})
         return report
 
+    def all_circuits(self):
+        return self.cfg['circuits'] + ([self.cfg['external_circuit']] if self.cfg.get('external_circuit') else [])
+
+    def circuit_plan(self, **_):
+        with self.lock('fabric'):
+            _, changes = self.circuit_setup()
+        return {'ok': True, 'changes': changes}
+
+    def circuit_setup(self):
+        """Plan OVSDB atómico. Los enlaces físicos siguen en sus bridges y conservan las VLAN ajenas."""
+        ensure(self.cfg['role'] == 'switch' and self.cfg.get('circuits'), 'Se requiere un switch de fase 2')
+        bridge, owner = self.cfg['bridge'], self.cfg['name']
+        slots = self.all_circuits()
+        wires = {tag(s['vlan']) for s in slots}
+        lo, hi = self.cfg['segment_range']
+        ensure(1 <= tag(lo) <= tag(hi) <= 4094 and all(not lo <= v <= hi for v in wires), 'Rangos VLAN superpuestos')
+        if self.cfg.get('external_tag') is not None:
+            external_tag = tag(self.cfg['external_tag'])
+            ensure(external_tag not in wires and not lo <= external_tag <= hi, 'VLAN externa en conflicto')
+        ensure(len(wires) == len(slots) and len({s['port'] for s in slots}) == len(slots), 'Circuitos repetidos')
+        rules = port_vlans()
+        commands, changes = [], []
+        if self.cfg.get('external_tag') is not None and not self.cfg.get('external_circuit'):
+            external = self.cfg['external_port']
+            ensure(external in rules and rules[external][:2] == ('access', {self.cfg['external_tag']}) and
+                   output('ovs-vsctl', 'port-to-br', external) == bridge, 'Falta el acceso externo preconfigurado')
+        if bridge in rules:
+            ensure(output('ovs-vsctl', 'get', 'Bridge', bridge, 'external_ids:g5_fabric').strip('"') == owner,
+                   'El bridge lógico ya existe y es ajeno')
+            self.check_normal_bridge(bridge)
+            allowed = {s['port'] for s in slots} | {self.cfg.get('external_port')}
+            ensure(set(output('ovs-vsctl', 'list-ports', bridge).splitlines()) <= allowed, 'Puerto lógico ajeno')
+        else:
+            commands += ['--', 'add-br', bridge, '--', 'set', 'Bridge', bridge, 'external_ids:g5_fabric=' + owner,
+                         '--', 'set', 'Port', bridge, 'vlan_mode=access', 'tag=0']
+            changes.append({'create_bridge': bridge})
+        uplinks = {u: output('ovs-vsctl', 'port-to-br', u) for u in {s['uplink'] for s in slots}}
+        for transport in sorted(set(uplinks.values())):
+            ensure(transport != bridge, 'La troncal debe llegar a un bridge de transporte')
+            self.check_normal_bridge(transport)
+            peers = {'g5t%d' % s['vlan'] for s in slots if uplinks[s['uplink']] == transport}
+            ports = set(output('ovs-vsctl', 'list-ports', transport).splitlines()) | {transport}
+            for port in sorted(ports - peers):
+                mode, tags, trunks = rules[port]
+                ensure(not tags.intersection(wires), 'El VID solicitado ya es una VLAN de acceso o nativa de ' + port)
+                if mode == 'access':
+                    ensure(port not in uplinks, 'La troncal es un puerto de acceso: ' + port)
+                    continue
+                ensure(mode in ('trunk', 'native-tagged', 'native-untagged'), 'Modo de puerto incompatible: ' + port)
+                current = trunks or set(range(4096))
+                assigned = {s['vlan'] for s in slots if s['uplink'] == port}
+                after = (current - wires) | assigned
+                # OVS interpreta trunks=[] como todas las VLAN; no se puede expresar la lista vacía.
+                ensure(after, 'El puerto quedaría sin VLAN autorizada: ' + port)
+                if after != current:
+                    def setting(vids):
+                        return 'trunks=' + (','.join(map(str, sorted(vids))) if vids else '[]')
+                    commands += ['--', 'wait-until', 'Port', port, setting(trunks),
+                                 '--', 'set', 'Port', port, setting(after)]
+                    changes.append(dict(port=port, add=sorted(after-current), remove=sorted(current-after)))
+        for s in slots:
+            peer, port = 'g5t%d' % s['vlan'], s['port']
+            logical_tag = self.cfg['external_tag'] if s == self.cfg.get('external_circuit') else s['vlan']
+            for name, target, other, vid in ((peer, uplinks[s['uplink']], port, s['vlan']), (port, bridge, peer, logical_tag)):
+                if name in rules:
+                    ensure(output('ovs-vsctl', 'get', 'Port', name, 'external_ids:g5_fabric').strip('"') == owner
+                           and output('ovs-vsctl', 'port-to-br', name) == target
+                           and output('ovs-vsctl', 'get', 'Interface', name, 'type').strip('"') == 'patch'
+                           and output('ovs-vsctl', 'get', 'Interface', name, 'options:peer').strip('"') == other,
+                           'Puerto existente ajeno o circuito cambiado: ' + name)
+                    leased = output('ovs-vsctl', '--if-exists', 'get', 'Port', name, 'external_ids:g5_slice').strip('"')
+                    ensure(rules[name][0] == 'access' and
+                           (rules[name][1] == {vid} or (target == bridge and s in self.cfg['circuits'] and
+                                                       re.fullmatch('[0-9a-f]{32}', leased))), 'Etiqueta ajena: ' + name)
+                    continue  # puede estar arrendado
+                commands += ['--', 'add-port', target, name, '--', 'set', 'Interface', name, 'type=patch',
+                             'options:peer=' + other, '--', 'set', 'Port', name, 'vlan_mode=access',
+                             'tag=' + str(vid), 'external_ids:g5_fabric=' + owner]
+                changes.append(dict(create_port=name, bridge=target, tag=vid))
+        return commands, changes
+
+    def check_switching_bridge(self):
+        bridge = self.cfg['bridge']
+        ports = {s['port'] for s in self.cfg['circuits']}
+        if self.cfg.get('external_tag') is not None:
+            external = self.cfg['external_port']
+            ensure(external not in ports and
+                   output('ovs-vsctl', 'get', 'Port', external, 'tag') == str(self.cfg['external_tag']) and
+                   output('ovs-vsctl', 'get', 'Port', external, 'vlan_mode').strip('"') == 'access',
+                   'El acceso externo no coincide con el inventario')
+            ports.add(external)
+        ensure(set(output('ovs-vsctl', 'list-ports', bridge).splitlines()) == ports,
+               'El bridge central debe contener exclusivamente los accesos inventariados')
+        self.check_normal_bridge(bridge)
+
+    def check_normal_bridge(self, bridge):
+        ensure(not output('ovs-vsctl', 'get-controller', bridge), 'El bridge tiene controlador externo: ' + bridge)
+        flows = [line for line in output('ovs-ofctl', 'dump-flows', bridge).splitlines() if 'actions=' in line]
+        ensure(len(flows) == 1 and re.search(r'priority=0\s+actions=NORMAL$', flows[0]),
+               'El bridge dedicado requiere conmutación NORMAL sin reglas adicionales')
+
+    def check_uplinks(self, selected):
+        rules = port_vlans()
+        bridges = {}
+        for slot in selected:
+            uplink = slot['uplink']
+            transport = output('ovs-vsctl', 'port-to-br', uplink)
+            if transport not in bridges:
+                self.check_normal_bridge(transport)
+                bridges[transport] = set(output('ovs-vsctl', 'list-ports', transport).splitlines()) | {transport}
+            peer = output('ovs-vsctl', 'get', 'Interface', slot['port'], 'options:peer').strip('"')
+            members = {p for p in bridges[transport] if carries_vlan(rules[p], slot['vlan'])}
+            ensure(transport != self.cfg['bridge'] and members == {uplink, peer},
+                   'VLAN %s no aislada en su troncal y patch' % slot['vlan'])
+
+    def check_circuit(self, slot):
+        port = slot['port']
+        bridge = self.cfg['bridge']
+        ensure(output('ovs-vsctl', 'port-to-br', port) == bridge, 'Bridge central incorrecto')
+        ensure(output('ovs-vsctl', 'get', 'Interface', port, 'type').strip('"') == 'patch',
+               'Se esperaba el extremo patch del circuito')
+        peer = output('ovs-vsctl', 'get', 'Interface', port, 'options:peer').strip('"')
+        transport = output('ovs-vsctl', 'port-to-br', peer)
+        ensure(output('ovs-vsctl', 'get', 'Interface', peer, 'options:peer').strip('"') == port and
+               transport != bridge and output('ovs-vsctl', 'port-to-br', slot['uplink']) == transport and
+               output('ovs-vsctl', 'get', 'Port', peer, 'tag') == str(slot['vlan']),
+               'El extremo de transporte no corresponde a la VLAN del circuito')
+        uplink = slot['uplink']
+        trunks = json.loads(output('ovs-vsctl', 'get', 'Port', uplink, 'trunks'))
+        mode = output('ovs-vsctl', 'get', 'Port', uplink, 'vlan_mode').strip('"')
+        ensure(mode in ('[]', 'trunk', 'native-tagged', 'native-untagged') and
+               (trunks == [] or slot['vlan'] in (trunks if isinstance(trunks, list) else [trunks])),
+               'Troncal sin la VLAN del circuito')
+        for endpoint in (peer, port):
+            ensure(output('ovs-vsctl', 'get', 'Port', endpoint, 'vlan_mode').strip('"') == 'access',
+                   'Cada extremo del circuito requiere vlan_mode=access')
+
+    def circuit_connect(self, sid, attachments, **_):
+        ident(sid, r'[0-9a-f]{32}')
+        ensure(self.cfg['role'] == 'switch', 'Se requiere el OVS central')
+        slots = {s['port']: s for s in self.cfg['circuits']}
+        lo, hi = self.cfg['segment_range']
+        path = self.root / 'switch' / ('circuits-' + sid + '.json')
+        with self.lock('fabric'):
+            ensure(not (self.root / 'tombstones' / (sid + '.json')).exists(), 'Slice retirado')
+            self.check_switching_bridge()
+            selected = [slots[a['port']] for a in attachments if a['port'] in slots]
+            if self.cfg.get('external_circuit') and any(a['segment'] == self.cfg['external_tag'] for a in attachments):
+                selected.append(self.cfg['external_circuit'])
+                self.check_circuit(selected[-1])
+            self.check_uplinks(selected)
+            ensure(not path.exists() or json.loads(path.read_text()) == attachments, 'Circuitos cambiaron')
+            changes = []
+            for a in attachments:
+                port = a['port']
+                slot = slots.get(port)
+                ensure(slot and slot['host'] == a['host'] and slot['vlan'] == a['vlan'], 'Circuito desconocido')
+                segment = tag(a['segment'])
+                ensure(lo <= segment <= hi or segment == self.cfg.get('external_tag'), 'Segmento no autorizado')
+                self.check_circuit(slot)
+                owner = output('ovs-vsctl', 'get', 'Port', port, 'external_ids').strip()
+                current = output('ovs-vsctl', 'get', 'Port', port, 'tag')
+                if current == str(segment) and output('ovs-vsctl', '--if-exists', 'get', 'Port', port,
+                                                      'external_ids:g5_slice').strip('"') == sid:
+                    continue
+                ensure(current == str(slot['vlan']) and 'g5_slice' not in owner, 'Circuito ocupado')
+                changes += ['--', 'wait-until', 'Port', port, 'tag=' + current,
+                            '--', 'set', 'Port', port, 'tag=' + str(segment), 'external_ids:g5_slice=' + sid]
+            atomic(path, attachments)
+            if changes:
+                output('ovs-vsctl', '--timeout=8', *changes)
+        return {'connected': len(attachments)}
+
+    def circuit_disconnect(self, sid, **_):
+        ident(sid, r'[0-9a-f]{32}')
+        ensure(self.cfg['role'] == 'switch', 'Se requiere el OVS central')
+        path = self.root / 'switch' / ('circuits-' + sid + '.json')
+        with self.lock('fabric'):
+            atomic(self.root / 'tombstones' / (sid + '.json'), {'deleted_at': time.time()})
+            if path.exists():
+                changes = []
+                for a in json.loads(path.read_text()):
+                    port = a['port']
+                    owner = output('ovs-vsctl', '--if-exists', 'get', 'Port', port, 'external_ids:g5_slice').strip('"')
+                    if owner == sid:
+                        changes += ['--', 'wait-until', 'Port', port, 'external_ids:g5_slice=' + sid,
+                                    '--', 'set', 'Port', port, 'tag=' + str(a['vlan']),
+                                    '--', 'remove', 'Port', port, 'external_ids', 'g5_slice']
+                    else:
+                        ensure(not owner and output('ovs-vsctl', 'get', 'Port', port, 'tag') == str(a['vlan']),
+                               'El circuito no está en cuarentena')
+                if changes:
+                    output('ovs-vsctl', '--timeout=8', *changes)
+                path.unlink()
+        return {'disconnected': True}
+
     def fabric_add(self, sid, svid=None, svids=None, **_):
         ident(sid, r'[0-9a-f]{32}')
         svids = sorted(set(svids)) if svids is not None else [svid]
-        ensure(1 <= len(svids) <= 64, 'Cantidad de S-VLAN inválida')
+        ensure(1 <= len(svids) <= 1024, 'Cantidad de S-VLAN inválida')
         for s in svids:
             tag(s)
         ensure(not (self.root / 'tombstones' / (sid + '.json')).exists(), 'Slice ya retirado')
@@ -588,6 +847,27 @@ class Agent:
         plan = self.load(sid); n = self.names(plan)
         if plan.get('transport') == 'vxlan':
             return self.network_vxlan(sid, plan, n)
+        if plan.get('fabric'):
+            ensure(len(self.cfg['data_ports']) == 1 and
+                   output('ovs-vsctl', 'port-to-br', self.cfg['data_ports'][0]) == self.cfg['bridge'],
+                   'La NIC de datos del mapa VNRT no pertenece al bridge del nodo')
+            wires = [a['vlan'] for a in plan['fabric']['attachments'] if a['host'] == self.cfg['name']]
+            self.owned_ovs('Bridge', n['bridge'], sid)
+            output('ovs-vsctl', '--may-exist', 'add-br', n['bridge'], '--', 'set', 'Bridge', n['bridge'],
+                   'external_ids:g5_slice=' + sid)
+            if wires:
+                for wire in wires:
+                    tag(wire)
+                self.fabric_add(sid, svids=wires)
+                trunks = 'trunks=' + ','.join(str(w) for w in wires)
+                for bridge, port, peer in ((n['bridge'], n['customer'], n['provider']),
+                                           (self.cfg['bridge'], n['provider'], n['customer'])):
+                    self.owned_ovs('Port', port, sid)
+                    output('ovs-vsctl', '--may-exist', 'add-port', bridge, port, '--', 'set', 'Interface', port,
+                           'type=patch', 'options:peer=' + peer, '--', 'set', 'Port', port,
+                           'vlan_mode=trunk', trunks, 'external_ids:g5_slice=' + sid)
+            output('ip', 'link', 'set', n['bridge'], 'up')
+            return {'bridge': n['bridge'], 'transport': 'central', 'circuits': wires}
         self.fabric_add(sid, svids=self.link_svids(plan))
         per_link = all('svid' in x for x in plan['networks'])
         if per_link:   # un par patch por enlace, cada uno con su S-VLAN
@@ -738,7 +1018,7 @@ class Agent:
                     ensure(output('cat', '/sys/class/net/' + tap + '/ifalias') == 'g5:' + sid, 'TAP ajeno')
                 net = next(x for x in plan['networks'] if x['name'] == nic['network'])
                 output('ovs-vsctl', '--may-exist', 'add-port', bridge, tap, '--', 'set', 'Port', tap,
-                       'vlan_mode=access', 'tag=' + str(net['cvid']), 'external_ids:g5_slice=' + sid)
+                       'vlan_mode=access', 'tag=' + str(nic.get('wire_vlan', net['cvid'])), 'external_ids:g5_slice=' + sid)
                 output(*self.police(tap))
                 output('ip', 'link', 'set', tap, 'mtu', str(self.cfg['guest_mtu']), 'up')
                 argv += ['-netdev', 'tap,id=n%s,ifname=%s,script=no,downscript=no' % (i, tap),
@@ -800,10 +1080,14 @@ class Agent:
                       'test -n "$dev"',
                       'if [ "$dev" != "' + name + '" ]; then sudo ip link set "$dev" down; sudo ip link set "$dev" name ' + name + '; fi',
                       'sudo ip addr flush dev ' + name]
-            if 'ip' in nic:  # en un enlace sin IP la interfaz queda arriba y sin dirección (Ex2 15b)
+            dhcp = idx == 0 and vm['internet'] and net.get('dhcp')
+            if 'ip' in nic and not dhcp:  # en un enlace sin IP la interfaz queda arriba y sin dirección (Ex2 15b)
                 lines += ['sudo ip addr add ' + nic['ip'] + '/' + net['cidr'].split('/')[1] + ' dev ' + name]
             lines += ['sudo ip link set ' + name + ' mtu ' + str(self.cfg['guest_mtu']) + ' up']
-            if idx == 0 and vm['internet']:
+            if dhcp:
+                lines += ['if command -v dhcpcd >/dev/null; then sudo dhcpcd -4 -w -t 30 ' + name +
+                          '; else sudo udhcpc -n -i ' + name + ' -p /var/run/udhcpc-' + name + '.pid; fi']
+            elif idx == 0 and vm['internet']:
                 lines += ['sudo ip route replace default via ' + net['gateway'] + ' dev ' + name]
         rc, result = serial_execute(str(directory / 'serial.sock'), '\n'.join(lines),
                                     self.cfg['probe_user'], self.cfg['probe_password'],
@@ -932,7 +1216,7 @@ class Agent:
                 self.owned_ovs('Port', port, sid)
                 self.ensure_veth(sid, port, 'g5l' + sid[:8] + str(idx), ns, local)
                 output('ovs-vsctl', '--may-exist', 'add-port', n['bridge'], port, '--', 'set', 'Port', port,
-                       'tag=' + str(net['cvid']), 'vlan_mode=access', 'external_ids:g5_slice=' + sid)
+                       'tag=' + str(net.get('gateway_vlan', net['cvid'])), 'vlan_mode=access', 'external_ids:g5_slice=' + sid)
                 output('ip', 'link', 'set', port, 'mtu', str(self.cfg['guest_mtu']), 'up')
                 output('ip', '-n', ns, 'addr', 'replace', net['gateway'] + '/' + net['cidr'].split('/')[1], 'dev', local)
                 output('ip', '-n', ns, 'link', 'set', local, 'mtu', str(self.cfg['guest_mtu']), 'up')
@@ -981,12 +1265,13 @@ class Agent:
             for table, chain, rule in hooks:
                 self.ipt(table, chain, rule)
         conf = directory / 'dnsmasq.conf'
-        lines = ['port=0', 'bind-interfaces', 'dhcp-authoritative', 'user=root',
+        lines = ['port=0', 'bind-interfaces', 'dhcp-authoritative', 'dhcp-ignore=tag:!known', 'user=root',
                  'pid-file=' + str(directory / 'dnsmasq.pid'),
                  'dhcp-leasefile=' + str(directory / 'leases'), 'log-facility=' + str(directory / 'dnsmasq.log')]
         active = False
         for idx, net in enumerate(plan['networks']):
-            if not net['dhcp']:
+            online = [vm for vm in plan['vms'] if vm['internet'] and vm['nics'][0]['network'] == net['name']]
+            if not net['dhcp'] or not online:
                 continue
             active = True
             subnet = ipaddress.ip_network(net['cidr'])
@@ -995,10 +1280,9 @@ class Agent:
                       'dhcp-option=tag:n%s,3,%s' % (idx, net['gateway']),
                       'dhcp-option=tag:n%s,6,%s' % (idx, self.cfg['dns_server']),
                       'dhcp-option=tag:n%s,26,%s' % (idx, self.cfg['guest_mtu'])]
-            for vm in plan['vms']:
-                for nic in vm['nics']:
-                    if nic['network'] == net['name']:
-                        lines.append('dhcp-host=%s,%s,%s,12h' % (nic['mac'], nic['ip'], vm['name']))
+            for vm in online:
+                nic = vm['nics'][0]
+                lines.append('dhcp-host=%s,%s,%s,12h' % (nic['mac'], nic['ip'], vm['name']))
         self.stop_process(directory, 'dnsmasq', '--conf-file=' + str(conf))
         if active:
             conf.write_text('\n'.join(lines) + '\n')
@@ -1133,7 +1417,8 @@ class Agent:
             result['firewall'] = output('ip', 'netns', 'exec', n['ns'], 'iptables', '-S', optional=True) if result['namespace_present'] else ''
             lease = self.root / 'slices' / sid / 'leases'
             result['dhcp_leases'] = lease.read_text() if lease.exists() else ''
-            if any(net['dhcp'] for net in plan['networks']):
+            online_networks = {v['nics'][0]['network'] for v in plan['vms'] if v['internet']}
+            if any(net['dhcp'] and net['name'] in online_networks for net in plan['networks']):
                 directory = self.root / 'slices' / sid
                 result['dhcp_running'] = bool(self.process(directory, 'dnsmasq', '--conf-file=' + str(directory / 'dnsmasq.conf')))
             else:
@@ -1230,7 +1515,7 @@ def main():
     request = json.loads(line.decode())
     action = request.pop('action')
     actions = ('doctor', 'bootstrap', 'prepare', 'image_status', 'image_receive', 'cache_gc',
-               'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete',
+               'circuit_plan', 'circuit_connect', 'circuit_disconnect', 'fabric_add', 'fabric_delete', 'network', 'gateway', 'vm_ensure', 'vm_stop', 'guest_setup', 'guest_probe', 'inventory', 'qinq_capture', 'inspect', 'delete',
                'diag_datapath', 'diag_capture', 'diag_ovs', 'diag_console', 'metrics')
     ensure(action in actions, 'Acción no admitida')
     if action == 'image_receive':

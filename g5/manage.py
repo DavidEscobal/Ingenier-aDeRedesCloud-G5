@@ -124,7 +124,7 @@ def main():
     parser.add_argument('--config', default='config/cluster.json')
     parser.add_argument('--keys', default='config/keys.json')
     parser.add_argument('--state', default='state')
-    parser.add_argument('command', choices=['init', 'install-agents', 'doctor', 'bootstrap', 'inventory', 'units', 'seed-demo'])
+    parser.add_argument('command', choices=['init', 'install-agents', 'doctor', 'circuit_plan', 'bootstrap', 'inventory', 'units', 'seed-demo'])
     parser.add_argument('--nodes', default='all')
     parser.add_argument('--skip-packages', action='store_true')
     args = parser.parse_args()

@@ -11,7 +11,7 @@ export function toFlow(topology) {
     id: n.id,
     type: 'vm',
     position: n.position || { x: 80 + (i % 6) * 170, y: 80 + Math.floor(i / 6) * 150 },
-    data: { image: n.image, vcpus: n.vcpus, memory_mb: n.memory_mb, disk_gb: n.disk_gb, internet: !!n.internet, host: n.host || '' },
+    data: { image: n.image, vcpus: n.vcpus, memory_mb: n.memory_mb, disk_gb: n.disk_gb, ovs_bridge: !!n.ovs_bridge, internet: !!n.internet, host: n.host || '' },
   }))
   const edges = []
   for (const s of topology.segments || []) {
@@ -77,6 +77,7 @@ export function fromFlow(nodes, edges, name, description = '') {
     description,
     nodes: vms.map((n) => ({ id: n.id, image: n.data.image, vcpus: n.data.vcpus, memory_mb: n.data.memory_mb,
       disk_gb: n.data.disk_gb, ...(n.data.internet ? { internet: true } : {}),
+      ...(n.data.ovs_bridge ? { ovs_bridge: true } : {}),
       ...(n.data.host ? { host: n.data.host } : {}), position: round(n.position) })),
     segments,
   }
@@ -89,6 +90,7 @@ function round(p) {
 // Comprobaciones locales rápidas; el Topology Manager vuelve a validar todo al guardar o compilar.
 export function localProblems(topology) {
   const problems = []
+  if (topology.cluster === '') problems.push('Elige el clúster de la topología.')
   if (!NAME.test(topology.name)) problems.push('Nombre: empieza con letra; letras, números, _ o - (máx. 64). Ej.: Ex2_G5_test')
   if (topology.nodes.length === 0) problems.push('Agrega al menos una VM.')
   if (topology.nodes.length > 16) problems.push('Máximo 16 VMs por topología.')

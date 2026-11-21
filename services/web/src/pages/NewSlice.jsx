@@ -22,11 +22,12 @@ export default function NewSlice() {
   const [n, setN] = useState(3)
   const [image, setImage] = useState('')
   const [size, setSize] = useState('small')
-  const [provider, setProvider] = useState('openstack')
+  const [chosenProvider, setProvider] = useState('openstack')
   const [zone, setZone] = useState('')
   const [zones, setZones] = useState([])
-  const [name, setName] = useState(fromEditor?.name || 'lineal-3')
+  const [name, setName] = useState(fromEditor?.name || '')
   const [topology, setTopology] = useState(fromEditor)
+  const provider = topology?.cluster || chosenProvider
   const [compiled, setCompiled] = useState(null)
   const preview = compiled?.topology === topology && compiled?.provider === provider ? compiled.spec : null
   const [imageNames, setImageNames] = useState(null)
@@ -72,7 +73,7 @@ export default function NewSlice() {
   useEffect(() => {
     let cancelled = false
     setZone('')
-    Api.monitoringState(provider === 'auto' ? undefined : provider) // auto: zonas de ambos clústeres
+    Api.monitoringState(provider === 'auto' ? undefined : provider)
       .then((st) => { if (!cancelled) setZones([...new Set(st.hosts.map((h) => h.zone).filter(Boolean))].sort()) })
       .catch(() => { if (!cancelled) setZones([]) })
     return () => { cancelled = true }
@@ -87,12 +88,6 @@ export default function NewSlice() {
       .catch((err) => { if (!cancelled) { setCompiled(null); setError(err.message) } })
     return () => { cancelled = true }
   }, [topology, provider]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function pickSource(value) {
-    setSource(value)
-    if (value.startsWith('gen:')) setName(`${value.slice(4)}-${n}`)
-    else if (value.startsWith('draft:')) setName(drafts.find((d) => 'draft:' + d.id === value)?.name || name)
-  }
 
   async function submit(event) {
     event.preventDefault()
@@ -145,7 +140,7 @@ export default function NewSlice() {
             </select>
           </label>
           <label>Topología
-            <select value={source} onChange={(e) => pickSource(e.target.value)} disabled={!catalog}>
+            <select value={source} onChange={(e) => setSource(e.target.value)} disabled={!catalog}>
               {fromEditor && <option value="editor">Desde el editor: {fromEditor.name}</option>}
               <optgroup label="Predefinidas">
                 {catalog?.generators.map((g) => <option key={g.id} value={'gen:' + g.id}>{g.label}</option>)}
@@ -161,7 +156,7 @@ export default function NewSlice() {
             <div className="upload-grid">
               <label>Nodos ({generator.min}–{generator.max})
                 <input type="number" min={generator.min} max={generator.max} value={n}
-                  onChange={(e) => { const v = Number(e.target.value) || generator.min; setN(v); setName(`${generator.id}-${v}`) }} />
+                  onChange={(e) => { const v = Number(e.target.value) || generator.min; setN(v) }} />
               </label>
               <label>Imagen
                 <select value={image} onChange={(e) => setImage(e.target.value)}>
@@ -177,11 +172,12 @@ export default function NewSlice() {
           )}
           {!generator && <p className="muted small">Imagen, tamaño e Internet de cada VM se definen en el editor de la topología.</p>}
           <label>Nombre del slice
-            <input value={name} onChange={(e) => { setName(e.target.value); setError('') }} />
+            <input required maxLength={64} value={name} onChange={(e) => { setName(e.target.value); setError('') }} />
           </label>
           <label>Proveedor
-            <select value={provider} onChange={(e) => setProvider(e.target.value)}>
-              {(catalog?.providers || ['openstack']).map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p] || p}</option>)}
+            <select value={provider} disabled={!!topology?.cluster} onChange={(e) => setProvider(e.target.value)}>
+              {(catalog?.providers || ['openstack']).filter((p) => !topology?.cluster || p === topology.cluster)
+                .map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p] || p}</option>)}
             </select>
           </label>
           <label>Zona de disponibilidad
@@ -194,7 +190,6 @@ export default function NewSlice() {
             El VM Placement (BCDP v2) ubica cada VM según los recursos libres; una VM con servidor fijado en el editor se
             respeta. Si no hay capacidad, el slice se rechaza con el motivo. Ver <Link to="/recursos">Recursos</Link>.
             {provider === 'linux' && ' Linux: imágenes CirrOS o Ubuntu.'}
-            {provider === 'auto' && ' Automático: se planifica en Linux y en OpenStack y se despliega donde ocupe menos servidores nuevos.'}
           </p>
           {needsGuest && (
             <fieldset className="panel-inner">
@@ -239,7 +234,7 @@ export default function NewSlice() {
                       <tr key={vm.name}>
                         <td>{vm.name}{vm.internet ? ' · Internet' : ''}{vm.host ? ' · ' + vm.host : ''}</td><td>{vm.image}</td><td>{vm.vcpus}</td>
                         <td>{vm.memory_mb} MB</td><td>{vm.disk_gb} GB</td>
-                        <td className="mono small">{vm.nics.map((x) => `${x.network} ${x.ip || 'DHCP'}`).join(' · ')}</td>
+                        <td className="mono small">{vm.nics.map((x) => `${x.network} ${x.ip || 'sin IP'}`).join(' · ')}</td>
                       </tr>
                     ))}
                   </tbody>

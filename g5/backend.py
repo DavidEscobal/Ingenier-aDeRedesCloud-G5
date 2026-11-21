@@ -21,6 +21,9 @@ class SSHBackend:
         self.nodes[config['gateway']['name']] = config['gateway']
         if config.get('switch'):  # fase 2: el switch lo administra el laboratorio (ya transporta VLAN)
             self.nodes[config['switch']['name']] = config['switch']
+        for switch in config.get('central_fabric', {}).values():
+            require(switch['name'] not in self.nodes, 'Nombre de switch central duplicado')
+            self.nodes[switch['name']] = switch
 
     def ssh(self, node):
         cfg = self.nodes[node]
@@ -109,6 +112,9 @@ class MemoryBackend:
         self.nodes[config['gateway']['name']] = config['gateway']
         if config.get('switch'):  # fase 2: el switch lo administra el laboratorio (ya transporta VLAN)
             self.nodes[config['switch']['name']] = config['switch']
+        for switch in config.get('central_fabric', {}).values():
+            require(switch['name'] not in self.nodes, 'Nombre de switch central duplicado')
+            self.nodes[switch['name']] = switch
         self.resources = {}
         self.images = set()
         self.calls = []
@@ -132,6 +138,10 @@ class MemoryBackend:
                 require(old['plan'] == params['plan'], 'Plan ya existe', 409)
             elif action == 'network':
                 self.resources[key]['network'] = True
+                fabric = self.resources[key]['plan'].get('fabric')
+                if fabric:
+                    return {'transport': 'central', 'simulated': True,
+                            'circuits': [a['vlan'] for a in fabric['attachments'] if a['host'] == node]}
             elif action == 'vm_ensure':
                 self.resources[key]['vms'][params['vm_name']] = {'running': True, 'simulated': True}
             elif action == 'vm_stop':

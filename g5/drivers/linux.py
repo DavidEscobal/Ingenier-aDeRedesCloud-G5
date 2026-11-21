@@ -10,6 +10,7 @@ import re
 from ..backend import RemoteError
 from ..model import Fault, require, integer, disk_bytes, slug, display_name, digest, fields, fingerprint
 from .base import ProviderDriver
+from . import fabric
 
 
 def link_svids(plan):
@@ -53,7 +54,7 @@ def validate_spec(spec, config):
         ranges.append(net)
     ids, addresses = set(), set()
     for vm in vms:
-        fields(vm, ('name', 'worker', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'internet', 'guest'),
+        fields(vm, ('name', 'worker', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'internet', 'guest', 'ovs_bridge'),
                ('name', 'worker', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics'))
         slug(vm['name'])
         require(vm['name'] not in ids, 'VM repetida')
@@ -77,6 +78,12 @@ def validate_spec(spec, config):
                 require(isinstance(keys, list) and len(keys) <= 8, 'Hasta 8 claves SSH públicas')  # 0: solo contraseña (Ex2)
                 for key in keys:
                     require(isinstance(key, str) and len(key) < 8192 and '\n' not in key and re.match(r'^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)) [A-Za-z0-9+/]+={0,3}(?: |$)', key), 'Clave SSH pública inválida')
+        require(type(vm.get('ovs_bridge', False)) is bool, 'ovs_bridge debe ser booleano')
+        if vm.get('ovs_bridge'):
+            data_nics = vm['nics'][1:] if vm['internet'] else vm['nics']
+            require(guest and guest['os'] == 'ubuntu' and len(data_nics) >= 2 and
+                    all(isinstance(nic, dict) and 'cidr' not in networks.get(nic.get('network'), {}) for nic in data_nics),
+                    'VM OVS requiere Ubuntu y al menos dos enlaces internos sin IP')
         nic_names = [n.get('name') for n in vm['nics'] if isinstance(n, dict) and n.get('name')]
         require(len(nic_names) == len(set(nic_names)), 'Nombre de NIC repetido')
         attached = set()
@@ -103,6 +110,9 @@ def validate_spec(spec, config):
     for vm in vms:
         if vm['internet']:
             require('cidr' in networks[vm['nics'][0]['network']], 'Internet requiere que la primera NIC tenga IP')
+    eligible = {v['nics'][0]['network'] for v in vms if v['internet']}
+    for net in networks.values():
+        net['dhcp'] = net['dhcp'] and net['name'] in eligible
     spec.setdefault('publications', [])
     require(isinstance(spec['publications'], list) and len(spec['publications']) <= 128, 'Máximo 128 publicaciones')
     ports = set()
@@ -206,6 +216,10 @@ class LinuxDriver(ProviderDriver):
             db.execute('INSERT INTO ports VALUES(?,?,?)', (pub['protocol'], pub['external_port'], sid))
         db.execute('INSERT INTO leases VALUES(?,?,?)', (svid, sid, slot))
         self.plan_transport(plan)
+        if self.cfg.get('central_fabric', {}).get('linux'):
+            require(plan['transport'] == 'qinq' and not self.switch(),
+                    'La red central requiere circuitos VLAN dedicados y excluye switch EX1/VXLAN')
+        fabric.reserve(self.cfg, db, sid, plan, 'linux')
         for link_svid in svids[1:]:
             db.execute('INSERT INTO link_svids VALUES(?,?)', (link_svid, sid))
 
@@ -256,6 +270,8 @@ class LinuxDriver(ProviderDriver):
         sid = plan['id']
         switch = self.switch()
         nodes = self.participants(plan)
+        if plan.get('fabric'):
+            fabric.connect(self.backend, plan)
         if switch and plan.get('transport', 'qinq') == 'qinq':
             self.retry(switch, 'fabric_add', ctx, sid=sid, svids=link_svids(plan))
         for node in nodes:
@@ -273,10 +289,15 @@ class LinuxDriver(ProviderDriver):
                         if attempt + 1 == self.cfg['remote_retries']:
                             raise
                         ctx.wait(min(2**attempt, 8) * self.cfg.get('retry_delay', 1))
-            self.retry(node, 'network', ctx, sid=sid)
+            result = self.retry(node, 'network', ctx, sid=sid)
+            if plan.get('fabric'):
+                expected = sorted(a['vlan'] for a in plan['fabric']['attachments'] if a['host'] == node)
+                require(result.get('transport') == 'central' and sorted(result.get('circuits', [])) == expected,
+                        'El agente no confirmó los circuitos centrales en ' + node, 503)
         self.parallel([lambda node=node: worker(node) for node in nodes])
         self.retry(self.cfg['gateway']['name'], 'gateway', ctx, sid=sid)
-        ctx.event('NETWORK_READY', 'QinQ, DHCP y política IPv4 aplicados')
+        ctx.event('NETWORK_READY', 'Transporte %s y política IPv4 aplicados' %
+                  (plan['fabric']['switch'] if plan.get('fabric') else plan.get('transport', 'qinq')))
 
         def start(node):
             # Primero se encienden todas las VMs del worker y después se configura cada invitado: así arrancan a la
@@ -297,6 +318,7 @@ class LinuxDriver(ProviderDriver):
     def cleanup(self, plan, ctx):
         sid = plan['id']
         self.parallel([lambda node=node: self.retry(node, 'delete', ctx, sid=sid) for node in self.participants(plan)])
+        fabric.disconnect(self.backend, plan)
         if self.switch():
             self.retry(self.switch(), 'fabric_delete', ctx, sid=sid)
 

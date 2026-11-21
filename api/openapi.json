@@ -1042,12 +1042,12 @@
           },
           "dhcp": {
             "type": "boolean",
-            "default": true
+            "default": true,
+            "description": "DHCP solo para la MAC primaria de una VM con Internet."
           }
         },
         "required": [
           "name",
-          "cidr",
           "cvid"
         ],
         "additionalProperties": false
@@ -1070,8 +1070,7 @@
           }
         },
         "required": [
-          "network",
-          "ip"
+          "network"
         ],
         "additionalProperties": false
       },
@@ -1120,6 +1119,11 @@
           },
           "guest": {
             "$ref": "#/components/schemas/Guest"
+          },
+          "ovs_bridge": {
+            "type": "boolean",
+            "default": false,
+            "description": "Ubuntu: unir en br0 las interfaces internas sin IPv4. Requiere al menos dos."
           }
         },
         "required": [
@@ -1449,8 +1453,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "name",
-          "cidr"
+          "name"
         ],
         "properties": {
           "name": {
@@ -1463,7 +1466,8 @@
           },
           "dhcp": {
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "Los enlaces internos se crean con DHCP desactivado."
           }
         }
       },
@@ -1523,6 +1527,22 @@
             "items": {
               "$ref": "#/components/schemas/OpenStackNIC"
             }
+          },
+          "ovs_bridge": {
+            "type": "boolean",
+            "default": false,
+            "description": "Ubuntu: unir en br0 las interfaces internas sin IPv4. Requiere al menos dos."
+          },
+          "internet": {
+            "type": "boolean",
+            "default": false,
+            "description": "Agregar una NIC de salida con DHCP."
+          },
+          "host": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
           }
         }
       },
@@ -1538,7 +1558,8 @@
         "properties": {
           "name": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "description": "Nombre visible del slice y del proyecto Keystone."
           },
           "provider": {
             "type": "string",
@@ -1560,6 +1581,30 @@
             "maxItems": 64,
             "items": {
               "$ref": "#/components/schemas/OpenStackVM"
+            }
+          },
+          "guest": {
+            "type": "object",
+            "required": [
+              "username",
+              "password_hash"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "username": {
+                "type": "string"
+              },
+              "password_hash": {
+                "type": "string",
+                "description": "SHA512 crypt para login VNC; requerido en Ubuntu."
+              },
+              "ssh_authorized_keys": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           }
         }

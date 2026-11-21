@@ -119,6 +119,7 @@ class AdapterTests(unittest.TestCase):
         # Topología lineal VM1–VM2–VM3 con OVS en VM2 (Ubuntu 2,5 GB) y salida a Internet: antes la red de acceso
         # pisaba las credenciales del slice y el adaptador fallaba con cualquier VM Ubuntu con Internet.
         spec = json.loads((ROOT / 'templates/ovs-lineal-linux.json').read_text(encoding='utf-8'))
+        spec['vms'][1]['ovs_bridge'] = True
         spec['guest'] = dict(GUEST)
         out = adapt(spec, ['server1', 'server2', 'server3'], self.resolve)
         vm2 = out['vms'][1]
@@ -126,6 +127,15 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual([n['network'] for n in vm2['nics']], ['inet2', 'l12', 'l23'])
         self.assertEqual((vm2['worker'], vm2['disk_gb']), ('server2', 2.5))
         validate_spec(out, self.cfg)
+        from g5.agent import cloud_documents
+        for i, nic in enumerate(vm2['nics']):
+            nic['mac'] = '02:00:00:00:00:%02x' % i
+        docs = cloud_documents(dict(out, id='a' * 32), vm2, 1450)
+        config = json.loads(docs['network-config'])['ethernets']
+        self.assertEqual([name for name, n in config.items() if n['dhcp4']], ['inet0'])
+        data = json.loads(docs['user-data'].split('\n', 1)[1])
+        self.assertEqual([c[-1] for c in data['runcmd'] if 'add-port' in c], [n['name'] for n in vm2['nics'][1:]])
+        self.assertEqual([n['name'] for n in out['networks'] if n['dhcp']], ['inet2'])
 
     def test_ubuntu_without_or_with_bad_credentials_is_rejected(self):
         with self.assertRaisesRegex(Fault, 'usuario y contraseña'):

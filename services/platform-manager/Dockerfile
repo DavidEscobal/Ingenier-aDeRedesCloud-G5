@@ -30,4 +30,4 @@ CMD ["--config", "/run/g5/cluster.json", \
      "--keys", "/run/g5/keys.json", \
      "--openstack-env", "/run/g5/openstack.env", \
      "--state", "/app/state", \
-     "--host", "0.0.0.0", "--port", "8000", "--internal-network"]
+     "--host", "0.0.0.0", "--port", "8000", "--internal-network", "--require-central-fabric"]

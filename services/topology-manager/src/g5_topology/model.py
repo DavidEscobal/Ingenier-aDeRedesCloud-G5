@@ -6,6 +6,7 @@
 """
 import os
 import json
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -13,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Ident = str
 IDENT = r"^[a-z][a-z0-9-]{0,31}$"   # nodos y segmentos (nombres de interfaces y recursos)
 NAME = r"^[A-Za-z][A-Za-z0-9_-]{0,63}$"  # nombre visible de la topología/slice (Ex2_G5_test)
-IMAGE_RE = __import__("re").compile(r"[a-z0-9][a-z0-9._-]{0,62}")
+IMAGE_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,62}")
 MAX_NODES = 16
 MAX_SEGMENTS = 48
 MAX_NICS = 8
@@ -69,6 +70,7 @@ class Node(Model):
     vcpus: int = Field(ge=1, le=64)
     memory_mb: int = Field(ge=64, le=524288)
     disk_gb: float = Field(ge=1, le=2048)  # admite 2.5 (Anexo del Ex2)
+    ovs_bridge: bool = False  # unir las interfaces de datos sin IPv4 dentro de Ubuntu
     internet: bool = False  # salida a Internet: Linux por la puerta del slice; OpenStack por la red provider external (R5)
     host: str | None = Field(default=None, pattern=IDENT)  # servidor fijo (Ex2 paso 3); None = automático
     position: Position | None = None
@@ -83,6 +85,7 @@ class Segment(Model):
 
 
 class Topology(Model):
+    cluster: Literal["linux", "openstack"] | None = None  # opcional en borradores anteriores
     schema_version: Literal[1] = 1
     name: str = Field(pattern=NAME)
     description: str = Field(default="", max_length=300)
@@ -121,11 +124,22 @@ class Topology(Model):
             raise ValueError(f"Nodos con más de {MAX_NICS} interfaces: {over}")
         return self
 
+    def compatible_clusters(self):
+        pinned = {n.host for n in self.nodes if n.host}
+        return [c for c, servers in hosts().items()
+                if (not self.cluster or c == self.cluster) and pinned.issubset(servers)]
+
     def check_catalog(self):
         """Tamaños e imágenes deben existir en el catálogo (flavors/imágenes reales)."""
         allowed = {(s["vcpus"], s["memory_mb"], s["disk_gb"]) for s in sizes()}
-        problems = []
+        problems = [] if self.compatible_clusters() else ["Los servidores deben pertenecer al mismo clúster."]
         for n in self.nodes:
+            if n.ovs_bridge:
+                if not re.search(r"ubuntu|bionic|focal|jammy|noble", n.image, re.I):
+                    problems.append(f"{n.id}: el switch OVS requiere una imagen Ubuntu")
+                links = [s for s in self.segments if n.id in s.members]
+                if len(links) < 2 or any(s.addressed for s in links):
+                    problems.append(f"{n.id}: OVS requiere al menos dos enlaces de datos, todos sin IP")
             if (n.vcpus, n.memory_mb, n.disk_gb) not in allowed:
                 problems.append(f"{n.id}: tamaño {n.vcpus} vCPU/{n.memory_mb} MB/{n.disk_gb} GB no disponible")
             # La existencia real de la imagen la verifica el platform-manager (preflight en Glance) al desplegar;

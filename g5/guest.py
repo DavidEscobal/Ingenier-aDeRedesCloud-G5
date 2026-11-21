@@ -43,17 +43,41 @@ MAC = re.compile(r'[0-9a-f]{2}(?::[0-9a-f]{2}){5}')
 
 
 def mtu_commands(mac, mtu):
-    """Fija el MTU de la NIC con esa MAC ahora y en los siguientes arranques (netplan, sin usar el MTU del DHCP).
+    """Configura por MAC el DHCP de Internet, también cuando Nova describe el circuito como estático."""
+    require(MAC.fullmatch(mac) and type(mtu) is int and (mtu == 0 or 576 <= mtu <= 9000), 'MTU o MAC inválidos')
+    return ['python3', '-c', INTERNET_CONFIG, mac, str(mtu)]
 
-    La red provider `external` anuncia 1500, pero el camino hacia Internet no deja pasar tramas tan grandes: la
-    conexión TCP se abre y las respuestas grandes se pierden (apt queda en «Waiting for headers»)."""
-    require(MAC.fullmatch(mac) and isinstance(mtu, int) and 576 <= mtu <= 9000, 'MTU o MAC inválidos')
-    script = ('for d in /sys/class/net/*; do [ "$(cat $d/address)" = "%s" ] || continue; n=${d##*/}; '
-              'ip link set dev "$n" mtu %d; '
-              'printf "network:\\n  version: 2\\n  ethernets:\\n    %%s:\\n      mtu: %d\\n'
-              '      dhcp4: true\\n      dhcp4-overrides:\\n        use-mtu: false\\n" "$n" > /etc/netplan/90-g5-mtu.yaml; '
-              'chmod 600 /etc/netplan/90-g5-mtu.yaml; done') % (mac, mtu, mtu)
-    return ['sh', '-c', script]
+
+INTERNET_CONFIG = '''
+from pathlib import Path
+import subprocess, sys, yaml
+mac, mtu = sys.argv[1], int(sys.argv[2])
+device = next(p.name for p in Path('/sys/class/net').iterdir() if (p / 'address').read_text().strip() == mac)
+found = False
+for path in sorted(Path('/etc/netplan').glob('*.yaml')):
+    doc = yaml.safe_load(path.read_text()) or {}
+    for name, config in ((doc.get('network') or {}).get('ethernets') or {}).items():
+        if (config.get('match') or {}).get('macaddress', '').lower() != mac and name != device:
+            continue
+        for key in ('addresses', 'gateway4', 'routes', 'nameservers'):
+            config.pop(key, None)
+        config['dhcp4'] = True
+        if mtu:
+            config['mtu'] = mtu
+            config.setdefault('dhcp4-overrides', {})['use-mtu'] = False
+        path.write_text(yaml.safe_dump(doc, default_flow_style=False))
+        found = True
+if not found:
+    config = {'match': {'macaddress': mac}, 'dhcp4': True}
+    if mtu:
+        config.update(mtu=mtu, **{'dhcp4-overrides': {'use-mtu': False}})
+    path = Path('/etc/netplan/90-g5-internet.yaml')
+    path.touch(mode=0o600)
+    path.write_text(yaml.safe_dump({'network': {'version': 2, 'ethernets': {'g5internet': config}}}))
+subprocess.run(['netplan', 'generate'], check=True)
+subprocess.run(['networkctl', 'reload'], check=True)
+subprocess.run(['networkctl', 'reconfigure', device], check=True)
+'''
 
 
 def flush_commands(macs):
@@ -102,7 +126,7 @@ for d in glob.glob('/sys/class/net/*'):
 '''
 
 
-def cloud_config(guest, hostname, mtu=None, unaddressed=()):
+def cloud_config(guest, hostname, mtu=None, unaddressed=(), ovs_bridge=False, internet=False):
     """`#cloud-config` para OpenStack (la red la configura cloud-init desde el config drive de Nova).
 
     `mtu`: (MAC, MTU) de la NIC de salida a Internet, si la VM la tiene; `unaddressed`: MACs que quedan sin IPv4."""
@@ -114,13 +138,23 @@ def cloud_config(guest, hostname, mtu=None, unaddressed=()):
             'ssh_pwauth': not guest['ssh_authorized_keys'], 'disable_root': True, 'chpasswd': {'expire': False},
             'package_update': False, 'package_upgrade': False}
     commands = ([mtu_commands(*mtu)] if mtu else []) + ([flush_commands(unaddressed)] if unaddressed else [])
+    if ovs_bridge:
+        if internet:
+            data['packages'] = ['openvswitch-switch']
+        data['runcmd'] = [['ovs-vsctl', '--may-exist', 'add-br', 'br0']]
+        for mac in unaddressed:
+            require(MAC.fullmatch(mac), 'MAC inválida')
+            data['runcmd'].append(['sh', '-ec',
+                'for d in /sys/class/net/*; do [ "$(cat "$d/address")" = "$1" ] || continue; '
+                'exec ovs-vsctl --may-exist add-port br0 "${d##*/}"; done; exit 1', 'sh', mac])
+        data['runcmd'].append(['ip', 'link', 'set', 'br0', 'up'])
     if commands:
         data['bootcmd'] = commands
     return '#cloud-config\n' + json.dumps(data, indent=2) + '\n'
 
 
-def user_data(guest, hostname, mtu=None, unaddressed=()):
-    text = cloud_config(guest, hostname, mtu, unaddressed)
+def user_data(guest, hostname, mtu=None, unaddressed=(), ovs_bridge=False, internet=False):
+    text = cloud_config(guest, hostname, mtu, unaddressed, ovs_bridge, internet)
     if len(text.encode()) > 48 * 1024:
         raise Fault('user_data demasiado grande para Nova')
     return base64.b64encode(text.encode()).decode()

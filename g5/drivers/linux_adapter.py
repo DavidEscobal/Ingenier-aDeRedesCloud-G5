@@ -7,7 +7,7 @@ El editor de topologías no conoce detalles del clúster Linux; aquí se complet
 - Imagen: nombre del catálogo -> SHA-256 de la copia local (la materializa `resolve_image`).
 - SO invitado: CirrOS (configuración por consola serie) o Ubuntu (cloud-init NoCloud, como en EX1). Ubuntu necesita
   el bloque `guest` del slice (usuario, hash SHA-512 crypt y llaves SSH opcionales) que arma el slice-manager.
-- Sin DHCP: las IPs que asigna el compilador se fijan dentro del invitado.
+- DHCP reservado a la interfaz de Internet; los enlaces internos conservan sus direcciones estáticas.
 - Internet: cada VM con `internet: true` recibe una red de acceso propia (10.200.i.0/27, NIC `inet0`, primera)
   hacia la puerta del slice (.1 en server4, NAT y firewall). Como en EX1, el acceso va separado de los enlaces
   del laboratorio para no unir VMs que el dibujo no une; la ruta por defecto sale solo por esa NIC.
@@ -30,9 +30,16 @@ def adapt(spec, workers, resolve_image):
     if not workers:
         raise Fault('No hay workers Linux habilitados', 409)
     networks = spec.setdefault('networks', [])
+    access_networks = set()
+    used_names = {net.get('name') for net in networks if isinstance(net, dict)}
     for i, vm in enumerate(spec['vms']):
         if isinstance(vm, dict) and vm.get('internet') is True:
             inet = 'inet%d' % (i + 1)  # nombre corto: el de la VM puede tener hasta 32 caracteres
+            if inet in used_names:
+                inet = next('%s-%d' % (inet, j) for j in range(1, len(used_names) + 2)
+                            if '%s-%d' % (inet, j) not in used_names)
+            used_names.add(inet)
+            access_networks.add(inet)
             networks.append({'name': inet, 'cidr': '10.200.%d.0/27' % (i + 1)})
             vm['nics'] = [{'name': 'inet0', 'network': inet, 'ip': '10.200.%d.10' % (i + 1)}] + list(vm.get('nics') or [])
     if len(networks) > 64:
@@ -41,7 +48,7 @@ def adapt(spec, workers, resolve_image):
         if not isinstance(net, dict):
             raise Fault('Red inválida')
         net['cvid'] = 100 + k
-        net['dhcp'] = False
+        net['dhcp'] = net['name'] in access_networks
     images, turn = {}, 0
     for i, vm in enumerate(spec['vms']):
         if not isinstance(vm, dict) or not isinstance(vm.get('image'), str):

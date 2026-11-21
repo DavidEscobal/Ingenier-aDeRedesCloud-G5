@@ -18,9 +18,10 @@ import re
 import ipaddress
 import time
 import urllib.parse
-from ...guest import user_data, validate_access
+from ...guest import is_ubuntu, user_data, validate_access
 from ...model import Fault, require, integer, slug, display_name, fields
 from ..base import ProviderDriver
+from .. import fabric
 from .session import OpenStackError, Session
 
 PRIVATE = [ipaddress.ip_network(x) for x in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')]
@@ -32,11 +33,21 @@ INGRESS = (('tcp', 22), ('icmp', None))
 PLACEHOLDER_POOL = '10.255.0.0/16'   # subredes de relleno para enlaces «sin IP» (Nova exige IP fija por puerto)
 
 
-def placeholder_cidrs(networks, pool=PLACEHOLDER_POOL):
-    """Un /28 del pool por cada red sin CIDR del slice, sin solaparse con las subredes del propio slice."""
+def placeholder_cidrs(networks, pool=PLACEHOLDER_POOL, vms=()):
+    """Reserva subredes de relleno con espacio para todos los miembros de los segmentos sin IP."""
     used = [ipaddress.ip_network(n['cidr']) for n in networks if 'cidr' in n]
-    free = (c for c in ipaddress.ip_network(pool).subnets(new_prefix=28) if not any(c.overlaps(u) for u in used))
-    return {n['name']: str(next(free)) for n in networks if 'cidr' not in n}
+    result = {}
+    for net in networks:
+        if 'cidr' in net:
+            continue
+        count = sum(n['network'] == net['name'] for vm in vms for n in vm['nics'])
+        prefix = min(28, 32 - (count + 1).bit_length())
+        subnet = next((c for c in ipaddress.ip_network(pool).subnets(new_prefix=prefix)
+                       if not any(c.overlaps(u) for u in used)), None)
+        require(subnet is not None, 'Sin espacio en el pool de subredes de relleno', 409)
+        used.append(subnet)
+        result[net['name']] = str(subnet)
+    return result
 IMAGE_NAME = re.compile(r'[a-z0-9][a-z0-9._-]{0,62}')
 DISK_FORMATS = {'qcow2': b'QFI\xfb', 'raw': None}
 
@@ -93,11 +104,12 @@ def validate_spec(spec, config):
         n['cidr'] = str(net)
         n.setdefault('dhcp', False)
         require(type(n['dhcp']) is bool, 'dhcp debe ser booleano')
+        n['dhcp'] = False  # Solo la NIC externa de una VM con Internet recibe DHCP.
         networks[n['name']] = n
         ranges.append(net)
     ids, addresses = set(), set()
     for vm in vms:
-        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host', 'zone', 'internet'),
+        fields(vm, ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics', 'host', 'zone', 'internet', 'ovs_bridge'),
                ('name', 'image', 'vcpus', 'memory_mb', 'disk_gb', 'nics'))
         vm.setdefault('internet', False)
         require(type(vm['internet']) is bool, 'internet debe ser booleano')
@@ -115,6 +127,11 @@ def validate_spec(spec, config):
         integer(vm['memory_mb'], 64, 524288, 'memory_mb')
         integer(vm['disk_gb'], 1, 2048, 'disk_gb')
         require(isinstance(vm['nics'], list) and 1 <= len(vm['nics']) <= 8, 'Se requieren 1..8 NICs')
+        require(type(vm.get('ovs_bridge', False)) is bool, 'ovs_bridge debe ser booleano')
+        if vm.get('ovs_bridge'):
+            require(spec.get('guest') and is_ubuntu(vm['image']) and len(vm['nics']) >= 2 and
+                    all(isinstance(nic, dict) and 'cidr' not in networks.get(nic.get('network'), {}) for nic in vm['nics']),
+                    'VM OVS requiere Ubuntu con credenciales y al menos dos enlaces internos sin IP')
         attached = set()
         for nic in vm['nics']:
             fields(nic, ('network', 'ip'), ('network',))
@@ -137,7 +154,8 @@ def validate_spec(spec, config):
 class OpenStackDriver(ProviderDriver):
     name = 'openstack'
 
-    def __init__(self, config, session=None):
+    def __init__(self, config, session=None, backend=None):
+        self.backend = backend
         self.cfg = config
         self.os_cfg = config.get('openstack', {})
         self._session = session
@@ -158,6 +176,16 @@ class OpenStackDriver(ProviderDriver):
     def preflight(self, spec):
         # Antes de admitir: Keystone responde, cada imagen existe en Glance y cada tamaño tiene flavor en Nova
         # (rechazo sin efectos; antes un tamaño sin flavor fallaba a mitad del despliegue).
+        central = self.cfg.get('central_fabric', {}).get('openstack')
+        require(central or not self.cfg.get('require_central_fabric'), 'Falta el inventario de circuitos para openstack', 503)
+        if central:
+            physnet = central.get('physnet')
+            agents = self.call('GET', 'network', '/v2.0/agents?agent_type=Open%20vSwitch%20agent')['agents']
+            mappings = {a['host']: a.get('configurations', {}).get('bridge_mappings', {}) for a in agents
+                        if a.get('alive') and a.get('admin_state_up')}
+            for host in {v.get('host') for v in spec['vms']}:
+                require(host and mappings.get(host, {}).get(physnet),
+                        'Neutron no confirma el physnet del circuito en ' + str(host), 503)
         for name in sorted({vm['image'] for vm in spec['vms']}):
             self.image(name)
         if not self.os_cfg.get('create_flavors', False):
@@ -167,8 +195,13 @@ class OpenStackDriver(ProviderDriver):
                     ', '.join('%d vCPU · %d MB · %d GB' % m for m in missing), 409)
         if any(vm.get('internet') for vm in spec['vms']):
             name = self.os_cfg.get('external_network', 'external')
-            require(self.find('network', '/v2.0/networks', 'networks', name=name),
-                    'Salida a Internet no disponible: falta la red provider %s en Neutron' % name, 409)
+            external = self.find('network', '/v2.0/networks', 'networks', name=name)
+            require(external, 'Salida a Internet no disponible: falta la red provider %s en Neutron' % name, 409)
+            if central and central.get('external_circuit'):
+                gateway = mappings.get(central['external_circuit']['host'], {})
+                require(gateway.get(physnet) and gateway.get(external.get('provider:physical_network')) and
+                        external.get('provider:network_type') == 'flat' and external.get('router:external'),
+                        'Neutron no confirma ambos bridges y la red externa flat en el headnode', 503)
 
     def hypervisors(self):
         """Inventario de los workers (monitoreo D-13 y R4-I-01): lo que Nova tiene comprometido por host y su
@@ -257,14 +290,20 @@ class OpenStackDriver(ProviderDriver):
     # ---- admisión -------------------------------------------------------------------------
     def reserve(self, db, sid, plan):
         # Sin llamadas de red dentro de la transacción SQLite: solo se fijan nombres estables.
+        fabric.reserve(self.cfg, db, sid, plan, 'openstack')
         short = sid[:8]
-        plan['project_name'] = 'g5-' + sid
+        name = plan['name']
+        in_use = db.execute("SELECT 1 FROM slices WHERE provider='openstack' AND reserved=1 "
+                            "AND json_extract(plan, '$.project_name')=?", (name,)).fetchone()
+        require(not in_use, 'Ya existe un proyecto OpenStack con ese nombre', 409)
+        plan['project_name'] = name
+        plan['project_marker'] = 'G5 slice id=' + sid
         for net in plan['networks']:
             net['os_name'] = 'g5-%s-%s' % (short, net['name'])
         for vm in plan['vms']:
             vm['os_name'] = 'g5-%s-%s' % (short, vm['name'])
             for nic in vm['nics']:
-                nic['os_name'] = 'g5-%s-%s-%s' % (short, vm['name'], nic['network'])
+                nic['os_name'] = 'g5-%s-%s.%s' % (short, vm['name'], nic['network'])
             if vm.get('internet'):
                 vm['inet_os_name'] = 'g5-%s-%s-%s' % (short, vm['name'], EXTERNAL_NIC)
         if any(vm.get('internet') for vm in plan['vms']):
@@ -290,6 +329,13 @@ class OpenStackDriver(ProviderDriver):
         if row['external_id'] != found['id'] or row['status'] == 'PENDING':
             ctx.store.resource_set(ctx.sid, kind, name, 'CREATED', found['id'])
         return found
+
+    @staticmethod
+    def owns_project(plan, project):
+        if 'project_marker' in plan:
+            return project.get('description') == plan['project_marker']
+        # Plan anterior: el nombre de Keystone incluía el UUID del slice.
+        return project['name'] == 'g5-' + plan['id']
 
     def domain_id(self):
         domain = self.find('identity', '/domains', 'domains', name=self.os_cfg.get('domain', 'Cloud'))
@@ -338,64 +384,128 @@ class OpenStackDriver(ProviderDriver):
     def deploy(self, plan, ctx):
         admin = self.session.user()
         domain = self.domain_id()
+        def lookup():
+            existing = self.find('identity', '/projects', 'projects', name=plan['project_name'], domain_id=domain)
+            if existing:
+                require(self.owns_project(plan, existing), 'El nombre de proyecto OpenStack ya está ocupado', 409)
+            return existing
+
         project = self.ensure(ctx, 'project', plan['project_name'],
-                              lambda: self.find('identity', '/projects', 'projects', name=plan['project_name'], domain_id=domain),
+                              lookup,
                               lambda: self.call('POST', 'identity', '/projects', {'project': {
-                                  'name': plan['project_name'], 'domain_id': domain, 'description': 'G5 slice ' + plan['name']}})['project'])
+                                  'name': plan['project_name'], 'domain_id': domain, 'description': plan.get('project_marker', 'G5 slice ' + plan['name'])}})['project'])
         pid = project['id']
         role = self.find('identity', '/roles', 'roles', name=self.os_cfg.get('role', 'admin'))
         require(role, 'Rol Keystone inexistente', 503)
         self.call('PUT', 'identity', '/projects/%s/users/%s/roles/%s' % (pid, admin['id'], role['id']))
         ctx.event('OS_PROJECT', plan['project_name'])
 
-        subnets, filler = {}, placeholder_cidrs(plan['networks'], self.os_cfg.get('placeholder_pool', PLACEHOLDER_POOL))
-        for net in plan['networks']:
-            n = self.ensure(ctx, 'network', net['name'],
-                            lambda: self.find('network', '/v2.0/networks', 'networks', pid, name=net['os_name'], project_id=pid),
-                            lambda: self.call('POST', 'network', '/v2.0/networks', {'network': {
-                                'name': net['os_name'], 'port_security_enabled': False}}, pid)['network'])
-            # Red «sin IP» (Ex2 15b): Nova rechaza puertos sin IP fija, así que lleva una subred de relleno sin DHCP
-            # ni gateway; CirrOS queda sin IP y en Ubuntu cloud-init la borra al arrancar (guest.flush_commands).
-            cidr = net.get('cidr', filler.get(net['name']))
-            s = self.ensure(ctx, 'subnet', net['name'],
-                            lambda: self.find('network', '/v2.0/subnets', 'subnets', pid, name=net['os_name'], network_id=n['id']),
-                            lambda: self.call('POST', 'network', '/v2.0/subnets', {'subnet': {
-                                'name': net['os_name'], 'network_id': n['id'], 'ip_version': 4, 'cidr': cidr,
-                                'gateway_ip': None, 'enable_dhcp': net['dhcp']}}, pid)['subnet'])
-            subnets[net['name']] = (n['id'], s['id'])
-        ctx.event('OS_NETWORKS', ', '.join(sorted(subnets)))
-        if filler:
-            ctx.event('OS_UNADDRESSED', ', '.join('%s (relleno %s)' % kv for kv in sorted(filler.items())))
+        filler = placeholder_cidrs(plan['networks'], self.os_cfg.get('placeholder_pool', PLACEHOLDER_POOL), plan['vms'])
         external, group = (self.external_access(ctx, plan, pid) if any(v.get('internet') for v in plan['vms'])
                            else (None, None))
+        subnets = {}
+        def network(key, cidr, vlan=None):
+            name = 'g5-%s-%s' % (ctx.sid[:8], key)
+            body = {'name': name, 'port_security_enabled': False}
+            if vlan is not None:
+                body.update({'provider:network_type': 'vlan', 'provider:physical_network': plan['fabric_physnet'],
+                             'provider:segmentation_id': vlan})
+            n = self.ensure(ctx, 'network', key,
+                            lambda: self.find('network', '/v2.0/networks', 'networks', pid, name=name, project_id=pid),
+                            lambda: self.call('POST', 'network', '/v2.0/networks', {'network': body}, pid)['network'])
+            if vlan is not None:
+                require(n.get('provider:segmentation_id') == vlan and n.get('provider:physical_network') == plan['fabric_physnet'],
+                        'Neutron no confirmó el circuito VLAN solicitado', 503)
+            subnet = self.ensure(ctx, 'subnet', key,
+                                 lambda: self.find('network', '/v2.0/subnets', 'subnets', pid, name=name, network_id=n['id']),
+                                 lambda: self.call('POST', 'network', '/v2.0/subnets', {'subnet': {
+                                     'name': name, 'network_id': n['id'], 'ip_version': 4, 'cidr': cidr,
+                                     'gateway_ip': None, 'enable_dhcp': False}}, pid)['subnet'])
+            return n['id'], subnet['id']
+
+        cidrs = {n['name']: n.get('cidr') or filler[n['name']] for n in plan['networks']}
+        circuit_ips = {}
+        if plan.get('fabric'):
+            # Una red provider por NIC: br-int del compute nunca tiene dos VMs en la misma red.
+            # Neutron ve subredes independientes: reservar IPs únicas en el segmento lógico completo.
+            reserved = {name: {nic['ip'] for vm in plan['vms'] for nic in vm['nics']
+                               if nic['network'] == name and 'ip' in nic} for name in cidrs}
+            candidates_by_net = {name: (str(ip) for ip in ipaddress.ip_network(cidr).hosts()) for name, cidr in cidrs.items()}
+            external_subnet = None
+            if external:
+                candidates = self.call('GET', 'network', '/v2.0/subnets?network_id=' + external)['subnets']
+                available = [s for s in candidates if s.get('enable_dhcp') and ':' not in s['cidr']]
+                require(len(available) == 1, 'Se requiere una subred IPv4 con DHCP en la red externa', 503)
+                external_subnet = available[0]
+            for vm in plan['vms']:
+                for nic in vm['nics']:
+                    v = nic['wire_vlan']
+                    key = nic['network']
+                    address = nic.get('ip') or next((ip for ip in candidates_by_net[key] if ip not in reserved[key]), None)
+                    require(address, 'Sin IP disponible en ' + key, 409)
+                    circuit_ips[v] = address
+                    subnets[v] = network('c%d' % v, cidrs[key], v)
+                if vm.get('internet'):
+                    v = vm['external_vlan']
+                    subnets[v] = network('c%d' % v, external_subnet['cidr'], v)
+            fabric.connect(self.backend, plan)
+        else:
+            for key, cidr in cidrs.items():
+                subnets[key] = network(key, cidr)
+        ctx.event('OS_NETWORKS', ', '.join(sorted(cidrs)))
+        if filler:
+            ctx.event('OS_UNADDRESSED', ', '.join('%s (relleno %s)' % kv for kv in sorted(filler.items())))
 
         def server(vm):
             ports, inet_mtu, unaddressed = [], None, []
             if vm.get('internet'):  # primera NIC: DHCP de la red provider, ruta por defecto y acceso por la VPN
-                port = self.ensure(ctx, 'port', '%s.%s' % (vm['name'], EXTERNAL_NIC),
-                                   lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=vm['inet_os_name'], network_id=external),
-                                   lambda: self.call('POST', 'network', '/v2.0/ports', {'port': {
-                                       'name': vm['inet_os_name'], 'network_id': external, 'port_security_enabled': True,
-                                       'security_groups': [group]}}, pid)['port'])
+                inet_net = external
+                inet_body = {'name': vm['inet_os_name'], 'port_security_enabled': True, 'security_groups': [group]}
+                if plan.get('fabric'):
+                    # IPAM y DHCP siguen en la red external compartida. La reserva no se conecta a Nova.
+                    lease_key = vm['name'] + '..external'
+                    lease_name = 'g5-%s-%s' % (ctx.sid[:8], lease_key)
+                    lease = self.ensure(ctx, 'port', lease_key,
+                                        lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=lease_name,
+                                                          network_id=external),
+                                        lambda: self.call('POST', 'network', '/v2.0/ports', {'port': {
+                                            'name': lease_name, 'network_id': external, 'fixed_ips': [
+                                                {'subnet_id': external_subnet['id']}]}}, pid)['port'])
+                    inet_net, subnet_id = subnets[vm['external_vlan']]
+                    inet_body.update(mac_address=lease['mac_address'], fixed_ips=[
+                        {'ip_address': lease['fixed_ips'][0]['ip_address'], 'subnet_id': subnet_id}])
+                inet_body['network_id'] = inet_net
+                inet_key = vm['name'] + ('..inet' if 'project_marker' in plan else '.inet')
+                port = self.ensure(ctx, 'port', inet_key,
+                                   lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=vm['inet_os_name'], network_id=inet_net),
+                                   lambda: self.call('POST', 'network', '/v2.0/ports', {'port': inet_body}, pid)['port'])
+                if plan.get('fabric'):
+                    require(port['mac_address'].lower() == lease['mac_address'].lower() and
+                            any(f['ip_address'] == lease['fixed_ips'][0]['ip_address'] for f in port['fixed_ips']),
+                            'El puerto de Internet no coincide con su reserva DHCP', 503)
                 ports.append({'port': port['id']})
-                if self.os_cfg.get('external_mtu', 1400) and port.get('mac_address'):
+                if plan.get('fabric') or (self.os_cfg.get('external_mtu', 1400) and port.get('mac_address')):
                     inet_mtu = (port['mac_address'].lower(), int(self.os_cfg.get('external_mtu', 1400)))
             for nic in vm['nics']:
-                net_id, subnet_id = subnets[nic['network']]
+                net_id, subnet_id = subnets[nic.get('wire_vlan', nic['network'])]
                 body = {'port': {'name': nic['os_name'], 'network_id': net_id, 'port_security_enabled': False}}
-                if 'ip' in nic:
-                    body['port']['fixed_ips'] = [{'subnet_id': subnet_id, 'ip_address': nic['ip']}]
+                address = circuit_ips.get(nic.get('wire_vlan'), nic.get('ip'))
+                if address:
+                    body['port']['fixed_ips'] = [{'subnet_id': subnet_id, 'ip_address': address}]
                 port = self.ensure(ctx, 'port', '%s.%s' % (vm['name'], nic['network']),
                                    lambda: self.find('network', '/v2.0/ports', 'ports', pid, name=nic['os_name'], network_id=net_id),
                                    lambda: self.call('POST', 'network', '/v2.0/ports', body, pid)['port'])
                 ports.append({'port': port['id']})
                 if nic['network'] in filler and port.get('mac_address'):
                     unaddressed.append(port['mac_address'].lower())
+            if vm.get('ovs_bridge'):
+                require(len(unaddressed) == len(vm['nics']), 'Falta la MAC de un puerto OVS', 503)
             image, flavor = self.image(vm['image']), self.flavor(vm)
             # Con credenciales: cloud-init crea el usuario y, desde el config drive, configura todas las NICs
             # (sin router no hay servicio de metadatos; la IP fija del puerto llega en network_data.json).
             # La NIC de salida usa un MTU menor que el anunciado por la red provider (ver guest.mtu_commands).
-            boot = ({'user_data': user_data(plan['guest'], vm['name'], inet_mtu, unaddressed), 'config_drive': True}
+            boot = ({'user_data': user_data(plan['guest'], vm['name'], inet_mtu, unaddressed,
+                                              vm.get('ovs_bridge', False), vm.get('internet', False)), 'config_drive': True}
                     if plan.get('guest') else {})
             created = self.ensure(ctx, 'server', vm['name'],
                                   lambda: self.find('compute', '/servers', 'servers', pid, name='^%s$' % vm['os_name']),
@@ -410,6 +520,8 @@ class OpenStackDriver(ProviderDriver):
             active = self.wait_server(ctx, created['id'], pid, 'ACTIVE')
             ctx.store.resource_set(ctx.sid, 'server', vm['name'], 'ACTIVE')
             placed[vm['name']] = active.get('OS-EXT-SRV-ATTR:host', '?')
+            if plan.get('fabric'):
+                require(placed[vm['name']] == vm['host'], 'Nova ubicó la VM fuera del circuito reservado', 503)
         placed = {}
         self.parallel([lambda vm=vm: server(vm) for vm in plan['vms']])
         detail = ', '.join('%s@%s' % (k, placed[k]) for k in sorted(placed))
@@ -452,15 +564,22 @@ class OpenStackDriver(ProviderDriver):
         pid = project and project['external_id']
         if not pid:
             found = self.find('identity', '/projects', 'projects', name=plan['project_name'], domain_id=self.domain_id())
-            pid = found and found['id']
+            pid = found['id'] if found and self.owns_project(plan, found) else None
         if not pid:
+            fabric.disconnect(self.backend, plan)
             for key, row in journal.items():
                 ctx.store.resource_set(ctx.sid, key[0], key[1], 'DELETED')
             return
+        port_names = {v['name'] + '.' + n['network']: n['os_name'] for v in plan['vms'] for n in v['nics']}
+        for vm in plan['vms']:
+            if vm.get('internet'):
+                port_names[vm['name'] + ('..inet' if 'project_marker' in plan else '.inet')] = vm['inet_os_name']
+                key = vm['name'] + '..external'
+                port_names[key] = 'g5-%s-%s' % (ctx.sid[:8], key)
         lookups = {
             'server': lambda r: self.find('compute', '/servers', 'servers', name='^g5-%s-%s$' % (ctx.sid[:8], r['name']),
                                           all_tenants=1, project_id=pid),
-            'port': lambda r: self.find('network', '/v2.0/ports', 'ports', name='g5-%s-%s' % (ctx.sid[:8], r['name'].replace('.', '-')), project_id=pid),
+            'port': lambda r: self.find('network', '/v2.0/ports', 'ports', name=port_names[r['name']], project_id=pid),
             'subnet': lambda r: self.find('network', '/v2.0/subnets', 'subnets', name='g5-%s-%s' % (ctx.sid[:8], r['name']), project_id=pid),
             'network': lambda r: self.find('network', '/v2.0/networks', 'networks', name='g5-%s-%s' % (ctx.sid[:8], r['name']), project_id=pid),
             'security_group': lambda r: self.find('network', '/v2.0/security-groups', 'security_groups',
@@ -471,6 +590,8 @@ class OpenStackDriver(ProviderDriver):
                  'subnet': ('network', '/v2.0/subnets/'), 'network': ('network', '/v2.0/networks/'),
                  'project': ('identity', '/projects/')}
         for kind in DELETE_ORDER:
+            if kind == 'network':
+                fabric.disconnect(self.backend, plan)
             rows = [r for (k, _), r in journal.items() if k == kind and r['status'] != 'DELETED']
             if kind == 'project' and not rows:
                 rows = [{'kind': 'project', 'name': plan['project_name'], 'external_id': pid}]

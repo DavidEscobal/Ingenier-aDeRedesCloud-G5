@@ -20,6 +20,8 @@ class CompileError(ValueError):
 def compile_spec(topology: Topology, provider: str, name: str | None = None):
     if provider not in PROVIDERS:
         raise CompileError(f"Proveedor {provider} aún no disponible para topologías editables")
+    if topology.cluster and provider != topology.cluster:
+        raise CompileError("El proveedor debe coincidir con el clúster de la topología")
     problems = topology.check_catalog()
     isolated = [n.id for n in topology.nodes if not any(n.id in s.members for s in topology.segments)]
     if isolated:
@@ -42,11 +44,11 @@ def compile_spec(topology: Topology, provider: str, name: str | None = None):
             for m in s.members:
                 nics[m].append({"network": s.id})
             continue
-        networks.append({"name": s.id, "cidr": f"192.168.{k}.0/24", "dhcp": True})
+        networks.append({"name": s.id, "cidr": f"192.168.{k}.0/24", "dhcp": False})
         for m in s.members:
             nics[m].append({"network": s.id, "ip": f"192.168.{k}.{10 + index[m]}"})
     vms = [{"name": n.id, "image": n.image, "vcpus": n.vcpus, "memory_mb": n.memory_mb,
             "disk_gb": int(n.disk_gb) if float(n.disk_gb).is_integer() else n.disk_gb,  # 2.5 solo si hace falta
-            "nics": nics[n.id], **({"internet": True} if n.internet else {}), **({"host": n.host} if n.host else {})}
+            "nics": nics[n.id], **({"ovs_bridge": True} if n.ovs_bridge else {}), **({"internet": True} if n.internet else {}), **({"host": n.host} if n.host else {})}
            for n in topology.nodes]
     return {"name": name or topology.name, "provider": provider, "networks": networks, "vms": vms}

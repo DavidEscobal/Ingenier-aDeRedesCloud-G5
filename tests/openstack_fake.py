@@ -135,7 +135,8 @@ class FakeCloud:
     def add_external(self):
         """Red provider compartida `external` (flat/physnet0) con la subred 10.60.10.0/24 y DHCP, como en el clúster."""
         self.networks['net-ext'] = {'id': 'net-ext', 'name': 'external', 'project_id': 'p-cloud-admin', 'shared': True,
-                                    'router:external': True, 'provider:network_type': 'flat', 'status': 'ACTIVE'}
+                                    'router:external': True, 'provider:network_type': 'flat',
+                                    'provider:physical_network': 'physnet0', 'status': 'ACTIVE'}
         self.subnets['sub-ext'] = {'id': 'sub-ext', 'name': 'external_subnet', 'network_id': 'net-ext',
                                    'project_id': 'p-cloud-admin', 'cidr': '10.60.10.0/24', 'enable_dhcp': True}
 
@@ -203,6 +204,10 @@ class FakeCloud:
         return 404, {'error': 'keystone'}
 
     def neutron(self, method, rest, query, body, project):
+        if rest == ['agents'] and method == 'GET':
+            return 200, {'agents': [dict(host=h, alive=True, admin_state_up=True, configurations={
+                'bridge_mappings': {'physnet1': 'br-vlan', **({'physnet0': 'br-provider'} if h == 'headnode' else {})}})
+                for h in self.hosts + ['headnode']]}
         tables = {'networks': self.networks, 'subnets': self.subnets, 'ports': self.ports,
                   'security-groups': self.security_groups, 'security-group-rules': self.security_group_rules}
         table = tables[rest[0]]
@@ -218,7 +223,12 @@ class FakeCloud:
                 return 404, {'NeutronError': {'message': 'grupo inexistente'}}
             if kind == 'port':
                 if item.get('fixed_ips'):
-                    ip = item['fixed_ips'][0]['ip_address']
+                    allocation = item['fixed_ips'][0]
+                    if 'ip_address' not in allocation:
+                        import ipaddress
+                        subnet = self.subnets[allocation['subnet_id']]
+                        allocation['ip_address'] = str(ipaddress.ip_network(subnet['cidr'])[10 + len(self.ports)])
+                    ip = allocation['ip_address']
                     if any(f['ip_address'] == ip for p in self.ports.values() if p['network_id'] == item['network_id'] for f in p['fixed_ips']):
                         return 409, {'NeutronError': {'message': 'IP en uso'}}
                 elif any(sn['network_id'] == item['network_id'] for sn in self.subnets.values()):
@@ -226,7 +236,7 @@ class FakeCloud:
                 else:
                     item['fixed_ips'] = []
                 item['device_id'] = ''
-                item['mac_address'] = 'fa:16:3e:00:%02x:%02x' % divmod(len(self.ports) + 1, 256)
+                item.setdefault('mac_address', 'fa:16:3e:00:%02x:%02x' % divmod(len(self.ports) + 1, 256))
             table[item['id']] = item
             return 201, {kind: item}
         if method == 'DELETE':

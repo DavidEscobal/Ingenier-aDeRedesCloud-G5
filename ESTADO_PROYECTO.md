@@ -1,6 +1,16 @@
 # ESTADO DEL PROYECTO — PUCP Private Cloud Orchestrator G5
 
-> **Leer primero en cada sesión nueva.** Última actualización local: 2026-11-20.
+> **Leer primero en cada sesión nueva.** Última actualización local: 2026-11-21.
+
+## 2026-11-21 — Red central por clúster y VM switch (implementación local)
+
+- El editor vincula cada borrador con Linux u OpenStack y ofrece servidores del clúster al seleccionar una VM. El usuario escribe el nombre del slice. En altas nuevas de OpenStack ese nombre identifica al proyecto Keystone. El diario conserva el UUID, los IDs de recursos y una marca de propiedad para recuperación.
+- El platform-manager de fase 2 exige un inventario privado de circuitos antes de admitir nuevos slices. Cada NIC reserva su VLAN de transporte, incluso entre VMs del mismo servidor. El agente de ovs1 (Linux) u ovs2 (OpenStack) une los extremos por segmento y los devuelve a cuarentena al borrar. Los planes existentes conservan su transporte.
+- En Linux el gateway reserva DHCP para la NIC primaria de las VMs autorizadas. En OpenStack los circuitos internos se crean sin DHCP. Solo la VM con Internet recibe acceso al segmento externo. Una IP fija en Neutron es una reserva de IPAM. La prueba de DHCP del laboratorio requiere observar las ofertas en los invitados.
+- `templates/ex2-vm4-ovs.topology.json` se importa desde Topologías. VM4 configura un bridge OVS en Ubuntu con sus tres enlaces internos sin IP y mantiene una NIC separada de Internet. VM5 también dispone de salida. Los alumnos configuran las IP del ejercicio en las interfaces de VM1, VM3 y VM5.
+- El mapa VNRT del equipo está en `config/fase2-links.json`. Enlaces 2–5: server1–4 a ovs1; enlaces 7–9: worker1–3 a ovs2; enlace 6: headnode a ovs2. La celda MPLink2 del enlace 17 no contiene una MAC válida. El agente resuelve los nombres de NIC por la MAC física y rechaza identidades ambiguas. El inventario de Neutron en `docs/evidencias/F0/inventario_openstack_20261103.json` documenta VLAN de tenant sobre physnet1/br-vlan y red external flat sobre physnet0/br-provider en el headnode.
+- `scripts/plan_fase2_fabric.py --help` genera fragmentos de configuración con las MAC del mapa y rangos VLAN asignados por el operador. `g5.manage circuit_plan` muestra en cada OVS qué puertos y VLAN cambiaría el bootstrap. El bootstrap central prepara patches y limita los VID de los circuitos al uplink correspondiente en los bridges existentes. Para Internet de OpenStack se admite un circuito permanente por el enlace 6 al headnode. Debe conectarse allí al dominio flat de external. Los enlaces de gateway 25/26 no se presuponen accesos directos al DHCP.
+- Verificación final local: 154 pruebas del núcleo, 70 de microservicios y 4 del visor web aprobadas; contratos OpenAPI al día, compilación de producción y recorrido en Chrome con datos de prueba. Pendientes de laboratorio: asignación exclusiva de VID, acceso de servicio a ambos OVS, revisión del plan OVSDB, conexión flat en el headnode y pruebas con capturas para ambos proveedores. Las conexiones SSH de solo lectura a app y headnode agotaron el tiempo de espera desde este entorno. Activar el nuevo platform-manager antes de preparar los circuitos impide altas nuevas.
 
 ## 2026-11-20 — Pruebas de microservicios en GitHub Actions
 

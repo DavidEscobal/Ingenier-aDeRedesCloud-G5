@@ -119,7 +119,13 @@ class GeneratorTests(unittest.TestCase):
         auto = compile_spec(pinned_ok := generate("lineal", 2), "auto")             # LAB7: modo automático
         self.assertEqual(auto["provider"], "auto")
         pinned_ok.nodes[0].host = "worker1"; pinned_ok.nodes[1].host = "server2"
-        self.assertEqual([v["host"] for v in compile_spec(pinned_ok, "auto")["vms"]], ["worker1", "server2"])
+        with self.assertRaises(CompileError):
+            compile_spec(pinned_ok, "auto")
+        bound = generate("lineal", 2)
+        bound.cluster = "linux"
+        with self.assertRaises(CompileError):
+            compile_spec(bound, "openstack")
+        self.assertTrue(all(not n["dhcp"] for n in compile_spec(bound, "linux")["networks"]))
 
     def test_combining_renames_collisions_and_links_both_parts(self):
         merged = combine(generate("anillo", 3), generate("estrella", 4), connect=("n1", "n1"))
@@ -128,6 +134,21 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(len(set(ids)), 7, "sin nombres repetidos")
         self.assertEqual(merged.segments[-1].members, ["n1", "n1-2"], "enlace entre ambas partes")
         validate_spec(compile_spec(merged, "openstack"), CORE_CONFIG)
+
+    def test_six_vm_ovs_topology(self):
+        doc = Topology.model_validate_json((Path(__file__).resolve().parents[2] /
+                                            "templates/ex2-vm4-ovs.topology.json").read_text(encoding="utf-8"))
+        for cluster in ("openstack", "linux"):
+            doc.cluster = cluster
+            spec = compile_spec(doc, cluster, "Ex2_G5_demo")
+            bridge, = [vm for vm in spec["vms"] if vm.get("ovs_bridge")]
+            self.assertEqual(bridge["name"], "vm4")
+            self.assertEqual({x["network"] for x in bridge["nics"]}, {"l14", "l34", "l45"})
+            self.assertEqual({vm["name"] for vm in spec["vms"] if vm.get("internet")}, {"vm4", "vm5"})
+            self.assertTrue(all("host" not in vm for vm in spec["vms"]))
+        doc.segments[2].addressed = True
+        with self.assertRaisesRegex(CompileError, "sin IP"):
+            compile_spec(doc, "linux")
 
 
 class TopologyServiceTests(unittest.TestCase):

@@ -87,6 +87,8 @@ def _free(base, wanted):
 
 def combine(base, add, connect=None, offset=None):
     """Agrega `add` a `base`: renombra lo que choque, desplaza posiciones y opcionalmente enlaza dos nodos."""
+    if not set(base.compatible_clusters()).intersection(add.compatible_clusters()):
+        raise ValueError("Las topologías pertenecen a clústeres incompatibles")
     used = {n.id for n in base.nodes} | {s.id for s in base.segments}
     rename = {}
     for n in add.nodes:
@@ -104,8 +106,8 @@ def combine(base, add, connect=None, offset=None):
         sid = _free(used, "-".join(members) if s.kind == "link" else s.id)
         used.add(sid)
         p = Position(x=s.position.x + dx, y=s.position.y) if s.position else None
-        segments.append(Segment(id=sid, kind=s.kind, members=members, position=p))
+        segments.append(Segment(id=sid, kind=s.kind, members=members, position=p, addressed=s.addressed))
     if connect:
         a, b = connect[0], rename.get(connect[1], connect[1])
         segments.append(Segment(id=_free(used, f"{a}-{b}"), kind="link", members=[a, b]))
-    return Topology(name=base.name, description=base.description, nodes=nodes, segments=segments)
+    return Topology(cluster=base.cluster or add.cluster, name=base.name, description=base.description, nodes=nodes, segments=segments)

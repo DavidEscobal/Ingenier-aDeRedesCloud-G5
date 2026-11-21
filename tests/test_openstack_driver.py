@@ -57,6 +57,68 @@ class OpenStackFixture(unittest.TestCase):
 
 
 class OpenStackDriverTests(OpenStackFixture):
+    def test_switch_guest_receives_only_internal_macs(self):
+        spec = json.loads((ROOT / 'templates/ovs-15b.json').read_text())
+        self.cloud.images.append(dict(id='img-ubuntu', name=spec['vms'][0]['image'], status='active'))
+        self.cloud.add_external()
+        spec['guest'] = {'username': 'alumno', 'password_hash': '$6$testsalt$' + 'b' * 86}
+        vm = next(v for v in spec['vms'] if v['name'] == 'vm4')
+        vm['ovs_bridge'] = True
+        row = self.run_job(self.create(spec))
+        self.assertEqual(row['status'], 'READY', row)
+        server = next(s for s in self.cloud.servers.values() if s['name'].endswith('-vm4'))
+        data = json.loads(base64.b64decode(server['user_data']).split(b'\n', 1)[1])
+        ports = [self.cloud.ports[p] for p in server['ports']]
+        bridged = [c[-1] for c in data['runcmd'] if c[0] == 'sh']
+        self.assertEqual(bridged, [p['mac_address'] for p in ports if p['network_id'] != 'net-ext'])
+        self.assertEqual(len(bridged), 3)
+        self.assertIn('openvswitch-switch', data['packages'])
+
+    def test_central_circuits_same_worker_with_external_dhcp(self):
+        self.cfg['require_central_fabric'] = True
+        spec = copy.deepcopy(LINEAL)
+        for vm in spec['vms']:
+            vm['host'] = 'worker1'
+        spec['vms'][1]['internet'] = True
+        self.cloud.add_external()
+        with self.assertRaisesRegex(Fault, 'inventario'):
+            self.create(spec)
+        self.cfg['central_fabric'] = {'openstack': {
+            'name': 'ovs2', 'role': 'switch', 'physnet': 'testnet', 'external_tag': 700,
+            'segment_range': [501, 510], 'external_port': 'test-ext',
+            'circuits': [dict(host='worker1', uplink='test-trunk', port='p%d' % v, vlan=v) for v in range(701, 706)]}}
+        slots = self.cfg['central_fabric']['openstack']['circuits']
+        last = slots.pop()
+        with self.assertRaisesRegex(Fault, 'circuito libre'):
+            self.create(spec)
+        self.assertFalse(self.store.rows('SELECT * FROM fabric_leases'))
+        slots.append(last)
+        with self.assertRaisesRegex(Fault, 'physnet'):
+            self.driver.preflight(spec)
+        self.cfg['central_fabric']['openstack']['physnet'] = 'physnet1'
+        self.driver.preflight(spec)
+        row = self.run_job(self.create(spec))
+        self.assertEqual(row['status'], 'READY', self.store.rows('SELECT * FROM events'))
+        attachments = row['plan']['fabric']['attachments']
+        self.assertEqual([a['segment'] for a in attachments], [501, 501, 502, 700, 502])
+        self.assertEqual(len({a['vlan'] for a in attachments}), 5)
+        nets = [n for n in self.cloud.networks.values() if n['id'] != 'net-ext']
+        self.assertEqual({n['provider:segmentation_id'] for n in nets}, {a['vlan'] for a in attachments})
+        self.assertTrue(all(n['provider:physical_network'] == 'physnet1' for n in nets))
+        self.assertTrue(all(not n['enable_dhcp'] for n in self.cloud.subnets.values() if n['id'] != 'sub-ext'))
+        [reservation] = [p for p in self.cloud.ports.values() if p['network_id'] == 'net-ext']
+        self.assertFalse(reservation['device_id'])
+        matches = [p for p in self.cloud.ports.values() if p['device_id'] and p['mac_address'] == reservation['mac_address']]
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]['fixed_ips'][0]['ip_address'], reservation['fixed_ips'][0]['ip_address'])
+        self.assertTrue(any(node == 'ovs2' and action == 'circuit_connect' for node, action, _ in self.app.backend.calls))
+        self.store.mutate(row['id'], 'profesor', True, 'central-delete', 'delete')
+        self.app.engine.process_one()
+        self.assertEqual(self.store.get_slice(row['id'])['status'], 'DELETED')
+        self.assertFalse(self.store.rows('SELECT * FROM fabric_leases'))
+        self.assertTrue(any(node == 'ovs2' and action == 'circuit_disconnect' for node, action, _ in self.app.backend.calls))
+        self.assertEqual(set(self.cloud.networks), {'net-ext'})
+
     def test_hypervisors_inventory_with_zones(self):
         rows = self.driver.hypervisors()
         self.assertEqual([r['node'] for r in rows], ['worker1', 'worker2', 'worker3'])
@@ -166,10 +228,10 @@ class OpenStackDriverTests(OpenStackFixture):
         data = {n: json.loads(base64.b64decode(s['user_data']).decode().split('\n', 1)[1]) for n, s in servers.items()}
         [command] = data['vm1']['bootcmd']
         mac = self.cloud.ports[servers['vm1']['ports'][0]]['mac_address']
-        self.assertEqual(command[:2], ['sh', '-c'])
-        self.assertIn('"%s"' % mac, command[2])
-        self.assertIn('mtu 1400', command[2])
-        self.assertIn('use-mtu: false', command[2])
+        self.assertEqual(command[:2], ['python3', '-c'])
+        self.assertEqual(command[3:], [mac, '1400'])
+        self.assertIn("config['dhcp4'] = True", command[2])
+        self.assertIn("['use-mtu'] = False", command[2])
         self.assertNotIn('bootcmd', data['vm2'], 'sin NIC de salida no se toca el MTU')
 
     def test_size_without_flavor_is_rejected_before_admission(self):
@@ -251,6 +313,33 @@ class OpenStackDriverTests(OpenStackFixture):
         nets = [{'name': 'a'}, {'name': 'b', 'cidr': '10.255.0.16/28'}, {'name': 'c'}]
         self.assertEqual(placeholder_cidrs(nets), {'a': '10.255.0.0/28', 'c': '10.255.0.32/28'})
 
+    @unittest.skipUnless(importlib.util.find_spec('yaml'), 'PyYAML se incluye en las imágenes Ubuntu')
+    def test_external_netplan_enables_dhcp_only_for_reserved_mac(self):
+        from unittest import mock
+        import yaml
+        from g5.guest import mtu_commands
+        external_mac = 'fa:16:3e:00:01:01'
+        with tempfile.TemporaryDirectory() as tmp:
+            sysnet, netplan = Path(tmp, 'net'), Path(tmp, 'netplan')
+            sysnet.mkdir(); netplan.mkdir()
+            nic = sysnet / 'ens3'
+            nic.mkdir()
+            (nic / 'address').write_text(external_mac)
+            path = netplan / '50-cloud-init.yaml'
+            data = {'addresses': ['192.168.1.11/24'], 'dhcp4': False}
+            path.write_text(yaml.safe_dump({'network': {'version': 2, 'ethernets': {
+                'internal': data, 'port0': {'match': {'macaddress': external_mac}, 'addresses': ['10.60.10.11/24']}}}}))
+            command = mtu_commands(external_mac, 1400)
+            script = command[2].replace('/sys/class/net', sysnet.as_posix()).replace('/etc/netplan', netplan.as_posix())
+            with mock.patch('sys.argv', ['guest'] + command[3:]), mock.patch('subprocess.run') as run:
+                exec(compile(script, 'internet-netplan', 'exec'), {})
+            result = yaml.safe_load(path.read_text())['network']['ethernets']
+            self.assertEqual(result['internal'], data)
+            self.assertTrue(result['port0']['dhcp4'])
+            self.assertNotIn('addresses', result['port0'])
+            self.assertEqual(result['port0']['mtu'], 1400)
+            run.assert_called_with(['networkctl', 'reconfigure', 'ens3'], check=True)
+
     def test_validation_is_provider_specific(self):
         spec = validate(LINEAL, self.cfg)
         self.assertEqual(spec['networks'][0]['dhcp'], False)
@@ -268,7 +357,7 @@ class OpenStackDriverTests(OpenStackFixture):
         row = self.run_job(job)
         self.assertEqual((row['status'], row['provider']), ('READY', 'openstack'))
         self.assertEqual(self.counts(), (2, 2, 2, 4, 3))
-        project = next(p for p in self.cloud.projects.values() if p['name'] == 'g5-' + job['slice_id'])
+        project = next(p for p in self.cloud.projects.values() if p['name'] == LINEAL['name'])
         self.assertTrue(all(s['project_id'] == project['id'] and s['status'] == 'ACTIVE' for s in self.cloud.servers.values()))
         self.assertIn((project['id'], 'u-cloud-admin', 'r-admin'), self.cloud.assignments)
         self.assertTrue(all(n['port_security_enabled'] is False for n in self.cloud.networks.values()))
@@ -284,6 +373,14 @@ class OpenStackDriverTests(OpenStackFixture):
         self.assertEqual(self.counts(), (1, 0, 0, 0, 0))
         self.assertIn('p-cloud-admin', self.cloud.projects)
         self.assertTrue(all(r['status'] == 'DELETED' for r in self.store.resources(job['slice_id'])))
+
+    def test_collision_preserves_foreign_project_during_rollback(self):
+        self.cloud.projects['foreign'] = {'id': 'foreign', 'name': LINEAL['name'], 'domain_id': 'd-cloud'}
+        row = self.run_job(self.create())
+        self.assertEqual(row['status'], 'FAILED_CLEANED')
+        self.assertIn('foreign', self.cloud.projects)
+        self.assertFalse(self.cloud.servers)
+        self.assertFalse(any(p == 'foreign' for p, _, _ in self.cloud.assignments))
 
     def test_replayed_deploy_does_not_duplicate_resources(self):
         job = self.create()

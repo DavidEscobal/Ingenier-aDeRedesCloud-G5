@@ -17,6 +17,7 @@ export default function TopologyEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [name, setName] = useState('mi-topologia')
+  const [cluster, setCluster] = useState('openstack')
   const [description, setDescription] = useState('')
   const [draft, setDraft] = useState(null) // {id, version}
   const [catalog, setCatalog] = useState(null)
@@ -41,6 +42,7 @@ export default function TopologyEditor() {
         const flow = toFlow(d.topology)
         setNodes(flow.nodes)
         setEdges(flow.edges)
+        setCluster(d.topology.cluster || '')
         setName(d.topology.name)
         setDescription(d.topology.description || '')
         setDraft({ id: d.id, version: d.version })
@@ -60,7 +62,15 @@ export default function TopologyEditor() {
   }
   useEffect(() => { setRenameValue(selectedNode?.id || '') }, [selectedNode?.id])
 
-  const topology = useMemo(() => fromFlow(nodes, edges, name, description), [nodes, edges, name, description])
+  const topology = useMemo(() => ({ ...fromFlow(nodes, edges, name, description), cluster }), [nodes, edges, name, description, cluster])
+  const availableHosts = catalog?.hosts?.[cluster] || []
+  function changeCluster(value) {
+    setCluster(value)
+    const allowed = catalog?.hosts?.[value] || []
+    setNodes((ns) => ns.map((n) => n.data.host && !allowed.includes(n.data.host)
+      ? { ...n, data: { ...n.data, host: '' } } : n))
+    changed()
+  }
   const problems = useMemo(() => localProblems(topology), [topology])
   const changed = () => { setDirty(true); setNotice('') }
 
@@ -111,7 +121,7 @@ export default function TopologyEditor() {
     setBusy(true)
     setError('')
     try {
-      const current = fromFlow(nodes, edges, name, description)
+      const current = topology
       const empty = current.nodes.length === 0
       const prefix = mode === 'replace' || empty ? 'n'
         : PREFIXES.find((p) => !current.nodes.some((x) => x.id === `${p}1`)) || 'x'
@@ -209,6 +219,12 @@ export default function TopologyEditor() {
 
       <div className="editor-grid">
         <aside className="panel side">
+          <label>Cluster
+            <select value={cluster} disabled={!catalog} onChange={(e) => changeCluster(e.target.value)}>
+              {!cluster && <option value="">Selecciona el clúster del borrador</option>}
+              <option value="linux">Linux</option><option value="openstack">OpenStack</option>
+            </select>
+          </label>
           <label>Nombre<input value={name} onChange={(e) => { setName(e.target.value); changed() }} /></label>
           <label>Descripción<input value={description} maxLength={300} onChange={(e) => { setDescription(e.target.value); changed() }} /></label>
           <h3>Topologías predefinidas</h3>
@@ -260,14 +276,15 @@ export default function TopologyEditor() {
                       onChange={(e) => updateSelected({ internet: e.target.checked })} />
                     Salida a Internet <small className="muted">(SSH e ICMP desde fuera)</small>
                   </label>
+                  <label className="checkbox">
+                    <input type="checkbox" checked={!!selectedNode.data.ovs_bridge}
+                      onChange={(e) => updateSelected({ ovs_bridge: e.target.checked })} />
+                    Usar como switch OVS <small className="muted">(Ubuntu, enlaces de datos sin IP)</small>
+                  </label>
                   <label>Servidor
                     <select value={selectedNode.data.host || ''} onChange={(e) => updateSelected({ host: e.target.value })}>
                       <option value="">Automático</option>
-                      {Object.entries(catalog?.hosts || {}).map(([provider, list]) => (
-                        <optgroup key={provider} label={provider === 'linux' ? 'Linux' : 'OpenStack'}>
-                          {list.map((h) => <option key={h} value={h}>{h}</option>)}
-                        </optgroup>
-                      ))}
+                      {availableHosts.map((h) => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </label>
                 </>

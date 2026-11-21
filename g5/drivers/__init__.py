@@ -8,7 +8,7 @@ VALIDATORS = {'linux': validate_linux, 'openstack': validate_openstack}
 
 def default_drivers(config, backend=None):
     # La sesión OpenStack se abre recién al primer uso: sin sección `openstack` el driver no se usa.
-    return {'linux': LinuxDriver(config, backend), 'openstack': OpenStackDriver(config)}
+    return {'linux': LinuxDriver(config, backend), 'openstack': OpenStackDriver(config, backend=backend)}
 
 
 def validate(spec, config):

@@ -755,6 +755,11 @@
             "minimum": 1.0,
             "title": "Disk Gb"
           },
+          "ovs_bridge": {
+            "type": "boolean",
+            "title": "Ovs Bridge",
+            "default": false
+          },
           "internet": {
             "type": "boolean",
             "title": "Internet",
@@ -868,6 +873,21 @@
       },
       "Topology": {
         "properties": {
+          "cluster": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "linux",
+                  "openstack"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster"
+          },
           "schema_version": {
             "type": "integer",
             "const": 1,

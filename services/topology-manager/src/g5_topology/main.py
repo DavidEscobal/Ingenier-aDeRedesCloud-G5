@@ -262,9 +262,16 @@ def list_drafts(request: Request, user: User):
     return request.app.state.drafts.list(user.id)
 
 
+def bind_cluster(topology: Topology):
+    allowed = topology.compatible_clusters()
+    if not allowed:
+        raise unprocessable("Los servidores deben pertenecer al mismo clúster.")
+    return topology.model_copy(update={"cluster": "openstack" if "openstack" in allowed else allowed[0]})
+
+
 @app.post("/v1/drafts", response_model=Draft, status_code=201, tags=["drafts"])
 def create_draft(body: DraftWrite, request: Request, user: User):
-    return request.app.state.drafts.create(user.id, body.topology)
+    return request.app.state.drafts.create(user.id, bind_cluster(body.topology))
 
 
 @app.get("/v1/drafts/{draft_id}", response_model=Draft, tags=["drafts"])
@@ -274,7 +281,7 @@ def get_draft(draft_id: DraftId, request: Request, user: User):
 
 @app.put("/v1/drafts/{draft_id}", response_model=Draft, tags=["drafts"])
 def update_draft(draft_id: DraftId, body: DraftUpdate, request: Request, user: User):
-    return request.app.state.drafts.update(user.id, draft_id, body.topology, body.version)
+    return request.app.state.drafts.update(user.id, draft_id, bind_cluster(body.topology), body.version)
 
 
 @app.delete("/v1/drafts/{draft_id}", tags=["drafts"])
